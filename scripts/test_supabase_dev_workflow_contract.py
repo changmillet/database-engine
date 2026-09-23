@@ -453,6 +453,7 @@ def main() -> int:
         "supabase test db supabase/tests/20260525_embedding_backpressure_and_deferred_queue.sql",
         "supabase test db supabase/tests/20260728_embedding_queue_selector_plan_governance.sql",
         "supabase test db supabase/tests/20260923_derivative_scheduler_budget.sql",
+        "supabase test db supabase/tests/20260923_retired_sample_library_contract.sql",
         "supabase test db supabase/tests/20260923_derivative_scheduler_benchmark.sql",
         "supabase test db supabase/tests/20260923_derivative_scheduler_history_profile.sql",
         "supabase test db supabase/tests/20260921_foundry60_time_alias_v2_math.sql",
