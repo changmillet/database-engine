@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-09-28
-lastReviewedCommit: 44be788b3f1d78732a380a0617f843cb17c33819
-lastReviewedNote: "Reviewed Database #746: modern secret keys use apikey-only dispatch; legacy JWT transport and authority metadata remain preserved. Rollback-only real pg_net coverage, exact local generation, Main hotfix/Dev backmerge and separate hosted/integration gates remain aligned."
+lastReviewedCommit: "0a84eb5e14a85c45fb22609ce1ff8449735e9e11"
+lastReviewedNote: "Reviewed Database #748 published-reference review behavior against current Dev 0a84eb5e14a85c45fb22609ce1ff8449735e9e11. Repository ownership, schema-workspace generation, SQL-test, branch and validation contracts remain unchanged; migration, generated workspace and targeted regression evidence stay aligned with the current Dev migration chain."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -391,7 +391,10 @@ head, and apply exactly one three-field PostgREST PATCH. The pull-request-only
 Preview job skips forks and first validates the event base/head commits plus
 the exact deployable-input allowlist: config, migrations, root/extra seeds,
 and Functions. Workspace, tests, Auth templates, and docs are excluded. A
-zero-diff PR emits `required=false` and performs no hosted Preview work. Any
+zero-diff PR emits `required=false` and performs no hosted Preview work. The
+exact same-repository `dev -> main` promotion also emits `required=false`
+after exact commit/branch validation, reuses source-PR disposable Preview and
+persistent-Dev proof, and receives no Preview authority or mutation. Any other
 allowlisted change still fails when its access token, main-parent ref, or
 persistent-Dev ref is absent, then binds one
 successful check from the exact official Supabase App/head to a unique

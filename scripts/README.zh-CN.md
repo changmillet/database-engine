@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-09-28
-lastReviewedCommit: 44be788b3f1d78732a380a0617f843cb17c33819
-lastReviewedNote: "Reviewed Database #746: modern secret keys use apikey-only dispatch; legacy JWT transport and authority metadata remain preserved. Rollback-only real pg_net coverage, exact local generation, Main hotfix/Dev backmerge and separate hosted/integration gates remain aligned."
+lastReviewedCommit: "0a84eb5e14a85c45fb22609ce1ff8449735e9e11"
+lastReviewedNote: "Reviewed Database #748 published-reference review behavior against current Dev 0a84eb5e14a85c45fb22609ce1ff8449735e9e11. Repository ownership, schema-workspace generation, SQL-test, branch and validation contracts remain unchanged; migration, generated workspace and targeted regression evidence stay aligned with the current Dev migration chain."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -334,8 +334,11 @@ python scripts/test_resolve_migration_head.py
 三字段 PostgREST PATCH。pull-request-only Preview job 对 fork 跳过，并先验证事件
 base/head commit 和精确可部署 allowlist：config、migrations、根/附加 seed 与
 Functions；workspace、tests、Auth templates 和文档不在其中。零 diff PR 输出
-`required=false`，不执行 hosted Preview。任一 allowlist 变化仍要求 access token、
-main-parent ref 与 persistent-Dev ref；随后必须把准确 head 上来自官方 Supabase App
+`required=false`，不执行 hosted Preview。准确的同仓 `dev -> main` promote 也会在
+验证准确 commit/branch 后输出 `required=false`，复用源 PR disposable Preview 与
+persistent-Dev 证明，且不接收 Preview authority、不执行 hosted mutation。除此之外
+的任一 allowlist 变化仍要求 access token、main-parent ref 与 persistent-Dev ref；
+随后必须把准确 head 上来自官方 Supabase App
 的唯一成功 check，与 `branches list` 中按 Git branch、PR number、parent 匹配的唯一
 non-default/non-persistent BranchResponse 绑定。两个 ref 必须相等且都不同于 main/Dev，
 才能执行 Preview 的一次相同 PATCH 与回读。

@@ -12912,6 +12912,141 @@ $$;
 ALTER FUNCTION "api"."cmd_notification_send_validation_issue"("p_recipient_user_id" "uuid", "p_dataset_type" "text", "p_dataset_id" "uuid", "p_dataset_version" "text", "p_link" "text", "p_issue_codes" "text"[], "p_tab_names" "text"[], "p_issue_count" integer, "p_audit" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "api"."cmd_open_data_process_publish_batch"("p_items" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'pg_temp'
+    AS $_$
+declare
+  v_actor uuid := auth.uid();
+  v_input_count integer;
+  v_requested_count integer;
+  v_existing_count integer;
+  v_inserted_count integer;
+  v_valid_count integer;
+begin
+  if v_actor is null then
+    raise exception using errcode = '28000', message = 'authentication required';
+  end if;
+
+  if not exists (
+    select 1
+    from private.roles r
+    where r.user_id = v_actor
+      and r.team_id = '00000000-0000-0000-0000-000000000000'::uuid
+      and r.role::text = 'data_product_manager'
+  ) then
+    raise exception using errcode = '42501', message = 'data_product_manager role required';
+  end if;
+
+  if jsonb_typeof(p_items) is distinct from 'array' then
+    raise exception using errcode = '22023', message = 'p_items must be a JSON array';
+  end if;
+
+  v_input_count := jsonb_array_length(p_items);
+  if v_input_count < 1 or v_input_count > 100 then
+    raise exception using errcode = '22023', message = 'p_items must contain between 1 and 100 items';
+  end if;
+
+  if exists (
+    select 1
+    from jsonb_array_elements(p_items) item(value)
+    where jsonb_typeof(item.value) is distinct from 'object'
+      or jsonb_typeof(item.value -> 'id') is distinct from 'string'
+      or jsonb_typeof(item.value -> 'version') is distinct from 'string'
+      or not ((item.value ->> 'id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+      or not ((item.value ->> 'version') ~ '^\d{2}\.\d{2}\.\d{3}$')
+  ) then
+    raise exception using errcode = '22023', message = 'each item must contain a valid id and version';
+  end if;
+
+  select count(*)
+  into v_requested_count
+  from (
+    select distinct
+      (item.value ->> 'id')::uuid as process_id,
+      (item.value ->> 'version')::character(9) as process_version
+    from jsonb_array_elements(p_items) item(value)
+  ) requested;
+
+  -- Lock in a stable order so concurrent overlapping batches cannot invert locks.
+  perform p.id
+  from public.processes p
+  join (
+    select distinct
+      (item.value ->> 'id')::uuid as process_id,
+      (item.value ->> 'version')::character(9) as process_version
+    from jsonb_array_elements(p_items) item(value)
+  ) requested
+    on requested.process_id = p.id
+   and requested.process_version = p.version
+  order by p.id, p.version
+  for update of p;
+
+  select count(*)
+  into v_valid_count
+  from public.processes p
+  join (
+    select distinct
+      (item.value ->> 'id')::uuid as process_id,
+      (item.value ->> 'version')::character(9) as process_version
+    from jsonb_array_elements(p_items) item(value)
+  ) requested
+    on requested.process_id = p.id
+   and requested.process_version = p.version
+  where p.state_code = 100;
+
+  if v_valid_count <> v_requested_count then
+    raise exception using
+      errcode = '22023',
+      message = 'all requested Process versions must exist with state_code 100';
+  end if;
+
+  select count(*)
+  into v_existing_count
+  from private.open_data_process_publications publication
+  join (
+    select distinct
+      (item.value ->> 'id')::uuid as process_id,
+      (item.value ->> 'version')::character(9) as process_version
+    from jsonb_array_elements(p_items) item(value)
+  ) requested
+    using (process_id, process_version);
+
+  insert into private.open_data_process_publications (
+    process_id,
+    process_version,
+    published_by
+  )
+  select distinct
+    (item.value ->> 'id')::uuid,
+    (item.value ->> 'version')::character(9),
+    v_actor
+  from jsonb_array_elements(p_items) item(value)
+  order by 1, 2
+  on conflict (process_id, process_version) do nothing;
+
+  get diagnostics v_inserted_count = row_count;
+
+  return jsonb_build_object(
+    'ok', true,
+    'data', jsonb_build_object(
+      'inputCount', v_input_count,
+      'requestedCount', v_requested_count,
+      'publishedCount', v_inserted_count,
+      'alreadyPublishedCount', v_existing_count
+    )
+  );
+end;
+$_$;
+
+
+ALTER FUNCTION "api"."cmd_open_data_process_publish_batch"("p_items" "jsonb") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "api"."cmd_open_data_process_publish_batch"("p_items" "jsonb") IS 'Idempotently publishes 1-100 exact state-100 Process versions for Open Data. Does not change Process lifecycle state.';
+
+
+
 CREATE OR REPLACE FUNCTION "api"."cmd_portal_lcia_projection_finalize_publication_v1"("p_projection_id" "uuid", "p_lcia_result_publication_id" "uuid", "p_package_version" "text", "p_package_result_hash" "text", "p_projection_content_hash" "text", "p_idempotency_key" "text", "p_audit" "jsonb" DEFAULT '{}'::"jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -14337,6 +14472,225 @@ ALTER FUNCTION "api"."cmd_review_collect_dataset_targets"("p_roots" "jsonb", "p_
 
 COMMENT ON FUNCTION "api"."cmd_review_collect_dataset_targets"("p_roots" "jsonb", "p_lock" boolean) IS 'Collects exact review targets; LifecycleModel result membership uses model_id plus coalesce(model_version, process version).';
 
+
+
+CREATE OR REPLACE FUNCTION "api"."cmd_review_contact_activate"("p_mode" "text", "p_id" "uuid", "p_json_ordered" "jsonb", "p_operation_id" "uuid", "p_source_version" "text" DEFAULT NULL::"text", "p_bind" boolean DEFAULT true, "p_expected_contact" "jsonb" DEFAULT NULL::"jsonb", "p_audit" "jsonb" DEFAULT '{}'::"jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'pg_temp'
+    AS $_$
+declare
+  v_actor uuid := auth.uid();
+  v_current_contact jsonb;
+  v_result jsonb;
+  v_created jsonb;
+  v_version text;
+  v_payload jsonb;
+  v_owner_ref jsonb;
+  v_contact_ref jsonb;
+  v_replay jsonb;
+begin
+  if v_actor is null then
+    return jsonb_build_object('ok', false, 'code', 'AUTH_REQUIRED', 'status', 401,
+      'message', 'Authentication required');
+  end if;
+
+  if not exists (
+    select 1 from private.roles
+    where user_id = v_actor
+      and team_id = '00000000-0000-0000-0000-000000000000'::uuid
+      and role = 'review-member'
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'REVIEW_MEMBER_REQUIRED', 'status', 403,
+      'message', 'Reviewer membership is required');
+  end if;
+
+  if p_mode not in ('create', 'createVersion') or p_id is null or p_operation_id is null then
+    return jsonb_build_object('ok', false, 'code', 'INVALID_REVIEWER_CONTACT_REQUEST', 'status', 400,
+      'message', 'A valid reviewer contact request is required');
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext('cmd_review_contact_activate'), hashtext(v_actor::text));
+
+  select payload->'result' into v_replay
+  from private.command_audit_log
+  where command = 'cmd_review_contact_activate'
+    and actor_user_id = v_actor
+    and payload->>'operation_id' = p_operation_id::text
+  order by created_at desc
+  limit 1;
+  if v_replay is not null then
+    return v_replay || jsonb_build_object('idempotent_replay', true);
+  end if;
+
+  if p_json_ordered is null or not (p_json_ordered ? 'contactDataSet') then
+    return jsonb_build_object('ok', false, 'code', 'INVALID_REVIEWER_CONTACT_REQUEST', 'status', 400,
+      'message', 'A valid reviewer contact request is required');
+  end if;
+
+  v_owner_ref := jsonb_build_object(
+    '@refObjectId', p_id::text,
+    '@type', 'contact data set',
+    '@uri', '../contacts/' || p_id::text || '.xml',
+    '@version', coalesce(
+      p_json_ordered #>> '{contactDataSet,administrativeInformation,publicationAndOwnership,common:dataSetVersion}',
+      p_source_version,
+      '01.00.000'
+    ),
+    'common:shortDescription', coalesce(
+      p_json_ordered #> '{contactDataSet,contactInformation,dataSetInformation,common:shortName}',
+      '[]'::jsonb
+    )
+  );
+  p_json_ordered := jsonb_set(
+    p_json_ordered,
+    '{contactDataSet,administrativeInformation,publicationAndOwnership,common:referenceToOwnershipOfDataSet}',
+    v_owner_ref,
+    true
+  );
+
+  if p_json_ordered #>> '{contactDataSet,contactInformation,dataSetInformation,common:UUID}'
+       is distinct from p_id::text
+     or p_json_ordered #> '{contactDataSet,contactInformation,dataSetInformation,common:shortName}'
+       is null
+     or p_json_ordered #> '{contactDataSet,contactInformation,dataSetInformation,common:name}'
+       is null
+     or p_json_ordered #> '{contactDataSet,contactInformation,dataSetInformation,classificationInformation,common:classification}'
+       is null
+     or nullif(p_json_ordered #>> '{contactDataSet,administrativeInformation,dataEntryBy,common:timeStamp}', '')
+       is null
+     or nullif(p_json_ordered #>> '{contactDataSet,administrativeInformation,dataEntryBy,common:referenceToDataSetFormat,@refObjectId}', '')
+       is null
+     or coalesce(p_json_ordered #>> '{contactDataSet,administrativeInformation,publicationAndOwnership,common:dataSetVersion}', '')
+       !~ '^[0-9]{2}\.[0-9]{2}\.[0-9]{3}$' then
+    return jsonb_build_object('ok', false, 'code', 'REVIEWER_CONTACT_VALIDATION_REQUIRED', 'status', 400,
+      'message', 'Reviewer contact must contain the validated required profile fields');
+  end if;
+
+  select contact into v_current_contact
+  from private.users where id = v_actor for update;
+
+  if v_current_contact is distinct from p_expected_contact then
+    return jsonb_build_object('ok', false, 'code', 'REVIEWER_CONTACT_CHANGED', 'status', 409,
+      'message', 'The reviewer contact binding changed; reload and try again');
+  end if;
+
+  if p_mode = 'create' and v_current_contact is not null then
+    return jsonb_build_object('ok', false, 'code', 'REVIEWER_CONTACT_ALREADY_BOUND', 'status', 409,
+      'message', 'A reviewer contact is already bound');
+  end if;
+
+  if p_mode = 'createVersion' then
+    if p_source_version is null
+       or v_current_contact->>'@refObjectId' is distinct from p_id::text
+       or v_current_contact->>'@version' is distinct from p_source_version
+       or not exists (
+         select 1 from public.contacts
+         where id = p_id and version = p_source_version
+           and user_id = v_actor and state_code = 100
+       ) then
+      return jsonb_build_object('ok', false, 'code', 'REVIEWER_CONTACT_SOURCE_INVALID', 'status', 409,
+        'message', 'The bound reviewer contact is not an eligible version source');
+    end if;
+  end if;
+
+  if not private.review_contact_references_ready(p_json_ordered, p_id) then
+    return jsonb_build_object('ok', false, 'code', 'REVIEWER_CONTACT_REFERENCE_NOT_OPEN', 'status', 400,
+      'message', 'Reviewer contact references must point to open data');
+  end if;
+
+  if p_mode = 'create' then
+    v_result := api.cmd_dataset_create('contacts', p_id, p_json_ordered, null, true,
+      coalesce(p_audit, '{}'::jsonb) || jsonb_build_object('reviewerProfile', true), null);
+  else
+    v_result := api.cmd_dataset_create_version('contacts', p_id, p_source_version,
+      p_json_ordered, null, true,
+      coalesce(p_audit, '{}'::jsonb) || jsonb_build_object('reviewerProfile', true), null);
+  end if;
+
+  if not coalesce((v_result->>'ok')::boolean, false) then
+    return v_result;
+  end if;
+
+  v_created := v_result->'data';
+  v_version := v_created->>'version';
+  select json_ordered::jsonb into v_payload
+  from public.contacts
+  where id = p_id and version = v_version and user_id = v_actor;
+  v_owner_ref := jsonb_build_object(
+    '@refObjectId', p_id::text,
+    '@type', 'contact data set',
+    '@uri', '../contacts/' || p_id::text || '.xml',
+    '@version', v_version,
+    'common:shortDescription', coalesce(
+      p_json_ordered #> '{contactDataSet,contactInformation,dataSetInformation,common:shortName}',
+      '[]'::jsonb
+    )
+  );
+  v_payload := jsonb_set(
+    v_payload,
+    '{contactDataSet,administrativeInformation,publicationAndOwnership,common:referenceToOwnershipOfDataSet}',
+    v_owner_ref,
+    true
+  );
+
+  update public.contacts
+  set json_ordered = v_payload::json,
+      rule_verification = true,
+      state_code = 100,
+      modified_at = now()
+  where id = p_id and version = v_version and user_id = v_actor
+  returning jsonb_build_object(
+    'id', id, 'version', version, 'state_code', state_code,
+    'rule_verification', rule_verification, 'json_ordered', json_ordered::jsonb
+  ) into v_created;
+
+  if v_created is null then
+    raise exception using errcode = 'P0001', message = 'REVIEWER_CONTACT_ACTIVATION_FAILED';
+  end if;
+
+  v_contact_ref := jsonb_build_object(
+    '@refObjectId', p_id::text,
+    '@type', 'contact data set',
+    '@uri', '../contacts/' || p_id::text || '.xml',
+    '@version', v_version,
+    'common:shortDescription', coalesce(
+      v_payload #> '{contactDataSet,contactInformation,dataSetInformation,common:shortName}',
+      '[]'::jsonb
+    )
+  );
+
+  if p_mode = 'create' or p_bind then
+    update private.users set contact = v_contact_ref where id = v_actor;
+  end if;
+
+  v_result := jsonb_build_object(
+    'ok', true,
+    'data', jsonb_build_object(
+      'dataset', v_created,
+      'contact', v_contact_ref,
+      'bound', p_mode = 'create' or p_bind
+    ),
+    'idempotent_replay', false
+  );
+
+  insert into private.command_audit_log(
+    command, actor_user_id, target_table, target_id, target_version, payload
+  ) values (
+    'cmd_review_contact_activate', v_actor, 'contacts', p_id, v_version,
+    coalesce(p_audit, '{}'::jsonb) || jsonb_build_object(
+      'operation_id', p_operation_id::text,
+      'mode', p_mode,
+      'bind', p_mode = 'create' or p_bind,
+      'result', v_result
+    )
+  );
+
+  return v_result;
+end;
+$_$;
+
+
+ALTER FUNCTION "api"."cmd_review_contact_activate"("p_mode" "text", "p_id" "uuid", "p_json_ordered" "jsonb", "p_operation_id" "uuid", "p_source_version" "text", "p_bind" boolean, "p_expected_contact" "jsonb", "p_audit" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "api"."cmd_review_extract_refs"("p_json" "jsonb") RETURNS TABLE("ref_type" "text", "ref_object_id" "uuid", "ref_version" "text")
@@ -15999,104 +16353,63 @@ declare
   v_comment private.comments%rowtype;
   v_comment_json jsonb := coalesce(p_json, '{}'::jsonb);
   v_review_json jsonb;
+  v_previous_comment_state integer;
 begin
   if v_actor is null then
-    return pg_catalog.jsonb_build_object(
-      'ok', false,
-      'code', 'AUTH_REQUIRED',
-      'status', 401,
-      'message', 'Authentication required'
-    );
+    return pg_catalog.jsonb_build_object('ok', false, 'code', 'AUTH_REQUIRED', 'status', 401, 'message', 'Authentication required');
   end if;
-
   if coalesce(pg_catalog.jsonb_typeof(v_comment_json), 'null') <> 'object' then
-    return pg_catalog.jsonb_build_object(
-      'ok', false,
-      'code', 'INVALID_COMMENT_JSON',
-      'status', 400,
-      'message', 'comment json must be an object'
-    );
+    return pg_catalog.jsonb_build_object('ok', false, 'code', 'INVALID_COMMENT_JSON', 'status', 400, 'message', 'comment json must be an object');
   end if;
 
-  select review_row.*
-  into v_review
+  select review_row.* into v_review
   from private.reviews as review_row
   where review_row.id = p_review_id
   for update;
 
   if not found then
-    return pg_catalog.jsonb_build_object(
-      'ok', false,
-      'code', 'REVIEW_NOT_FOUND',
-      'status', 404,
-      'message', 'Review not found'
-    );
+    return pg_catalog.jsonb_build_object('ok', false, 'code', 'REVIEW_NOT_FOUND', 'status', 404, 'message', 'Review not found');
   end if;
-
-  if v_review.state_code not in (-1, 1) then
+  if v_review.state_code <> 1 then
     return pg_catalog.jsonb_build_object(
       'ok', false,
       'code', 'INVALID_REVIEW_STATE',
       'status', 409,
-      'message', 'Review comments can only be edited for assigned or rejected reviews',
-      'details', pg_catalog.jsonb_build_object(
-        'state_code', v_review.state_code
-      )
+      'message', 'Review comments can only be edited before finalization',
+      'details', pg_catalog.jsonb_build_object('state_code', v_review.state_code)
     );
   end if;
-
   if not api.cmd_review_json_array(v_review.reviewer_id)
     @> pg_catalog.jsonb_build_array(pg_catalog.to_jsonb(v_actor::text)) then
-    return pg_catalog.jsonb_build_object(
-      'ok', false,
-      'code', 'REVIEWER_REQUIRED',
-      'status', 403,
-      'message', 'Only assigned reviewers can edit review comments'
-    );
+    return pg_catalog.jsonb_build_object('ok', false, 'code', 'REVIEWER_REQUIRED', 'status', 403, 'message', 'Only assigned reviewers can edit review comments');
   end if;
 
-  select comment_row.*
-  into v_comment
+  select comment_row.* into v_comment
   from private.comments as comment_row
-  where comment_row.review_id = p_review_id
-    and comment_row.reviewer_id = v_actor
+  where comment_row.review_id = p_review_id and comment_row.reviewer_id = v_actor
   for update;
 
-  if found and v_comment.state_code in (-2, 2) then
+  if found and v_comment.state_code not in (0, 1, -3) then
     return pg_catalog.jsonb_build_object(
       'ok', false,
       'code', 'INVALID_COMMENT_STATE',
       'status', 409,
       'message', 'This reviewer comment can no longer be edited',
-      'details', pg_catalog.jsonb_build_object(
-        'state_code', v_comment.state_code
-      )
+      'details', pg_catalog.jsonb_build_object('state_code', v_comment.state_code)
     );
   end if;
 
+  v_previous_comment_state := v_comment.state_code;
   if v_comment.review_id is null then
-    insert into private.comments (
-      review_id,
-      reviewer_id,
-      json,
-      state_code
-    )
-    values (
-      p_review_id,
-      v_actor,
-      v_comment_json::json,
-      case
-        when v_review.state_code = -1 then -1
-        else 0
-      end
-    )
+    insert into private.comments (review_id, reviewer_id, json, state_code)
+    values (p_review_id, v_actor, v_comment_json::json, 0)
     returning * into v_comment;
   else
     update private.comments
     set json = v_comment_json::json,
+        state_code = 0,
         modified_at = pg_catalog.now()
-    where review_id = p_review_id
-      and reviewer_id = v_actor
+    where review_id = p_review_id and reviewer_id = v_actor
     returning * into v_comment;
   end if;
 
@@ -16104,30 +16417,25 @@ begin
     coalesce(v_review.json, '{}'::jsonb),
     'submit_comments_temporary',
     v_actor,
-    pg_catalog.jsonb_build_object('reviewer_id', v_actor)
+    pg_catalog.jsonb_build_object(
+      'reviewer_id', v_actor,
+      'previous_comment_state_code', v_previous_comment_state,
+      'comment_state_code', 0
+    )
   );
-
   update private.reviews
-  set json = v_review_json,
-      modified_at = pg_catalog.now()
+  set json = v_review_json, modified_at = pg_catalog.now()
   where id = p_review_id
   returning * into v_review;
 
   insert into private.command_audit_log (
-    command,
-    actor_user_id,
-    target_table,
-    target_id,
-    payload
-  )
-  values (
-    'cmd_review_save_comment_draft',
-    v_actor,
-    'reviews',
-    p_review_id,
+    command, actor_user_id, target_table, target_id, payload
+  ) values (
+    'cmd_review_save_comment_draft', v_actor, 'reviews', p_review_id,
     coalesce(p_audit, '{}'::jsonb) || pg_catalog.jsonb_build_object(
       'reviewer_id', v_actor,
-      'comment_state_code', v_comment.state_code
+      'previous_comment_state_code', v_previous_comment_state,
+      'comment_state_code', 0
     )
   );
 
@@ -16145,7 +16453,7 @@ $$;
 ALTER FUNCTION "api"."cmd_review_save_comment_draft"("p_review_id" "uuid", "p_json" "jsonb", "p_audit" "jsonb") OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "api"."cmd_review_save_comment_draft"("p_review_id" "uuid", "p_json" "jsonb", "p_audit" "jsonb") IS 'Temporarily stores editable reviewer Comment JSON and audit metadata without provisioning Reference Reviews or Root candidate hints.';
+COMMENT ON FUNCTION "api"."cmd_review_save_comment_draft"("p_review_id" "uuid", "p_json" "jsonb", "p_audit" "jsonb") IS 'Stores an assigned reviewer draft only while the review is active; re-editing a submitted opinion resets its state to pending without provisioning references.';
 
 
 
@@ -20657,6 +20965,178 @@ ALTER FUNCTION "api"."hybrid_search_lifecyclemodels_v2"("query_text" "text", "qu
 
 
 COMMENT ON FUNCTION "api"."hybrid_search_lifecyclemodels_v2"("query_text" "text", "query_embedding" "text", "filter_condition" "text", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "data_source" "text", "page_size" integer, "page_current" integer, "query_terms" "text"[]) IS 'Hybrid Search v2: extracted_md lexical candidates plus embedding_ft semantic candidates, fused with lexical_weight and semantic_weight.';
+
+
+
+CREATE OR REPLACE FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[], "source_filter" "text" DEFAULT 'all'::"text", "publication_filter" "text" DEFAULT 'all'::"text") RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "model_id" "uuid", "model_version" character, "is_published" boolean, "total_count" bigint)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'pg_temp'
+    SET "statement_timeout" TO '60s'
+    AS $_$
+declare
+  v_kind text := lower(btrim(coalesce(p_dataset_kind, '')));
+  v_source_filter text := lower(btrim(coalesce(source_filter, 'all')));
+  v_publication_filter text := lower(btrim(coalesce(publication_filter, 'all')));
+  v_table regclass;
+  v_model_id_expression text := 'null::uuid';
+  v_model_version_expression text := 'null::character(9)';
+  v_terms text[];
+  v_filter jsonb := coalesce(filter_condition, '{}'::jsonb);
+  v_page_size integer := least(greatest(coalesce(page_size, 10), 1), 100);
+  v_page_current integer := greatest(coalesce(page_current, 1), 1);
+  v_candidate_limit integer := least(greatest(coalesce(match_count, 20), v_page_size) * 10, 2000);
+  v_threshold_distance double precision := 1 - least(greatest(coalesce(match_threshold, 0.5), -1), 1);
+  v_sql text;
+begin
+  v_table := case v_kind
+    when 'process' then 'public.processes'::regclass
+    when 'flow' then 'public.flows'::regclass
+    when 'lifecyclemodel' then 'public.lifecyclemodels'::regclass
+    when 'contact' then 'public.contacts'::regclass
+    when 'source' then 'public.sources'::regclass
+    when 'unitgroup' then 'public.unitgroups'::regclass
+    when 'flowproperty' then 'public.flowproperties'::regclass
+    else null
+  end;
+  if v_table is null then
+    raise exception using errcode = '22023', message = 'unsupported p_dataset_kind';
+  end if;
+  if v_source_filter not in ('all', 'literature', 'enterprise') then
+    raise exception using errcode = '22023', message = 'source_filter must be all, literature, or enterprise';
+  end if;
+  if v_publication_filter not in ('all', 'published', 'unpublished') then
+    raise exception using errcode = '22023', message = 'publication_filter must be all, published, or unpublished';
+  end if;
+  if v_kind <> 'process' and v_publication_filter <> 'all' then
+    raise exception using errcode = '22023', message = 'publication filter is supported only for Process data';
+  end if;
+  if coalesce(btrim(query_text), '') = '' then
+    raise exception using errcode = '22023', message = 'query_text is required';
+  end if;
+
+  v_terms := private.pgroonga_escape_query_terms(query_terms);
+  if cardinality(v_terms) = 0 then
+    v_terms := private.pgroonga_escape_query_terms(array[query_text]);
+  end if;
+  if v_kind = 'process' then
+    v_model_id_expression := 'd.model_id';
+    v_model_version_expression := 'd.model_version';
+  end if;
+
+  v_sql := format($sql$
+    with lexical_candidates as materialized (
+      select
+        d.id,
+        pgroonga_score(d.tableoid, d.ctid) as score
+      from %1$s d
+      where d.state_code = 100
+        and ($1 = 'all' or ($1 = 'literature' and d.user_id is null) or ($1 = 'enterprise' and d.user_id is not null))
+        and private.open_data_catalog_filter_matches($5, d.json, $3)
+        and d.search_text &@~| $4
+      order by score desc, d.modified_at desc, d.id
+      limit $7
+    ),
+    lexical as (
+      select
+        lexical_candidates.id,
+        rank() over (order by max(lexical_candidates.score) desc, lexical_candidates.id)::bigint as lexical_rank
+      from lexical_candidates
+      group by lexical_candidates.id
+    ),
+    semantic_candidates as materialized (
+      select
+        d.id,
+        d.embedding_ft <=> $6::extensions.vector(1024) as distance
+      from %1$s d
+      where d.state_code = 100
+        and d.embedding_ft is not null
+        and ($1 = 'all' or ($1 = 'literature' and d.user_id is null) or ($1 = 'enterprise' and d.user_id is not null))
+        and private.open_data_catalog_filter_matches($5, d.json, $3)
+        and (d.embedding_ft <=> $6::extensions.vector(1024)) < $8
+      order by d.embedding_ft <=> $6::extensions.vector(1024), d.id
+      limit $7
+    ),
+    semantic as (
+      select
+        semantic_candidates.id,
+        rank() over (order by min(semantic_candidates.distance), semantic_candidates.id)::bigint as semantic_rank
+      from semantic_candidates
+      group by semantic_candidates.id
+    ),
+    fused as (
+      select
+        coalesce(lexical.id, semantic.id) as id,
+        coalesce(1.0 / ($9 + lexical.lexical_rank), 0.0) * $10
+          + coalesce(1.0 / ($9 + semantic.semantic_rank), 0.0) * $11 as score
+      from lexical
+      full outer join semantic using (id)
+    ),
+    visible_rows as (
+      select
+        d.id,
+        d.json,
+        d.version,
+        d.modified_at,
+        d.team_id,
+        %2$s as model_id,
+        %3$s as model_version,
+        case when $5 = 'process' then exists (
+          select 1 from private.open_data_process_publications publication
+          where publication.process_id = d.id and publication.process_version = d.version
+        ) else false end as is_published,
+        fused.score
+      from %1$s d
+      join fused using (id)
+      where d.state_code = 100
+        and ($1 = 'all' or ($1 = 'literature' and d.user_id is null) or ($1 = 'enterprise' and d.user_id is not null))
+        and private.open_data_catalog_filter_matches($5, d.json, $3)
+    ),
+    latest_rows as (
+      select distinct on (visible_rows.id) visible_rows.*
+      from visible_rows
+      order by visible_rows.id, visible_rows.version desc, visible_rows.modified_at desc
+    ),
+    filtered_rows as (
+      select latest_rows.*
+      from latest_rows
+      where $5 <> 'process'
+        or $2 = 'all'
+        or ($2 = 'published' and latest_rows.is_published)
+        or ($2 = 'unpublished' and not latest_rows.is_published)
+    ),
+    counted_rows as (
+      select filtered_rows.*, count(*) over()::bigint as total_count
+      from filtered_rows
+    )
+    select
+      counted_rows.id,
+      counted_rows.json,
+      counted_rows.version,
+      counted_rows.modified_at,
+      counted_rows.team_id,
+      counted_rows.model_id,
+      counted_rows.model_version,
+      counted_rows.is_published,
+      counted_rows.total_count
+    from counted_rows
+    order by counted_rows.score desc, counted_rows.modified_at desc, counted_rows.id
+    limit $12
+    offset ($13 - 1) * $12
+  $sql$, v_table, v_model_id_expression, v_model_version_expression);
+
+  return query execute v_sql
+    using v_source_filter, v_publication_filter, v_filter, v_terms, v_kind,
+      query_embedding, v_candidate_limit, v_threshold_distance, greatest(coalesce(rrf_k, 10), 1),
+      greatest(coalesce(lexical_weight, 0.5), 0), greatest(coalesce(semantic_weight, 0.5), 0),
+      v_page_size, v_page_current;
+end;
+$_$;
+
+
+ALTER FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") IS 'Hybrid Open Data search with source and exact-version Process publication filters applied to lexical and semantic candidates before fusion, count, and pagination.';
 
 
 
@@ -25690,6 +26170,133 @@ $$;
 ALTER FUNCTION "api"."qry_review_admin_queue_items_v2"("p_status" "text", "p_page" integer, "p_page_size" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "api"."qry_review_batch_eligibility_v1"("p_review_ids" "uuid"[], "p_operation" "text") RETURNS TABLE("ordinal" integer, "review_id" "uuid", "eligible" boolean, "reason_code" "text", "state_code" integer, "target_table" "text", "data_version" "text", "reviewer_count" integer, "submitted_opinion_count" integer, "approve_opinion_count" integer, "reject_opinion_count" integer)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_actor uuid := auth.uid();
+  v_operation text := pg_catalog.lower(pg_catalog.btrim(coalesce(p_operation, '')));
+  v_is_admin boolean;
+  v_is_member boolean;
+begin
+  if v_actor is null then return; end if;
+  if v_operation not in (
+    'admin-assign', 'admin-approve', 'admin-reject',
+    'reviewer-approve', 'reviewer-reject'
+  ) then
+    raise exception using errcode = '22023', message = 'INVALID_REVIEW_BATCH_OPERATION';
+  end if;
+
+  v_is_admin := api.cmd_review_is_review_admin(v_actor);
+  v_is_member := api.cmd_review_is_review_member(v_actor);
+  if (v_operation like 'admin-%' and not v_is_admin)
+    or (v_operation like 'reviewer-%' and not v_is_member) then
+    return;
+  end if;
+
+  return query
+  with requested as (
+    select requested_id, requested_ordinal::integer
+    from pg_catalog.unnest(coalesce(p_review_ids, array[]::uuid[]))
+      with ordinality as item(requested_id, requested_ordinal)
+  ), facts as (
+    select
+      requested.requested_ordinal,
+      requested.requested_id,
+      review_row.id,
+      review_row.state_code,
+      review_row.target_table,
+      pg_catalog.btrim(review_row.data_version::text) as data_version,
+      pg_catalog.jsonb_array_length(coalesce(review_row.reviewer_id, '[]'::jsonb))::integer
+        as reviewer_count,
+      coalesce(review_comments.submitted_opinion_count, 0)::integer
+        as submitted_opinion_count,
+      coalesce(review_comments.approve_opinion_count, 0)::integer as approve_opinion_count,
+      coalesce(review_comments.reject_opinion_count, 0)::integer as reject_opinion_count,
+      actor_comment.state_code as actor_comment_state_code,
+      coalesce(review_row.reviewer_id, '[]'::jsonb)
+        @> pg_catalog.jsonb_build_array(pg_catalog.to_jsonb(v_actor::text)) as actor_is_assigned
+    from requested
+    left join private.reviews as review_row
+      on review_row.id = requested.requested_id
+      and (
+        v_operation like 'admin-%'
+        or api.policy_review_can_read(review_row.id, v_actor)
+      )
+    left join private.comments as actor_comment
+      on actor_comment.review_id = review_row.id and actor_comment.reviewer_id = v_actor
+    left join lateral (
+      select
+        pg_catalog.count(*) filter (where comment_row.state_code in (1, -3))
+          as submitted_opinion_count,
+        pg_catalog.count(*) filter (where comment_row.state_code = 1)
+          as approve_opinion_count,
+        pg_catalog.count(*) filter (where comment_row.state_code = -3)
+          as reject_opinion_count
+      from private.comments as comment_row
+      where comment_row.review_id = review_row.id
+        and coalesce(review_row.reviewer_id, '[]'::jsonb)
+          @> pg_catalog.jsonb_build_array(pg_catalog.to_jsonb(comment_row.reviewer_id::text))
+        and comment_row.state_code <> -2
+    ) as review_comments on true
+  )
+  select
+    facts.requested_ordinal,
+    facts.requested_id,
+    case
+      when facts.id is null then false
+      when v_operation = 'admin-assign' then facts.state_code in (0, 1)
+      when v_operation = 'admin-approve' then
+        facts.state_code = 1
+        and facts.reviewer_count > 0
+        and facts.submitted_opinion_count = facts.reviewer_count
+      when v_operation = 'admin-reject' then facts.state_code in (0, 1)
+      else facts.state_code = 1
+        and facts.actor_is_assigned
+        and facts.actor_comment_state_code = 0
+    end as eligible,
+    case
+      when facts.id is null then 'REVIEW_NOT_FOUND'
+      when v_operation = 'admin-assign' and facts.state_code not in (0, 1)
+        then 'REVIEW_ALREADY_COMPLETED'
+      when v_operation = 'admin-approve' and facts.state_code <> 1
+        then 'REVIEW_NOT_IN_PROGRESS'
+      when v_operation = 'admin-approve' and facts.reviewer_count = 0
+        then 'REVIEWER_REQUIRED'
+      when v_operation = 'admin-approve'
+        and facts.submitted_opinion_count <> facts.reviewer_count
+        then 'REVIEWER_OPINIONS_PENDING'
+      when v_operation = 'admin-reject' and facts.state_code not in (0, 1)
+        then 'REVIEW_ALREADY_COMPLETED'
+      when v_operation like 'reviewer-%' and facts.state_code <> 1
+        then 'REVIEW_NOT_IN_PROGRESS'
+      when v_operation like 'reviewer-%' and not facts.actor_is_assigned
+        then 'REVIEWER_REQUIRED'
+      when v_operation like 'reviewer-%' and facts.actor_comment_state_code <> 0
+        then 'OPINION_ALREADY_SUBMITTED'
+      else null
+    end as reason_code,
+    facts.state_code,
+    facts.target_table,
+    facts.data_version,
+    facts.reviewer_count,
+    facts.submitted_opinion_count,
+    facts.approve_opinion_count,
+    facts.reject_opinion_count
+  from facts
+  order by facts.requested_ordinal;
+end;
+$$;
+
+
+ALTER FUNCTION "api"."qry_review_batch_eligibility_v1"("p_review_ids" "uuid"[], "p_operation" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "api"."qry_review_batch_eligibility_v1"("p_review_ids" "uuid"[], "p_operation" "text") IS 'Read-only, actor-scoped preflight for review batch confirmations; execution commands remain authoritative and independently revalidate state.';
+
+
+
 CREATE OR REPLACE FUNCTION "api"."qry_review_find_member_candidate_by_email"("p_email" "text") RETURNS TABLE("id" "uuid", "email" "text", "display_name" "text", "contact" "jsonb")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -26064,6 +26671,142 @@ ALTER FUNCTION "api"."qry_review_get_admin_queue_items_v4"("p_status" "text", "p
 
 
 COMMENT ON FUNCTION "api"."qry_review_get_admin_queue_items_v4"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") IS 'Admin full-text queue over exact dataset versions; search_text matches precede task count and pagination. Empty query preserves v3 behavior.';
+
+
+
+CREATE OR REPLACE FUNCTION "api"."qry_review_get_admin_queue_items_v5"("p_status" "text" DEFAULT NULL::"text", "p_page" integer DEFAULT 1, "p_page_size" integer DEFAULT 50, "p_sort_by" "text" DEFAULT 'modified_at'::"text", "p_sort_order" "text" DEFAULT 'desc'::"text", "p_display_mode" "text" DEFAULT 'all'::"text", "p_target_table" "text" DEFAULT NULL::"text", "p_query" "text" DEFAULT NULL::"text") RETURNS TABLE("id" "uuid", "data_id" "uuid", "data_version" "text", "state_code" integer, "review_kind" "text", "target_table" "text", "reviewer_id" "jsonb", "json" "jsonb", "deadline" timestamp with time zone, "created_at" timestamp with time zone, "modified_at" timestamp with time zone, "comment_state_codes" "jsonb", "reviewer_count" integer, "completed_reviewer_count" integer, "approve_opinion_count" integer, "reject_opinion_count" integer, "root_matches_status" boolean, "root_can_read" boolean, "total_count" bigint)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_actor uuid := auth.uid();
+  v_query text := nullif(pg_catalog.btrim(p_query), '');
+  v_limit integer := greatest(1, least(coalesce(p_page_size, 50), 100));
+  v_offset integer := (greatest(coalesce(p_page, 1), 1) - 1) * v_limit;
+  v_sort_key text := case pg_catalog.lower(coalesce(p_sort_by, ''))
+    when 'created_at' then 'created_at'
+    when 'createat' then 'created_at'
+    when 'deadline' then 'deadline'
+    when 'state_code' then 'state_code'
+    when 'statecode' then 'state_code'
+    else 'modified_at'
+  end;
+  v_order_dir text := api.cmd_membership_resolve_sort_direction(p_sort_order);
+  v_status text := pg_catalog.lower(coalesce(p_status, ''));
+  v_display_mode text := pg_catalog.lower(pg_catalog.btrim(coalesce(p_display_mode, 'all')));
+  v_target_table text := nullif(
+    pg_catalog.lower(pg_catalog.btrim(coalesce(p_target_table, ''))),
+    ''
+  );
+begin
+  if v_actor is null or not api.cmd_review_is_review_admin(v_actor) then
+    return;
+  end if;
+  if v_status not in ('', 'all', 'unassigned', 'in-progress', 'completed') then
+    return;
+  end if;
+  if v_display_mode not in ('all', 'model_process', 'other') then
+    raise exception using errcode = '22023', message = 'INVALID_REVIEW_DISPLAY_MODE';
+  end if;
+  if v_target_table is not null and not (
+    v_target_table = any(array[
+      'contacts', 'sources', 'unitgroups', 'flowproperties', 'flows',
+      'processes', 'lifecyclemodels'
+    ]::text[])
+  ) then
+    raise exception using errcode = '22023', message = 'INVALID_REVIEW_TARGET_TABLE';
+  end if;
+  if pg_catalog.char_length(v_query) > 1000 then
+    raise exception using errcode = '22023', message = 'REVIEW_QUERY_TOO_LONG';
+  end if;
+
+  return query
+  with matches as materialized (
+    select * from private.review_search_dataset_versions_v1(v_query, v_target_table)
+    where v_query is not null
+  ), q as (
+    select
+      review_row.id,
+      review_row.data_id,
+      pg_catalog.btrim(review_row.data_version::text) as data_version,
+      review_row.state_code,
+      review_row.review_kind,
+      review_row.target_table,
+      coalesce(review_row.reviewer_id, '[]'::jsonb) as reviewer_id,
+      coalesce(review_row.json, '{}'::jsonb) as json,
+      review_row.deadline,
+      review_row.created_at,
+      review_row.modified_at,
+      coalesce(review_comments.comment_state_codes, '[]'::jsonb) as comment_state_codes,
+      pg_catalog.jsonb_array_length(coalesce(review_row.reviewer_id, '[]'::jsonb))::integer
+        as reviewer_count,
+      coalesce(review_comments.completed_reviewer_count, 0)::integer
+        as completed_reviewer_count,
+      coalesce(review_comments.approve_opinion_count, 0)::integer as approve_opinion_count,
+      coalesce(review_comments.reject_opinion_count, 0)::integer as reject_opinion_count,
+      true as root_matches_status,
+      true as root_can_read
+    from private.reviews as review_row
+    left join lateral (
+      select
+        pg_catalog.jsonb_agg(
+          pg_catalog.to_jsonb(comment_row.state_code)
+          order by comment_row.created_at, comment_row.reviewer_id
+        ) filter (where comment_row.reviewer_id is not null) as comment_state_codes,
+        pg_catalog.count(*) filter (
+          where comment_row.state_code in (1, -3, 2, -1)
+        ) as completed_reviewer_count,
+        pg_catalog.count(*) filter (where comment_row.state_code in (1, 2))
+          as approve_opinion_count,
+        pg_catalog.count(*) filter (where comment_row.state_code in (-3, -1))
+          as reject_opinion_count
+      from private.comments as comment_row
+      where comment_row.review_id = review_row.id
+        and coalesce(review_row.reviewer_id, '[]'::jsonb)
+          @> pg_catalog.jsonb_build_array(pg_catalog.to_jsonb(comment_row.reviewer_id::text))
+        and comment_row.state_code <> -2
+    ) as review_comments on true
+    where review_row.review_kind in ('root', 'reference')
+      and (
+        v_status in ('', 'all')
+        or (v_status = 'unassigned' and review_row.state_code = 0)
+        or (v_status = 'in-progress' and review_row.state_code = 1)
+        or (v_status = 'completed' and review_row.state_code in (-1, 2))
+      )
+      and (
+        v_display_mode = 'all'
+        or (v_display_mode = 'model_process' and review_row.target_table in ('processes', 'lifecyclemodels'))
+        or (v_display_mode = 'other' and review_row.target_table not in ('processes', 'lifecyclemodels'))
+      )
+      and (v_target_table is null or review_row.target_table = v_target_table)
+      and (v_query is null or exists (
+        select 1 from matches
+        where matches.target_table = review_row.target_table
+          and matches.data_id = review_row.data_id
+          and matches.data_version = review_row.data_version
+      ))
+  )
+  select q.*, pg_catalog.count(*) over() as total_count
+  from q
+  order by
+    case when v_sort_key = 'created_at' and v_order_dir = 'asc' then q.created_at end asc nulls last,
+    case when v_sort_key = 'created_at' and v_order_dir = 'desc' then q.created_at end desc nulls last,
+    case when v_sort_key = 'deadline' and v_order_dir = 'asc' then q.deadline end asc nulls last,
+    case when v_sort_key = 'deadline' and v_order_dir = 'desc' then q.deadline end desc nulls last,
+    case when v_sort_key = 'state_code' and v_order_dir = 'asc' then q.state_code end asc nulls last,
+    case when v_sort_key = 'state_code' and v_order_dir = 'desc' then q.state_code end desc nulls last,
+    case when v_sort_key = 'modified_at' and v_order_dir = 'asc' then q.modified_at end asc nulls last,
+    case when v_sort_key = 'modified_at' and v_order_dir = 'desc' then q.modified_at end desc nulls last,
+    q.id
+  limit v_limit offset v_offset;
+end;
+$$;
+
+
+ALTER FUNCTION "api"."qry_review_get_admin_queue_items_v5"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "api"."qry_review_get_admin_queue_items_v5"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") IS 'Review-admin workspace queue: unassigned, in-progress, and completed stages with current-reviewer progress and opinion counts.';
 
 
 
@@ -26674,6 +27417,147 @@ COMMENT ON FUNCTION "api"."qry_review_get_member_queue_items_v4"("p_status" "tex
 
 
 
+CREATE OR REPLACE FUNCTION "api"."qry_review_get_member_queue_items_v5"("p_status" "text" DEFAULT 'pending'::"text", "p_page" integer DEFAULT 1, "p_page_size" integer DEFAULT 50, "p_sort_by" "text" DEFAULT 'modified_at'::"text", "p_sort_order" "text" DEFAULT 'desc'::"text", "p_display_mode" "text" DEFAULT 'all'::"text", "p_target_table" "text" DEFAULT NULL::"text", "p_query" "text" DEFAULT NULL::"text") RETURNS TABLE("id" "uuid", "data_id" "uuid", "data_version" "text", "review_state_code" integer, "review_kind" "text", "target_table" "text", "reviewer_id" "jsonb", "json" "jsonb", "deadline" timestamp with time zone, "created_at" timestamp with time zone, "modified_at" timestamp with time zone, "comment_state_code" integer, "comment_json" "jsonb", "comment_created_at" timestamp with time zone, "comment_modified_at" timestamp with time zone, "reviewer_count" integer, "completed_reviewer_count" integer, "approve_opinion_count" integer, "reject_opinion_count" integer, "root_matches_status" boolean, "root_can_read" boolean, "total_count" bigint)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_actor uuid := auth.uid();
+  v_query text := nullif(pg_catalog.btrim(p_query), '');
+  v_limit integer := greatest(1, least(coalesce(p_page_size, 50), 100));
+  v_offset integer := (greatest(coalesce(p_page, 1), 1) - 1) * v_limit;
+  v_sort_key text := case pg_catalog.lower(coalesce(p_sort_by, ''))
+    when 'created_at' then 'created_at'
+    when 'createat' then 'created_at'
+    when 'deadline' then 'deadline'
+    when 'state_code' then 'state_code'
+    when 'statecode' then 'state_code'
+    when 'comment_modified_at' then 'comment_modified_at'
+    when 'commentmodifiedat' then 'comment_modified_at'
+    else 'modified_at'
+  end;
+  v_order_dir text := api.cmd_membership_resolve_sort_direction(p_sort_order);
+  v_status text := pg_catalog.lower(coalesce(p_status, 'pending'));
+  v_display_mode text := pg_catalog.lower(pg_catalog.btrim(coalesce(p_display_mode, 'all')));
+  v_target_table text := nullif(
+    pg_catalog.lower(pg_catalog.btrim(coalesce(p_target_table, ''))),
+    ''
+  );
+begin
+  if v_actor is null or not api.cmd_review_is_review_member(v_actor) then
+    return;
+  end if;
+  if v_status not in ('pending', 'submitted', 'completed') then
+    return;
+  end if;
+  if v_display_mode not in ('all', 'model_process', 'other') then
+    raise exception using errcode = '22023', message = 'INVALID_REVIEW_DISPLAY_MODE';
+  end if;
+  if v_target_table is not null and not (
+    v_target_table = any(array[
+      'contacts', 'sources', 'unitgroups', 'flowproperties', 'flows',
+      'processes', 'lifecyclemodels'
+    ]::text[])
+  ) then
+    raise exception using errcode = '22023', message = 'INVALID_REVIEW_TARGET_TABLE';
+  end if;
+  if pg_catalog.char_length(v_query) > 1000 then
+    raise exception using errcode = '22023', message = 'REVIEW_QUERY_TOO_LONG';
+  end if;
+
+  return query
+  with matches as materialized (
+    select * from private.review_search_dataset_versions_v1(v_query, v_target_table)
+    where v_query is not null
+  ), q as (
+    select
+      review_row.id,
+      review_row.data_id,
+      pg_catalog.btrim(review_row.data_version::text) as data_version,
+      review_row.state_code as review_state_code,
+      review_row.review_kind,
+      review_row.target_table,
+      coalesce(review_row.reviewer_id, '[]'::jsonb) as reviewer_id,
+      coalesce(review_row.json, '{}'::jsonb) as json,
+      review_row.deadline,
+      review_row.created_at,
+      greatest(review_row.modified_at, actor_comment.modified_at) as modified_at,
+      actor_comment.state_code as comment_state_code,
+      coalesce(actor_comment.json::jsonb, '{}'::jsonb) as comment_json,
+      actor_comment.created_at as comment_created_at,
+      actor_comment.modified_at as comment_modified_at,
+      pg_catalog.jsonb_array_length(coalesce(review_row.reviewer_id, '[]'::jsonb))::integer
+        as reviewer_count,
+      coalesce(review_comments.completed_reviewer_count, 0)::integer
+        as completed_reviewer_count,
+      coalesce(review_comments.approve_opinion_count, 0)::integer as approve_opinion_count,
+      coalesce(review_comments.reject_opinion_count, 0)::integer as reject_opinion_count,
+      true as root_matches_status,
+      true as root_can_read
+    from private.comments as actor_comment
+    join private.reviews as review_row on review_row.id = actor_comment.review_id
+    left join lateral (
+      select
+        pg_catalog.count(*) filter (
+          where comment_row.state_code in (1, -3, 2, -1)
+        ) as completed_reviewer_count,
+        pg_catalog.count(*) filter (where comment_row.state_code in (1, 2))
+          as approve_opinion_count,
+        pg_catalog.count(*) filter (where comment_row.state_code in (-3, -1))
+          as reject_opinion_count
+      from private.comments as comment_row
+      where comment_row.review_id = review_row.id
+        and coalesce(review_row.reviewer_id, '[]'::jsonb)
+          @> pg_catalog.jsonb_build_array(pg_catalog.to_jsonb(comment_row.reviewer_id::text))
+        and comment_row.state_code <> -2
+    ) as review_comments on true
+    where review_row.review_kind in ('root', 'reference')
+      and actor_comment.reviewer_id = v_actor
+      and api.policy_review_can_read(review_row.id, v_actor)
+      and (
+        (v_status = 'pending' and review_row.state_code = 1 and actor_comment.state_code = 0)
+        or (v_status = 'submitted' and review_row.state_code = 1 and actor_comment.state_code in (1, -3))
+        or (v_status = 'completed' and review_row.state_code in (-1, 2) and actor_comment.state_code <> -2)
+      )
+      and (
+        v_display_mode = 'all'
+        or (v_display_mode = 'model_process' and review_row.target_table in ('processes', 'lifecyclemodels'))
+        or (v_display_mode = 'other' and review_row.target_table not in ('processes', 'lifecyclemodels'))
+      )
+      and (v_target_table is null or review_row.target_table = v_target_table)
+      and (v_query is null or exists (
+        select 1 from matches
+        where matches.target_table = review_row.target_table
+          and matches.data_id = review_row.data_id
+          and matches.data_version = review_row.data_version
+      ))
+  )
+  select q.*, pg_catalog.count(*) over() as total_count
+  from q
+  order by
+    case when v_sort_key = 'created_at' and v_order_dir = 'asc' then q.created_at end asc nulls last,
+    case when v_sort_key = 'created_at' and v_order_dir = 'desc' then q.created_at end desc nulls last,
+    case when v_sort_key = 'deadline' and v_order_dir = 'asc' then q.deadline end asc nulls last,
+    case when v_sort_key = 'deadline' and v_order_dir = 'desc' then q.deadline end desc nulls last,
+    case when v_sort_key = 'state_code' and v_order_dir = 'asc' then q.review_state_code end asc nulls last,
+    case when v_sort_key = 'state_code' and v_order_dir = 'desc' then q.review_state_code end desc nulls last,
+    case when v_sort_key = 'comment_modified_at' and v_order_dir = 'asc' then q.comment_modified_at end asc nulls last,
+    case when v_sort_key = 'comment_modified_at' and v_order_dir = 'desc' then q.comment_modified_at end desc nulls last,
+    case when v_sort_key = 'modified_at' and v_order_dir = 'asc' then q.modified_at end asc nulls last,
+    case when v_sort_key = 'modified_at' and v_order_dir = 'desc' then q.modified_at end desc nulls last,
+    q.id
+  limit v_limit offset v_offset;
+end;
+$$;
+
+
+ALTER FUNCTION "api"."qry_review_get_member_queue_items_v5"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "api"."qry_review_get_member_queue_items_v5"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") IS 'Reviewer workspace queue: pending, submitted opinion, and terminal completed stages with actor comment and aggregate progress facts.';
+
+
+
 CREATE OR REPLACE FUNCTION "api"."qry_review_get_member_root_queue_items_v2"("p_status" "text" DEFAULT 'pending'::"text", "p_page" integer DEFAULT 1, "p_page_size" integer DEFAULT 10, "p_sort_by" "text" DEFAULT 'modified_at'::"text", "p_sort_order" "text" DEFAULT 'desc'::"text") RETURNS TABLE("id" "uuid", "data_id" "uuid", "data_version" "text", "review_state_code" integer, "review_kind" "text", "target_table" "text", "reviewer_id" "jsonb", "json" "jsonb", "deadline" timestamp with time zone, "created_at" timestamp with time zone, "modified_at" timestamp with time zone, "comment_state_code" integer, "comment_json" "jsonb", "comment_created_at" timestamp with time zone, "comment_modified_at" timestamp with time zone, "root_matches_status" boolean, "root_can_read" boolean, "total_count" bigint)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -26951,6 +27835,73 @@ $_$;
 
 
 ALTER FUNCTION "api"."qry_review_get_member_workload"("p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_role" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "api"."qry_review_get_my_contact_status"() RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_actor uuid := auth.uid();
+  v_contact jsonb;
+  v_row jsonb;
+  v_id uuid;
+  v_version text;
+  v_ready boolean := false;
+begin
+  if v_actor is null then
+    return jsonb_build_object('ok', false, 'code', 'AUTH_REQUIRED', 'status', 401,
+      'message', 'Authentication required');
+  end if;
+
+  if not exists (
+    select 1 from private.roles
+    where user_id = v_actor
+      and team_id = '00000000-0000-0000-0000-000000000000'::uuid
+      and role = 'review-member'
+  ) then
+    return jsonb_build_object('ok', false, 'code', 'REVIEW_MEMBER_REQUIRED', 'status', 403,
+      'message', 'Reviewer membership is required');
+  end if;
+
+  select contact into v_contact from private.users where id = v_actor;
+
+  if v_contact is null or v_contact = 'null'::jsonb then
+    return jsonb_build_object('ok', true, 'data', jsonb_build_object(
+      'status', 'missing', 'ready', false, 'contact', null, 'dataset', null));
+  end if;
+
+  begin
+    v_id := nullif(v_contact->>'@refObjectId', '')::uuid;
+    v_version := nullif(v_contact->>'@version', '');
+  exception when invalid_text_representation then
+    v_id := null;
+  end;
+
+  if v_id is not null and v_version is not null then
+    select jsonb_build_object(
+      'id', id, 'version', version, 'state_code', state_code,
+      'rule_verification', rule_verification, 'json_ordered', json_ordered::jsonb
+    ) into v_row
+    from public.contacts
+    where id = v_id and version = v_version and user_id = v_actor;
+
+    v_ready := v_row is not null
+      and coalesce((v_row->>'state_code')::integer, 0) = 100
+      and coalesce((v_row->>'rule_verification')::boolean, false);
+  end if;
+
+  return jsonb_build_object('ok', true, 'data', jsonb_build_object(
+    'status', case when v_ready then 'ready' else 'invalid' end,
+    'ready', v_ready,
+    'contact', v_contact,
+    'dataset', v_row
+  ));
+end;
+$$;
+
+
+ALTER FUNCTION "api"."qry_review_get_my_contact_status"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "api"."qry_review_member_queue_items_v2"("p_status" "text" DEFAULT NULL::"text", "p_page" integer DEFAULT 1, "p_page_size" integer DEFAULT 20) RETURNS TABLE("id" "uuid", "review_kind" "text", "target_table" "text", "data_id" "uuid", "data_version" "text", "state_code" integer, "submitted_revision_checksum" "text", "my_comment_state_code" integer, "deadline" timestamp with time zone, "modified_at" timestamp with time zone, "total_count" bigint)
@@ -27909,6 +28860,163 @@ $$;
 
 
 ALTER FUNCTION "api"."search_lifecyclemodels_latest"("query_text" "text", "filter_condition" "jsonb", "order_by" "jsonb", "page_size" bigint, "page_current" bigint, "data_source" "text", "this_user_id" "text", "team_id_filter" "uuid", "state_code_filter" integer, "query_terms" "text"[]) OWNER TO "api_internal_executor";
+
+
+CREATE OR REPLACE FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text" DEFAULT 'list'::"text", "p_query_text" "text" DEFAULT ''::"text", "p_query_terms" "text"[] DEFAULT NULL::"text"[], "p_filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "p_source_filter" "text" DEFAULT 'all'::"text", "p_publication_filter" "text" DEFAULT 'all'::"text", "p_page_size" integer DEFAULT 10, "p_page_current" integer DEFAULT 1, "p_sort_by" "text" DEFAULT 'modified_at'::"text", "p_sort_direction" "text" DEFAULT 'desc'::"text") RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "model_id" "uuid", "model_version" character, "is_published" boolean, "total_count" bigint)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'pg_temp'
+    SET "statement_timeout" TO '60s'
+    AS $_$
+declare
+  v_kind text := lower(btrim(coalesce(p_dataset_kind, '')));
+  v_mode text := lower(btrim(coalesce(p_search_mode, 'list')));
+  v_source_filter text := lower(btrim(coalesce(p_source_filter, 'all')));
+  v_publication_filter text := lower(btrim(coalesce(p_publication_filter, 'all')));
+  v_table regclass;
+  v_model_id_expression text := 'null::uuid';
+  v_model_version_expression text := 'null::character(9)';
+  v_match_clause text;
+  v_score_expression text := '0::double precision';
+  v_order_clause text;
+  v_sort_by text := lower(btrim(coalesce(p_sort_by, 'modified_at')));
+  v_sort_direction text := lower(btrim(coalesce(p_sort_direction, 'desc')));
+  v_page_size integer := least(greatest(coalesce(p_page_size, 10), 1), 100);
+  v_page_current integer := greatest(coalesce(p_page_current, 1), 1);
+  v_filter jsonb := coalesce(p_filter_condition, '{}'::jsonb);
+  v_terms text[];
+  v_uuid_pattern text;
+  v_sql text;
+begin
+  v_table := case v_kind
+    when 'process' then 'public.processes'::regclass
+    when 'flow' then 'public.flows'::regclass
+    when 'lifecyclemodel' then 'public.lifecyclemodels'::regclass
+    when 'contact' then 'public.contacts'::regclass
+    when 'source' then 'public.sources'::regclass
+    when 'unitgroup' then 'public.unitgroups'::regclass
+    when 'flowproperty' then 'public.flowproperties'::regclass
+    else null
+  end;
+  if v_table is null then
+    raise exception using errcode = '22023', message = 'unsupported p_dataset_kind';
+  end if;
+  if v_mode not in ('list', 'lexical', 'uuid') then
+    raise exception using errcode = '22023', message = 'p_search_mode must be list, lexical, or uuid';
+  end if;
+  if v_source_filter not in ('all', 'literature', 'enterprise') then
+    raise exception using errcode = '22023', message = 'p_source_filter must be all, literature, or enterprise';
+  end if;
+  if v_publication_filter not in ('all', 'published', 'unpublished') then
+    raise exception using errcode = '22023', message = 'p_publication_filter must be all, published, or unpublished';
+  end if;
+  if v_kind <> 'process' and v_publication_filter <> 'all' then
+    raise exception using errcode = '22023', message = 'publication filter is supported only for Process data';
+  end if;
+  if v_sort_by not in ('version', 'created_at', 'modified_at') then
+    v_sort_by := 'modified_at';
+  end if;
+  if v_sort_direction not in ('asc', 'desc') then
+    v_sort_direction := 'desc';
+  end if;
+
+  if v_kind = 'process' then
+    v_model_id_expression := 'd.model_id';
+    v_model_version_expression := 'd.model_version';
+  end if;
+
+  if v_mode = 'lexical' then
+    v_terms := private.pgroonga_escape_query_terms(p_query_terms);
+    if cardinality(v_terms) = 0 then
+      v_terms := private.pgroonga_escape_query_terms(array[p_query_text]);
+    end if;
+    if cardinality(v_terms) = 0 then
+      raise exception using errcode = '22023', message = 'lexical search requires query text';
+    end if;
+    v_match_clause := 'and d.search_text &@~| $4';
+    v_score_expression := 'pgroonga_score(d.tableoid, d.ctid)';
+    v_order_clause := 'candidate_score desc, modified_at desc, id';
+  elsif v_mode = 'uuid' then
+    if not (coalesce(btrim(p_query_text), '') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') then
+      raise exception using errcode = '22023', message = 'uuid search requires a UUID query';
+    end if;
+    v_uuid_pattern := '%' || lower(btrim(p_query_text)) || '%';
+    v_match_clause := 'and d.json::text like $5';
+    v_order_clause := 'modified_at desc, id';
+  else
+    v_match_clause := '';
+    v_order_clause := format('%I %s nulls last, id', v_sort_by, v_sort_direction);
+  end if;
+
+  v_sql := format($sql$
+    with candidate_rows as (
+      select
+        d.id,
+        d.json,
+        d.version,
+        d.created_at,
+        d.modified_at,
+        d.team_id,
+        %2$s as model_id,
+        %3$s as model_version,
+        case when $6 = 'process' then exists (
+          select 1
+          from private.open_data_process_publications publication
+          where publication.process_id = d.id
+            and publication.process_version = d.version
+        ) else false end as is_published,
+        %4$s as candidate_score
+      from %1$s d
+      where d.state_code = 100
+        and ($1 = 'all' or ($1 = 'literature' and d.user_id is null) or ($1 = 'enterprise' and d.user_id is not null))
+        and private.open_data_catalog_filter_matches($6, d.json, $3)
+        %5$s
+    ),
+    latest_rows as (
+      select distinct on (candidate_rows.id) candidate_rows.*
+      from candidate_rows
+      order by candidate_rows.id, candidate_rows.version desc, candidate_rows.modified_at desc
+    ),
+    filtered_rows as (
+      select latest_rows.*
+      from latest_rows
+      where $6 <> 'process'
+        or $2 = 'all'
+        or ($2 = 'published' and latest_rows.is_published)
+        or ($2 = 'unpublished' and not latest_rows.is_published)
+    ),
+    counted_rows as (
+      select filtered_rows.*, count(*) over()::bigint as total_count
+      from filtered_rows
+    )
+    select
+      counted_rows.id,
+      counted_rows.json,
+      counted_rows.version,
+      counted_rows.modified_at,
+      counted_rows.team_id,
+      counted_rows.model_id,
+      counted_rows.model_version,
+      counted_rows.is_published,
+      counted_rows.total_count
+    from counted_rows
+    order by %6$s
+    limit $7
+    offset ($8 - 1) * $7
+  $sql$, v_table, v_model_id_expression, v_model_version_expression,
+    v_score_expression, v_match_clause, v_order_clause);
+
+  return query execute v_sql
+    using v_source_filter, v_publication_filter, v_filter, v_terms,
+      v_uuid_pattern, v_kind, v_page_size, v_page_current;
+end;
+$_$;
+
+
+ALTER FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") IS 'Lists or searches latest state-100 Open Data rows with source and exact-version Process publication filters applied before count and pagination.';
+
 
 
 CREATE OR REPLACE FUNCTION "api"."search_processes"("query_text" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "data_source" "text" DEFAULT 'tg'::"text", "this_user_id" "text" DEFAULT ''::"text", "team_id_filter" "uuid" DEFAULT NULL::"uuid", "state_code_filter" integer DEFAULT NULL::integer, "type_of_data_set_filter" "text" DEFAULT 'all'::"text", "query_terms" "text"[] DEFAULT NULL::"text"[], "owner_draft_only" boolean DEFAULT false) RETURNS TABLE("rank" bigint, "id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "model_id" "uuid", "model_version" character, "total_count" bigint)
@@ -52932,6 +54040,97 @@ $$;
 ALTER FUNCTION "private"."oauth_client_has_capability"("p_capability_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "private"."open_data_catalog_filter_matches"("p_dataset_kind" "text", "p_json" "jsonb", "p_filter_condition" "jsonb") RETURNS boolean
+    LANGUAGE "plpgsql" IMMUTABLE PARALLEL SAFE
+    SET "search_path" TO 'pg_catalog', 'pg_temp'
+    AS $$
+declare
+  v_filter jsonb := coalesce(p_filter_condition, '{}'::jsonb);
+  v_type_filter text;
+  v_type_filters text[];
+  v_as_input boolean;
+  v_classification_filter jsonb := '[]'::jsonb;
+begin
+  if p_dataset_kind = 'process' then
+    v_type_filter := nullif(btrim(v_filter ->> 'typeOfDataSet'), '');
+    v_filter := v_filter - 'typeOfDataSet';
+    return p_json @> v_filter
+      and (
+        v_type_filter is null
+        or v_type_filter = 'all'
+        or p_json #>> '{processDataSet,modellingAndValidation,LCIMethodAndAllocation,typeOfDataSet}' = v_type_filter
+      );
+  end if;
+
+  if p_dataset_kind <> 'flow' then
+    return p_json @> v_filter;
+  end if;
+
+  v_type_filter := nullif(btrim(v_filter ->> 'flowType'), '');
+  v_type_filters := case when v_type_filter is null then null else string_to_array(v_type_filter, ',') end;
+  v_filter := v_filter - 'flowType';
+
+  if v_filter ? 'asInput' then
+    v_as_input := nullif(btrim(v_filter ->> 'asInput'), '')::boolean;
+  end if;
+  v_filter := v_filter - 'asInput';
+
+  if jsonb_typeof(v_filter -> 'classification') = 'array' then
+    v_classification_filter := v_filter -> 'classification';
+  end if;
+  v_filter := v_filter - 'classification';
+
+  return p_json @> v_filter
+    and (
+      v_type_filters is null
+      or p_json #>> '{flowDataSet,modellingAndValidation,LCIMethod,typeOfDataSet}' = any(v_type_filters)
+    )
+    and (
+      v_as_input is null
+      or not v_as_input
+      or not p_json @> '{"flowDataSet":{"flowInformation":{"dataSetInformation":{"classificationInformation":{"common:elementaryFlowCategorization":{"common:category":[{"#text":"Emissions","@level":"0"}]}}}}}}'::jsonb
+    )
+    and (
+      jsonb_array_length(v_classification_filter) = 0
+      or exists (
+        select 1
+        from jsonb_array_elements(v_classification_filter) selected(item)
+        where (
+          selected.item ->> 'scope' = 'elementary'
+          and exists (
+            select 1
+            from jsonb_array_elements(
+              case jsonb_typeof(p_json #> '{flowDataSet,flowInformation,dataSetInformation,classificationInformation,common:elementaryFlowCategorization,common:category}')
+                when 'array' then p_json #> '{flowDataSet,flowInformation,dataSetInformation,classificationInformation,common:elementaryFlowCategorization,common:category}'
+                when 'object' then jsonb_build_array(p_json #> '{flowDataSet,flowInformation,dataSetInformation,classificationInformation,common:elementaryFlowCategorization,common:category}')
+                else '[]'::jsonb
+              end
+            ) category(item)
+            where category.item ->> '@catId' = selected.item ->> 'code'
+          )
+        ) or (
+          selected.item ->> 'scope' = 'classification'
+          and exists (
+            select 1
+            from jsonb_array_elements(
+              case jsonb_typeof(p_json #> '{flowDataSet,flowInformation,dataSetInformation,classificationInformation,common:classification,common:class}')
+                when 'array' then p_json #> '{flowDataSet,flowInformation,dataSetInformation,classificationInformation,common:classification,common:class}'
+                when 'object' then jsonb_build_array(p_json #> '{flowDataSet,flowInformation,dataSetInformation,classificationInformation,common:classification,common:class}')
+                else '[]'::jsonb
+              end
+            ) classification(item)
+            where classification.item ->> '@classId' = selected.item ->> 'code'
+          )
+        )
+      )
+    );
+end;
+$$;
+
+
+ALTER FUNCTION "private"."open_data_catalog_filter_matches"("p_dataset_kind" "text", "p_json" "jsonb", "p_filter_condition" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "private"."pgroonga_escape_query_terms"("query_terms" "text"[]) RETURNS "text"[]
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO 'extensions', 'pg_temp'
@@ -60255,6 +61454,21 @@ $$;
 ALTER FUNCTION "private"."protect_example_dataset_write"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "private"."reject_open_data_process_publication_mutation"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'pg_catalog', 'pg_temp'
+    AS $$
+begin
+  raise exception using
+    errcode = '55000',
+    message = 'Open Data Process publications are append-only';
+end;
+$$;
+
+
+ALTER FUNCTION "private"."reject_open_data_process_publication_mutation"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "private"."result_process_content_sha256_v1"("p_text" "text") RETURNS "text"
     LANGUAGE "sql" IMMUTABLE
     SET "search_path" TO ''
@@ -60848,6 +62062,81 @@ COMMENT ON FUNCTION "private"."review_canonical_json_text_v1"("p_value" "jsonb")
 
 
 
+CREATE OR REPLACE FUNCTION "private"."review_contact_references_ready"("p_json_ordered" "jsonb", "p_self_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_ref record;
+  v_table text;
+  v_exists boolean;
+begin
+  if p_json_ordered #>> '{contactDataSet,administrativeInformation,publicationAndOwnership,common:referenceToOwnershipOfDataSet,@refObjectId}'
+       is distinct from p_self_id::text then
+    return false;
+  end if;
+
+  for v_ref in
+    with recursive nodes(value) as (
+      select coalesce(
+        p_json_ordered #- '{contactDataSet,administrativeInformation,publicationAndOwnership,common:referenceToOwnershipOfDataSet}',
+        '{}'::jsonb
+      )
+      union all
+      select child.value
+      from nodes
+      cross join lateral (
+        select value from jsonb_each(
+          case when jsonb_typeof(nodes.value) = 'object' then nodes.value else '{}'::jsonb end
+        )
+        union all
+        select value from jsonb_array_elements(
+          case when jsonb_typeof(nodes.value) = 'array' then nodes.value else '[]'::jsonb end
+        )
+      ) child
+    )
+    select distinct
+      value->>'@type' as ref_type,
+      (value->>'@refObjectId')::uuid as ref_id,
+      value->>'@version' as ref_version
+    from nodes
+    where jsonb_typeof(value) = 'object'
+      and coalesce(value->>'@refObjectId', '') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      and nullif(value->>'@version', '') is not null
+      and value->>'@type' in (
+        'contact data set', 'source data set', 'unit group data set',
+        'flow property data set', 'flow data set', 'process data set',
+        'lifeCycleModel data set'
+      )
+  loop
+    v_table := case v_ref.ref_type
+      when 'contact data set' then 'contacts'
+      when 'source data set' then 'sources'
+      when 'unit group data set' then 'unitgroups'
+      when 'flow property data set' then 'flowproperties'
+      when 'flow data set' then 'flows'
+      when 'process data set' then 'processes'
+      when 'lifeCycleModel data set' then 'lifecyclemodels'
+    end;
+
+    execute format(
+      'select exists(select 1 from public.%I where id = $1 and version = $2 and state_code = 100)',
+      v_table
+    ) into v_exists using v_ref.ref_id, v_ref.ref_version;
+
+    if not coalesce(v_exists, false) then
+      return false;
+    end if;
+  end loop;
+
+  return true;
+end;
+$_$;
+
+
+ALTER FUNCTION "private"."review_contact_references_ready"("p_json_ordered" "jsonb", "p_self_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "private"."review_dataset_can_read_v1"("p_actor" "uuid", "p_target_table" "text", "p_target_row" "jsonb") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -60917,7 +62206,15 @@ begin
     join private.reviews as root_review
       on root_review.id = target.root_review_id
       and root_review.state_code in (0, 1)
-    where not exists (
+    where coalesce((
+      api.cmd_review_get_dataset_row(
+        target.target_table,
+        target.data_id,
+        target.data_version,
+        false
+      )->>'state_code'
+    )::integer, 0) < 100
+      and not exists (
       select 1
       from private.reviews as candidate
       where candidate.review_kind = 'reference'
@@ -60960,6 +62257,14 @@ begin
       candidate.id
     limit 1
   ) as reference_review on true
+  where coalesce((
+    api.cmd_review_get_dataset_row(
+      target.target_table,
+      target.data_id,
+      target.data_version,
+      false
+    )->>'state_code'
+  )::integer, 0) < 100
   order by target.root_review_id, target.target_table,
     target.data_id, target.data_version;
 end;
@@ -60983,7 +62288,11 @@ declare
   v_team_id uuid := nullif(p_target_row->>'team_id', '')::uuid;
   v_state integer := coalesce((p_target_row->>'state_code')::integer, 0);
 begin
-  if v_owner_id is null and v_state < 100 then
+  if v_state >= 100 then
+    return null;
+  end if;
+
+  if v_owner_id is null then
     raise exception using
       errcode = '23502',
       message = 'REFERENCE_OWNER_UNRESOLVED';
@@ -61026,7 +62335,7 @@ begin
       gen_random_uuid(),
       (p_target_row->>'id')::uuid,
       p_target_row->>'version',
-      case when v_state >= 100 then 2 else 0 end,
+      0,
       '[]'::jsonb,
       private.review_build_json_v1(
         p_target_table,
@@ -61038,7 +62347,7 @@ begin
       'reference',
       p_target_table,
       p_checksum,
-      case when v_state >= 100 then p_checksum else null end,
+      null,
       v_owner_id,
       v_team_id
     )
@@ -82360,6 +83669,25 @@ ALTER TABLE ONLY "private"."oauth_relation_capability_grants" FORCE ROW LEVEL SE
 ALTER TABLE "private"."oauth_relation_capability_grants" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "private"."open_data_process_publications" (
+    "process_id" "uuid" NOT NULL,
+    "process_version" character(9) NOT NULL,
+    "published_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "published_by" "uuid" NOT NULL
+);
+
+
+ALTER TABLE "private"."open_data_process_publications" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "private"."open_data_process_publications" IS 'Exact Process versions explicitly published in the Open Data catalog. Row existence is the publication state.';
+
+
+
+COMMENT ON COLUMN "private"."open_data_process_publications"."published_by" IS 'Authenticated actor that first published the exact Process version.';
+
+
+
 CREATE TABLE IF NOT EXISTS "private"."portal_catalog_character_rows_v1" (
     "dataset_kind" "text" NOT NULL,
     "id" "uuid" NOT NULL,
@@ -84563,6 +85891,11 @@ ALTER TABLE ONLY "private"."oauth_relation_capability_grants"
 
 
 
+ALTER TABLE ONLY "private"."open_data_process_publications"
+    ADD CONSTRAINT "open_data_process_publications_pkey" PRIMARY KEY ("process_id", "process_version");
+
+
+
 ALTER TABLE ONLY "private"."portal_catalog_character_rows_v1"
     ADD CONSTRAINT "portal_catalog_character_rows_v1_pkey" PRIMARY KEY ("dataset_kind", "id", "version");
 
@@ -86508,6 +87841,10 @@ COMMENT ON TRIGGER "portal_sitemap_rows_sync_v1" ON "private"."portal_catalog_fa
 
 
 
+CREATE OR REPLACE TRIGGER "reject_open_data_process_publication_mutation" BEFORE DELETE OR UPDATE ON "private"."open_data_process_publications" FOR EACH ROW EXECUTE FUNCTION "private"."reject_open_data_process_publication_mutation"();
+
+
+
 CREATE OR REPLACE TRIGGER "result_process_publications_immutable" BEFORE DELETE OR UPDATE ON "private"."result_process_publications" FOR EACH ROW EXECUTE FUNCTION "private"."result_process_publications_immutable_v1"();
 
 
@@ -87217,6 +88554,11 @@ ALTER TABLE ONLY "private"."oauth_client_capability_grants"
 
 
 
+ALTER TABLE ONLY "private"."open_data_process_publications"
+    ADD CONSTRAINT "open_data_process_publications_process_fkey" FOREIGN KEY ("process_id", "process_version") REFERENCES "public"."processes"("id", "version") ON UPDATE RESTRICT ON DELETE RESTRICT;
+
+
+
 ALTER TABLE ONLY "private"."portal_catalog_character_rows_v1"
     ADD CONSTRAINT "portal_catalog_character_parent_v1_fk" FOREIGN KEY ("dataset_kind", "id", "version") REFERENCES "private"."portal_catalog_search_rows_v1"("dataset_kind", "id", "version") ON UPDATE RESTRICT ON DELETE CASCADE;
 
@@ -87704,6 +89046,9 @@ ALTER TABLE "private"."oauth_client_registry_audit" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "private"."oauth_relation_capability_grants" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "private"."open_data_process_publications" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "portal_catalog_character_rows_internal_all_v1" ON "private"."portal_catalog_character_rows_v1" TO "api_internal_executor" USING (true) WITH CHECK (true);
@@ -88634,6 +89979,12 @@ GRANT ALL ON FUNCTION "api"."cmd_notification_send_validation_issue"("p_recipien
 
 
 
+REVOKE ALL ON FUNCTION "api"."cmd_open_data_process_publish_batch"("p_items" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."cmd_open_data_process_publish_batch"("p_items" "jsonb") TO "api_internal_executor";
+GRANT ALL ON FUNCTION "api"."cmd_open_data_process_publish_batch"("p_items" "jsonb") TO "authenticated";
+
+
+
 REVOKE ALL ON FUNCTION "api"."cmd_portal_lcia_projection_finalize_publication_v1"("p_projection_id" "uuid", "p_lcia_result_publication_id" "uuid", "p_package_version" "text", "p_package_result_hash" "text", "p_projection_content_hash" "text", "p_idempotency_key" "text", "p_audit" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "api"."cmd_portal_lcia_projection_finalize_publication_v1"("p_projection_id" "uuid", "p_lcia_result_publication_id" "uuid", "p_package_version" "text", "p_package_result_hash" "text", "p_projection_content_hash" "text", "p_idempotency_key" "text", "p_audit" "jsonb") TO "authenticated";
 
@@ -88694,6 +90045,11 @@ GRANT ALL ON FUNCTION "api"."cmd_review_change_member_role"("p_user_id" "uuid", 
 
 REVOKE ALL ON FUNCTION "api"."cmd_review_collect_dataset_targets"("p_roots" "jsonb", "p_lock" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "api"."cmd_review_collect_dataset_targets"("p_roots" "jsonb", "p_lock" boolean) TO "api_internal_executor";
+
+
+
+REVOKE ALL ON FUNCTION "api"."cmd_review_contact_activate"("p_mode" "text", "p_id" "uuid", "p_json_ordered" "jsonb", "p_operation_id" "uuid", "p_source_version" "text", "p_bind" boolean, "p_expected_contact" "jsonb", "p_audit" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."cmd_review_contact_activate"("p_mode" "text", "p_id" "uuid", "p_json_ordered" "jsonb", "p_operation_id" "uuid", "p_source_version" "text", "p_bind" boolean, "p_expected_contact" "jsonb", "p_audit" "jsonb") TO "authenticated";
 
 
 
@@ -89178,6 +90534,13 @@ GRANT ALL ON FUNCTION "api"."hybrid_search_lifecyclemodels"("query_text" "text",
 REVOKE ALL ON FUNCTION "api"."hybrid_search_lifecyclemodels_v2"("query_text" "text", "query_embedding" "text", "filter_condition" "text", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "data_source" "text", "page_size" integer, "page_current" integer, "query_terms" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "api"."hybrid_search_lifecyclemodels_v2"("query_text" "text", "query_embedding" "text", "filter_condition" "text", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "data_source" "text", "page_size" integer, "page_current" integer, "query_terms" "text"[]) TO "anon";
 GRANT ALL ON FUNCTION "api"."hybrid_search_lifecyclemodels_v2"("query_text" "text", "query_embedding" "text", "filter_condition" "text", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "data_source" "text", "page_size" integer, "page_current" integer, "query_terms" "text"[]) TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") TO "anon";
+GRANT ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") TO "api_internal_executor";
 
 
 
@@ -89692,6 +91055,12 @@ GRANT ALL ON FUNCTION "api"."qry_review_admin_queue_items_v2"("p_status" "text",
 
 
 
+REVOKE ALL ON FUNCTION "api"."qry_review_batch_eligibility_v1"("p_review_ids" "uuid"[], "p_operation" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."qry_review_batch_eligibility_v1"("p_review_ids" "uuid"[], "p_operation" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "api"."qry_review_batch_eligibility_v1"("p_review_ids" "uuid"[], "p_operation" "text") TO "api_internal_executor";
+
+
+
 REVOKE ALL ON FUNCTION "api"."qry_review_find_member_candidate_by_email"("p_email" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "api"."qry_review_find_member_candidate_by_email"("p_email" "text") TO "authenticated";
 
@@ -89711,6 +91080,12 @@ GRANT ALL ON FUNCTION "api"."qry_review_get_admin_queue_items_v3"("p_status" "te
 REVOKE ALL ON FUNCTION "api"."qry_review_get_admin_queue_items_v4"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "api"."qry_review_get_admin_queue_items_v4"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "api"."qry_review_get_admin_queue_items_v4"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") TO "api_internal_executor";
+
+
+
+REVOKE ALL ON FUNCTION "api"."qry_review_get_admin_queue_items_v5"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."qry_review_get_admin_queue_items_v5"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "api"."qry_review_get_admin_queue_items_v5"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") TO "api_internal_executor";
 
 
 
@@ -89756,6 +91131,12 @@ GRANT ALL ON FUNCTION "api"."qry_review_get_member_queue_items_v4"("p_status" "t
 
 
 
+REVOKE ALL ON FUNCTION "api"."qry_review_get_member_queue_items_v5"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."qry_review_get_member_queue_items_v5"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "api"."qry_review_get_member_queue_items_v5"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_display_mode" "text", "p_target_table" "text", "p_query" "text") TO "api_internal_executor";
+
+
+
 REVOKE ALL ON FUNCTION "api"."qry_review_get_member_root_queue_items_v2"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "api"."qry_review_get_member_root_queue_items_v2"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text") TO "api_internal_executor";
 GRANT ALL ON FUNCTION "api"."qry_review_get_member_root_queue_items_v2"("p_status" "text", "p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text") TO "authenticated";
@@ -89765,6 +91146,11 @@ GRANT ALL ON FUNCTION "api"."qry_review_get_member_root_queue_items_v2"("p_statu
 REVOKE ALL ON FUNCTION "api"."qry_review_get_member_workload"("p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_role" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "api"."qry_review_get_member_workload"("p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_role" "text") TO "api_internal_executor";
 GRANT ALL ON FUNCTION "api"."qry_review_get_member_workload"("p_page" integer, "p_page_size" integer, "p_sort_by" "text", "p_sort_order" "text", "p_role" "text") TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "api"."qry_review_get_my_contact_status"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."qry_review_get_my_contact_status"() TO "authenticated";
 
 
 
@@ -89880,6 +91266,13 @@ GRANT ALL ON FUNCTION "api"."search_lifecyclemodels"("query_text" "text", "filte
 REVOKE ALL ON FUNCTION "api"."search_lifecyclemodels_latest"("query_text" "text", "filter_condition" "jsonb", "order_by" "jsonb", "page_size" bigint, "page_current" bigint, "data_source" "text", "this_user_id" "text", "team_id_filter" "uuid", "state_code_filter" integer, "query_terms" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "api"."search_lifecyclemodels_latest"("query_text" "text", "filter_condition" "jsonb", "order_by" "jsonb", "page_size" bigint, "page_current" bigint, "data_source" "text", "this_user_id" "text", "team_id_filter" "uuid", "state_code_filter" integer, "query_terms" "text"[]) TO "anon";
 GRANT ALL ON FUNCTION "api"."search_lifecyclemodels_latest"("query_text" "text", "filter_condition" "jsonb", "order_by" "jsonb", "page_size" bigint, "page_current" bigint, "data_source" "text", "this_user_id" "text", "team_id_filter" "uuid", "state_code_filter" integer, "query_terms" "text"[]) TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") TO "anon";
+GRANT ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") TO "api_internal_executor";
 
 
 
@@ -91101,6 +92494,10 @@ GRANT ALL ON FUNCTION "private"."oauth_client_has_capability"("p_capability_id" 
 
 
 
+REVOKE ALL ON FUNCTION "private"."open_data_catalog_filter_matches"("p_dataset_kind" "text", "p_json" "jsonb", "p_filter_condition" "jsonb") FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "private"."pgroonga_escape_query_terms"("query_terms" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."pgroonga_escape_query_terms"("query_terms" "text"[]) TO "service_role";
 GRANT ALL ON FUNCTION "private"."pgroonga_escape_query_terms"("query_terms" "text"[]) TO "api_internal_executor";
@@ -91575,6 +92972,10 @@ REVOKE ALL ON FUNCTION "private"."protect_example_dataset_write"() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION "private"."reject_open_data_process_publication_mutation"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "private"."result_process_content_sha256_v1"("p_text" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."result_process_content_sha256_v1"("p_text" "text") TO "api_internal_executor";
 
@@ -91636,6 +93037,10 @@ GRANT ALL ON FUNCTION "private"."review_candidate_root_ids_v1"("p_target_table" 
 
 REVOKE ALL ON FUNCTION "private"."review_canonical_json_text_v1"("p_value" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."review_canonical_json_text_v1"("p_value" "jsonb") TO "api_internal_executor";
+
+
+
+REVOKE ALL ON FUNCTION "private"."review_contact_references_ready"("p_json_ordered" "jsonb", "p_self_id" "uuid") FROM PUBLIC;
 
 
 
@@ -92701,6 +94106,10 @@ GRANT SELECT("source_modified_at") ON TABLE "private"."next_hybrid_public_candid
 
 GRANT ALL ON TABLE "private"."notifications" TO "service_role";
 GRANT SELECT ON TABLE "private"."notifications" TO "api_internal_executor";
+
+
+
+GRANT SELECT ON TABLE "private"."open_data_process_publications" TO "api_internal_executor";
 
 
 

@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-09-28
-lastReviewedCommit: 44be788b3f1d78732a380a0617f843cb17c33819
-lastReviewedNote: "Reviewed Database #746: modern secret keys use apikey-only dispatch; legacy JWT transport and authority metadata remain preserved. Rollback-only real pg_net coverage, exact local generation, Main hotfix/Dev backmerge and separate hosted/integration gates remain aligned."
+lastReviewedCommit: "0a84eb5e14a85c45fb22609ce1ff8449735e9e11"
+lastReviewedNote: "Reviewed Database #748 published-reference review behavior against current Dev 0a84eb5e14a85c45fb22609ce1ff8449735e9e11. Repository ownership, schema-workspace generation, SQL-test, branch and validation contracts remain unchanged; migration, generated workspace and targeted regression evidence stay aligned with the current Dev migration chain."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -53,6 +53,12 @@ and `Authorization: Bearer`. Dispatch preserves its fixed empty search path,
 SECURITY DEFINER ownership and existing ACLs, body, regional header and timeout.
 
 ## Schema Boundaries
+
+Open Data catalog publication is represented independently in
+`private.open_data_process_publications`, keyed by the exact Process `id` and
+`version`. Publication is append-only, does not mutate the Process
+`state_code`, and deliberately does not depend on the temporary
+`private.sample_library_process_publications` relation.
 
 For LifecycleModel review and bundle operations, authoritative composition comes from ILCD `processInstance` references and the Process ownership pair `public.processes.model_id` plus `coalesce(public.processes.model_version, public.processes.version)`. The nullable `model_version` is an additive correction to the original same-version bundle assumption: new writers persist the exact owning LifecycleModel version, while historical rows with `model_version is null` retain the legacy Process-version fallback. Readers must never substitute the latest LifecycleModel version. `lifecyclemodels.json_tg` is persisted for frontend reconstruction only and must not define review closure, approval targets, publication admission, or deletion membership.
 
@@ -385,6 +391,14 @@ validates that representation on `private.users`; the existing Auth-to-private
 mirror remains its only synchronization path. This descriptive profile value
 must never be used as an authorization, role, team, or RLS input.
 
+Review Member Contact readiness is projected through
+`api.qry_review_get_my_contact_status()`. Initial creation and later version
+updates use `api.cmd_review_contact_activate(...)`, which serializes each actor,
+checks the current profile binding, forces a self-ownership reference, requires
+open external references, publishes the created Contact as state `100`, and
+updates the optional account binding in one transaction. Ordinary Contact
+commands and Review Admin membership admission do not write this binding.
+
 ## National Carbon Process Statistics
 
 `api.qry_national_carbon_organization_contributions(integer)` returns the
@@ -448,7 +462,7 @@ pagination, new JSON GIN index, or synthetic 50,000-row benchmark is required.
 | `supabase/tests/preview/**` | exact-ref-bound disposable Hosted Preview mutation fixtures, cleanup, rollback-only fault assertions, and offline transport/lifecycle contracts; test-only and excluded from migrations, seeds, Dev data rehearsal, and production execution |
 | `.env.supabase.dev.local.example`, `.env.supabase.main.local.example` | operator branch-binding templates |
 | `scripts/**` | export, refresh, change-copy, migration-generation, and workflow-contract helpers; `resolve_migration_head.py` is the single parser used to derive the current checkout's exact migration head for persistent-Dev verification |
-| `.github/workflows/supabase-dev.yml` | local-contract rebuild, exact-check-gated PR Preview PostgREST/anonymous Hybrid verification, database-only persistent-Dev migration deployment with `db push --include-all`, and exact hosted verification |
+| `.github/workflows/supabase-dev.yml` | local-contract rebuild, exact-check-gated PR Preview PostgREST/anonymous Hybrid verification, exact `dev -> main` promotion classification that reuses source-PR and persistent-Dev proof without hosted mutation, database-only persistent-Dev migration deployment with `db push --include-all`, and exact hosted verification |
 | `supabase/workspace/changes/**` | manual overlay area used when generating migrations from workspace files |
 | `supabase/workspace/remote_schema.sql` | generated full raw dump from the remote database |
 | `supabase/workspace/global/**` | generated split-out global objects rebuilt on workspace refresh |
@@ -463,7 +477,7 @@ pagination, new JSON GIN index, or synthetic 50,000-row benchmark is required.
 - Git `dev` is the daily integration trunk
 - Git `main` is the promoted release line
 - PR branches map to Supabase preview branches
-- the pull-request-only Preview job skips forks before authority, verifies exact event base/head commits, and classifies only deployable Preview inputs: `config.toml`, migrations, root/extra seed files, and Functions. Repository-only workspace, test, template, and documentation files are excluded. An exact zero diff over the deployable set succeeds without Preview authority or hosted mutation and accepts the official App's expected `skipped` result. Any deployable change still fails closed when authority is absent and requires the exact official check, disposable BranchResponse identity, PostgREST PATCH/readback, enabled public key, and anonymous Hybrid/sitemap proof; the job has no migration, Function, persistent-Dev, or production mutation path
+- the pull-request-only Preview job skips forks before authority, verifies exact event base/head commits, and classifies only deployable Preview inputs: `config.toml`, migrations, root/extra seed files, and Functions. Repository-only workspace, test, template, and documentation files are excluded. An exact zero diff over the deployable set succeeds without Preview authority or hosted mutation and accepts the official App's expected `skipped` result. The exact same-repository `dev -> main` promotion also stops before authority or hosted mutation because its long-lived head is the persistent Dev project and it reuses the source PRs' disposable Preview evidence plus persistent-Dev proof. Every other deployable change still fails closed when authority is absent and requires the exact official check, disposable BranchResponse identity, PostgREST PATCH/readback, enabled public key, and anonymous Hybrid/sitemap proof; the job has no migration, Function, persistent-Dev, or production mutation path
 - `.github/workflows/supabase-dev.yml` is the sole migration deployer for Git `dev`; it gates the remote job on the local contract, issues exactly one `db push --include-all`, applies one exact Management API PATCH limited to the three PostgREST runtime fields checked into `supabase/config.toml`, and verifies the exact hosted result without Functions deployment, broad config push, or any other Management API mutation
 - after the database deployment succeeds, persistent-Dev Functions are deployed and validated through `tiangong-lca-edge-functions`; this repo contains no Function runtime source or Function deploy command
 - the production Supabase project is migrated automatically by the Supabase GitHub integration when Git `main` advances

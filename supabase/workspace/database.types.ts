@@ -427,6 +427,10 @@ export type Database = {
         }
         Returns: Json
       }
+      cmd_open_data_process_publish_batch: {
+        Args: { p_items: Json }
+        Returns: Json
+      }
       cmd_portal_lcia_projection_finalize_publication_v1: {
         Args: {
           p_audit?: Json
@@ -527,6 +531,19 @@ export type Database = {
           state_code: number
           table_name: string
         }[]
+      }
+      cmd_review_contact_activate: {
+        Args: {
+          p_audit?: Json
+          p_bind?: boolean
+          p_expected_contact?: Json
+          p_id: string
+          p_json_ordered: Json
+          p_mode: string
+          p_operation_id: string
+          p_source_version?: string
+        }
+        Returns: Json
       }
       cmd_review_extract_refs: {
         Args: { p_json: Json }
@@ -1169,6 +1186,35 @@ export type Database = {
         Returns: {
           id: string
           json: Json
+          modified_at: string
+          team_id: string
+          total_count: number
+          version: string
+        }[]
+      }
+      hybrid_search_open_data_catalog: {
+        Args: {
+          filter_condition?: Json
+          lexical_weight?: number
+          match_count?: number
+          match_threshold?: number
+          p_dataset_kind: string
+          page_current?: number
+          page_size?: number
+          publication_filter?: string
+          query_embedding: string
+          query_terms?: string[]
+          query_text: string
+          rrf_k?: number
+          semantic_weight?: number
+          source_filter?: string
+        }
+        Returns: {
+          id: string
+          is_published: boolean
+          json: Json
+          model_id: string
+          model_version: string
           modified_at: string
           team_id: string
           total_count: number
@@ -2020,6 +2066,22 @@ export type Database = {
           total_count: number
         }[]
       }
+      qry_review_batch_eligibility_v1: {
+        Args: { p_operation: string; p_review_ids: string[] }
+        Returns: {
+          approve_opinion_count: number
+          data_version: string
+          eligible: boolean
+          ordinal: number
+          reason_code: string
+          reject_opinion_count: number
+          review_id: string
+          reviewer_count: number
+          state_code: number
+          submitted_opinion_count: number
+          target_table: string
+        }[]
+      }
       qry_review_find_member_candidate_by_email: {
         Args: { p_email: string }
         Returns: {
@@ -2100,6 +2162,39 @@ export type Database = {
           json: Json
           modified_at: string
           review_kind: string
+          reviewer_id: Json
+          root_can_read: boolean
+          root_matches_status: boolean
+          state_code: number
+          target_table: string
+          total_count: number
+        }[]
+      }
+      qry_review_get_admin_queue_items_v5: {
+        Args: {
+          p_display_mode?: string
+          p_page?: number
+          p_page_size?: number
+          p_query?: string
+          p_sort_by?: string
+          p_sort_order?: string
+          p_status?: string
+          p_target_table?: string
+        }
+        Returns: {
+          approve_opinion_count: number
+          comment_state_codes: Json
+          completed_reviewer_count: number
+          created_at: string
+          data_id: string
+          data_version: string
+          deadline: string
+          id: string
+          json: Json
+          modified_at: string
+          reject_opinion_count: number
+          review_kind: string
+          reviewer_count: number
           reviewer_id: Json
           root_can_read: boolean
           root_matches_status: boolean
@@ -2271,6 +2366,42 @@ export type Database = {
           total_count: number
         }[]
       }
+      qry_review_get_member_queue_items_v5: {
+        Args: {
+          p_display_mode?: string
+          p_page?: number
+          p_page_size?: number
+          p_query?: string
+          p_sort_by?: string
+          p_sort_order?: string
+          p_status?: string
+          p_target_table?: string
+        }
+        Returns: {
+          approve_opinion_count: number
+          comment_created_at: string
+          comment_json: Json
+          comment_modified_at: string
+          comment_state_code: number
+          completed_reviewer_count: number
+          created_at: string
+          data_id: string
+          data_version: string
+          deadline: string
+          id: string
+          json: Json
+          modified_at: string
+          reject_opinion_count: number
+          review_kind: string
+          review_state_code: number
+          reviewer_count: number
+          reviewer_id: Json
+          root_can_read: boolean
+          root_matches_status: boolean
+          target_table: string
+          total_count: number
+        }[]
+      }
       qry_review_get_member_root_queue_items_v2: {
         Args: {
           p_page?: number
@@ -2321,6 +2452,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      qry_review_get_my_contact_status: { Args: never; Returns: Json }
       qry_review_member_queue_items_v2: {
         Args: { p_page?: number; p_page_size?: number; p_status?: string }
         Returns: {
@@ -2643,6 +2775,32 @@ export type Database = {
           json: Json
           modified_at: string
           rank: number
+          team_id: string
+          total_count: number
+          version: string
+        }[]
+      }
+      search_open_data_catalog: {
+        Args: {
+          p_dataset_kind: string
+          p_filter_condition?: Json
+          p_page_current?: number
+          p_page_size?: number
+          p_publication_filter?: string
+          p_query_terms?: string[]
+          p_query_text?: string
+          p_search_mode?: string
+          p_sort_by?: string
+          p_sort_direction?: string
+          p_source_filter?: string
+        }
+        Returns: {
+          id: string
+          is_published: boolean
+          json: Json
+          model_id: string
+          model_version: string
+          modified_at: string
           team_id: string
           total_count: number
           version: string
