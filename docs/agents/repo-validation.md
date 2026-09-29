@@ -32,9 +32,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-09-28
-lastReviewedCommit: "0a84eb5e14a85c45fb22609ce1ff8449735e9e11"
-lastReviewedNote: "Reviewed Database #748 published-reference review behavior against current Dev 0a84eb5e14a85c45fb22609ce1ff8449735e9e11. Repository ownership, schema-workspace generation, SQL-test, branch and validation contracts remain unchanged; migration, generated workspace and targeted regression evidence stay aligned with the current Dev migration chain."
+lastReviewedAt: 2026-09-29
+lastReviewedCommit: 6578fc9ecf49046c15d082a1808d7e29836bae6c
+lastReviewedNote: "Reviewed Database #754 rejected review-report download authorization. Full local reset plus focused pgTAP covers exact-owner admission, cross-user/version/process denials, unchanged Source RLS, current attachment replacement, empty attachments, and traversal rejection."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -623,3 +623,5 @@ After a blank candidate rebuild, run `supabase/tests/20260927_portal_catalog_bou
 Compare the exact Main predecessor and candidate on one owned synthetic fixture, including predecessor-issued cursors. Materialize one RPC result before reading its digest, cursor, rows or payload: referencing a STABLE function through an inlined subquery can execute it repeatedly and is not a valid one-call timing collector. Record the collector hash, exact baseline/candidate source, roles, effective work_mem, fixture cardinality/card width and EXPLAIN ANALYZE/BUFFERS. The legacy qualification uses 4 MB work_mem and an unchanged eight-second request budget; its four-client profile must compare successful responses to the serial reference and report p95 wall time against the two-second controlled-fixture target. These are local measurements, not production p95 or an attribution of the original failed query arguments.
 
 The populated cutover must reject missing/drifted facts before replacing readers. Assert that temporary DDL membership/schema rights return to their prestate, that the retained internal execution principal still works and external private access stays denied. Rebuild the owned fixture before writer probes and export. Qualify real committed withdrawal with an independent reader session, regenerate all five schemas and Data API types twice without drift, then require official Preview/CI, exact Main deployment/source/functional readback, required Dev synchronization and eligible Root integration.
+
+Allocation-v4 qualification additionally runs `supabase/tests/20260929_allocation_v4_scope_closure.sql` with the scope-closure suites above in an isolated local project. Verify omitted/explicit identity parity, v3 hash separation, stale-version rejection, cutoff and unchanged internal ACLs. This local proof does not authorize production migration or certificate reuse.

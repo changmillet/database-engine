@@ -37,9 +37,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-09-28
-lastReviewedCommit: "0a84eb5e14a85c45fb22609ce1ff8449735e9e11"
-lastReviewedNote: "Reviewed Database #748 published-reference review behavior against current Dev 0a84eb5e14a85c45fb22609ce1ff8449735e9e11. Repository ownership, schema-workspace generation, SQL-test, branch and validation contracts remain unchanged; migration, generated workspace and targeted regression evidence stay aligned with the current Dev migration chain."
+lastReviewedAt: 2026-09-29
+lastReviewedCommit: b446dd7a7999b4872f7f808673464327ec89f009
+lastReviewedNote: "Reviewed Database #754 rejected review-report download authorization after integrating current Dev through Database #755. The actor-bound descriptor RPC preserves Source RLS, derives only current exact-version external_docs attachments, and follows the existing migration, capability-manifest, SQL-test, and branch contracts."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md
