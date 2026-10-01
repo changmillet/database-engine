@@ -30,9 +30,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-09-29
-lastReviewedCommit: 6578fc9ecf49046c15d082a1808d7e29836bae6c
-lastReviewedNote: "Reviewed Database #754 rejected review-report download authorization. One SECURITY DEFINER API façade binds the authenticated Process owner to an exact terminal rejected comment and returns only current attachment descriptors; Source relations and RLS remain unchanged."
+lastReviewedAt: 2026-10-01
+lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
+lastReviewedNote: "Reviewed Database #762. Current dependencies derive from Root JSON and approving Comment states 1/2; rejection opinions retain evidence without adding dependencies. Exact reference guards and rejected-report download/Source RLS remain intact."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -92,6 +92,20 @@ in `private.api_capability_grants`. That table records the owning capability ID
 and admitted caller roles; migrations first remove inherited grants and then
 rebuild the external ACL from this closed manifest. New or overloaded RPCs are
 therefore denied until their exact signature is deliberately classified.
+
+## Review opinion dependency scope
+
+Current Root/Reference derivation reads actual Root JSON and approving Comment
+metadata in states `1` and `2`. A reviewer rejection (`-3`) is an opinion awaiting
+final administrator action: submission preserves its report and reason without
+provisioning Reference Reviews or applying metadata to the Root. Draft (`0`),
+revoked (`-2`) and terminal rejected (`-1`) Comments likewise add no dependency.
+This matches approval metadata admission and final approval; a genuine Root JSON
+or approving Comment reference still requires its exact current Reference Review.
+Report Sources referenced by approval metadata retain existing review admission.
+Rejected report download uses its separate actor-bound descriptor RPC and retains
+Source RLS; it does not publish the Source or turn rejection evidence into a
+business dependency.
 
 ## Protected Derivative Scheduling
 

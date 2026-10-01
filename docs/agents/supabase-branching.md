@@ -22,9 +22,9 @@ checkPaths:
   - .github/workflows/supabase-dev.yml
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
-lastReviewedAt: 2026-09-29
-lastReviewedCommit: 18c3090d8335d805290e8b0b9556e0c3e6fb3f43
-lastReviewedNote: "Reviewed Database #754 rejected review report download delivery. Adding the targeted pgTAP file to the existing local-contract job does not change branch bindings, Preview authority, persistent Dev deployment, or production promotion behavior."
+lastReviewedAt: 2026-10-01
+lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
+lastReviewedNote: "Reviewed Database #762. Adding the focused rejection-scope suite to the local-contract job does not change Preview authority, Dev migration deployment, Main promotion or branch bindings."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

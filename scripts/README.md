@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-09-29
-lastReviewedCommit: b446dd7a7999b4872f7f808673464327ec89f009
-lastReviewedNote: "Reviewed Database #754 rejected review report download delivery after integrating current Dev through Database #755. Existing schema-workspace and Data API type generation commands remain authoritative; exact-local snapshots are regenerated with the CI-pinned CLI and checked for drift."
+lastReviewedAt: 2026-10-01
+lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
+lastReviewedNote: "Reviewed Database #762. Five-schema local regeneration and public/api type generation follow existing commands; two runs are deterministic and helper semantics remain unchanged."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml

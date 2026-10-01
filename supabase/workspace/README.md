@@ -20,9 +20,9 @@ checkPaths:
   - .githooks/pre-push
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-09-29
-lastReviewedCommit: b446dd7a7999b4872f7f808673464327ec89f009
-lastReviewedNote: "Reviewed Database #754 rejected review report download delivery after integrating current Dev through Database #755. The generated RPC/helper workspace and public/api type snapshot match the combined exact local migration head; generated-versus-stable ownership rules are unchanged."
+lastReviewedAt: 2026-10-01
+lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
+lastReviewedNote: "Reviewed Database #762. Exact-local five-schema snapshot changes only the resolver Comment-state filter and its comment; two generations match across 1840 files and public/api types remain unchanged. Hosted Dev provenance remains deferred."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
