@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: eae0933d87cf83dbf160b2439c6de5431c758ab1
-lastReviewedNote: "Reviewed Database #761 CI regression registration: the filtered latest-Flow suite runs in the existing schema/capability local-contract step; workflow authority, branch bindings and SQL behavior stay unchanged."
+lastReviewedCommit: c5fc0522
+lastReviewedNote: "Reviewed Database #759 member workload drill-down CI repair after integrating current Dev through Database #761. Clean reset, deterministic Supabase 2.117.0 generation, and focused workload/API contract pgTAP remain required proof."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

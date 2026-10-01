@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
-lastReviewedNote: "Reviewed Database #761: exact-local schema and Data API type generation with CI-pinned Supabase CLI 2.117.0 produced two identical snapshots; generated ownership and command contracts remain unchanged."
+lastReviewedCommit: c5fc0522
+lastReviewedNote: "Reviewed Database #759 after integrating current Dev through Database #761. The generated public/api snapshot matches Supabase CLI 2.117.0; generic helper formatting and generated-versus-stable ownership rules remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
