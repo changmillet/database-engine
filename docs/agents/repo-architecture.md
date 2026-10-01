@@ -30,9 +30,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-09-29
-lastReviewedCommit: 6578fc9ecf49046c15d082a1808d7e29836bae6c
-lastReviewedNote: "Reviewed Database #754 rejected review-report download authorization. One SECURITY DEFINER API façade binds the authenticated Process owner to an exact terminal rejected comment and returns only current attachment descriptors; Source relations and RLS remain unchanged."
+lastReviewedAt: 2026-10-01
+lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
+lastReviewedNote: "Reviewed Database #762 refresh against exact Dev merge 4a4083a (#759/#761). Workload classification/facade, bounded Flow reads and current rejection-opinion scope coexist; existing routes, ownership and branch authority remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -92,6 +92,24 @@ in `private.api_capability_grants`. That table records the owning capability ID
 and admitted caller roles; migrations first remove inherited grants and then
 rebuild the external ACL from this closed manifest. New or overloaded RPCs are
 therefore denied until their exact signature is deliberately classified.
+
+## Review opinion dependency scope
+
+Current Root/Reference derivation reads actual Root JSON, approving submissions
+(`1`), and retained finalized-Comment compatibility (`2`). A current reviewer
+rejection (`-3`) is an opinion awaiting final administrator action: submission
+preserves its report and reason without provisioning Reference Reviews or
+applying metadata to the Root. Draft (`0`), revoked (`-2`) and terminal rejected
+(`-1`) Comments likewise add no dependency.
+
+Final approval marks every non-revoked Comment as `2`, including an earlier
+rejection. State `2` therefore records finalization and does not prove an
+original approving decision. This fix preserves that finalized-comment
+compatibility and does not reinterpret historical opinions. Active Root JSON
+and eligible Comment dependencies retain their exact current Reference Review
+guard. Report Sources in approving submissions retain existing review admission.
+Rejected report download uses its separate actor-bound descriptor RPC and
+retains Source RLS; it does not publish the Source or add a business dependency.
 
 ## Protected Derivative Scheduling
 
@@ -953,3 +971,14 @@ For nonempty text, the same legacy pattern helpers, exact-id union semantics and
 V2 Facets intersects authoritative legacy candidate keys with the synchronized classic-filter universe, then groups the six existing scalar facet columns. Duplicate pattern hits do not double-count an exact dataset version. Both readers remain subject to explicit public states, facet-contract identity and the complete cutover coverage/state/timestamp guard. Their public DTOs, scientific values, runtime budgets, projection/writer graph and exposed ACLs remain unchanged.
 
 The Search kernel owner aligns with the existing portal_public_executor reader; the previous api_internal_executor EXECUTE principal is explicitly retained. Temporary DDL role/schema permissions are restored before the migration commits, including after a failed transaction. These owner and grant changes require generated snapshots and role/visibility tests rather than a blanket assertion that all ownership metadata is identical.
+
+## Filtered Flow latest-version reader
+
+`api.get_latest_flow_versions` admits an identity when any version visible to
+the invoker matches its filters, then returns that identity's latest visible
+version. The filtered branch reads matching id/JSON facts separately from
+visible keys, counts and pages those narrow keys, and hydrates only the selected
+exact id/version through the primary key under the same RLS. It preserves
+legacy object/array classification and Emissions containment, source scopes,
+count and sort semantics, the existing type-expression indexes, and the
+60-second function setting. No projection, index, writer or grant is added.

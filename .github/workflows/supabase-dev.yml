@@ -65,8 +65,10 @@ jobs:
           supabase test db supabase/tests/20260810_issue_455_mutable_export_terminal_refresh.sql
           supabase test db supabase/tests/20260910_selected_export_refresh.sql
           supabase test db supabase/tests/20260909_review_queue_full_text_search.sql
+          supabase test db supabase/tests/20260930_review_member_workload_drilldown.sql
           supabase test db supabase/tests/20260928_review_rejection_visibility.sql
           supabase test db supabase/tests/20260929_rejected_review_report_download.sql
+          supabase test db supabase/tests/20261001_rejected_comment_reference_scope.sql
           supabase test db supabase/tests/20260909_tidas_partial_import.sql
           supabase test db supabase/tests/20260918_tidas_full_package_import.sql
           supabase test db supabase/tests/20260919_portal_navigation_v1.sql
@@ -74,6 +76,7 @@ jobs:
           supabase test db supabase/tests/20260926_portal_catalog_bounded_v3.sql
           supabase test db supabase/tests/20260927_portal_catalog_bounded_v2.sql
           supabase test db supabase/tests/20260910_example_dataset_scope.sql
+          supabase test db supabase/tests/20261001_filtered_latest_flow_payloads.sql
           supabase test db supabase/tests/20260921_guarded_dataset_save_draft.sql
           supabase test db supabase/tests/20260714_guarded_dataset_derivative_rebuild.sql
           supabase test db supabase/tests/20260715_guarded_dataset_derivative_rebuild_batch.sql

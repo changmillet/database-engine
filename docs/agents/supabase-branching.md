@@ -22,9 +22,9 @@ checkPaths:
   - .github/workflows/supabase-dev.yml
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
-lastReviewedAt: 2026-09-29
-lastReviewedCommit: 18c3090d8335d805290e8b0b9556e0c3e6fb3f43
-lastReviewedNote: "Reviewed Database #754 rejected review report download delivery. Adding the targeted pgTAP file to the existing local-contract job does not change branch bindings, Preview authority, persistent Dev deployment, or production promotion behavior."
+lastReviewedAt: 2026-10-01
+lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
+lastReviewedNote: "Reviewed combined Database #761/#762. Registering both focused SQL suites in local-contract does not change Preview authority, persistent Dev deployment, Main promotion or branch bindings."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

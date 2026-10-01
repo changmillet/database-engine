@@ -22,9 +22,9 @@ checkPaths:
   - .github/workflows/supabase-dev.yml
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
-lastReviewedAt: 2026-09-29
-lastReviewedCommit: 18c3090d8335d805290e8b0b9556e0c3e6fb3f43
-lastReviewedNote: "复核 Database #754 驳回审查报告下载交付。将定向 pgTAP 文件接入现有 local-contract job，不改变分支绑定、Preview 权限、持久 Dev 部署或生产晋升行为。"
+lastReviewedAt: 2026-10-01
+lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
+lastReviewedNote: "复核 Database #761/#762 组合：两项定向 SQL 回归均加入 local-contract，不改变 Preview 权限、Dev 部署、Main 晋升或分支绑定。"
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
