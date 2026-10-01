@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
-lastReviewedNote: "Reviewed combined Database #761/#762. Both focused SQL suites run in CI; combined blank replay, adjacent regressions and deterministic five-schema generation qualify local coexistence. Preview, Dev/Main and root integration remain separate proofs."
+lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
+lastReviewedNote: "Reviewed Database #759/#761/#762 combined qualification against Dev 4a4083a. New workload, Flow and Review suites plus schema/API/OAuth proof and deterministic CLI 2.117.0 generation are required; hosted Preview, Dev/Main and root integration remain separate."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

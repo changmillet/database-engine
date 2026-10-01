@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
-lastReviewedNote: "Reviewed combined Database #761/#762. The bounded filtered Flow reader preserves historical match/latest-visible output and invoker RLS; current rejection opinions are excluded while finalized state-2 compatibility remains. Both implementation contracts coexist without new schema ownership."
+lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
+lastReviewedNote: "Reviewed Database #762 refresh against exact Dev merge 4a4083a (#759/#761). Workload classification/facade, bounded Flow reads and current rejection-opinion scope coexist; existing routes, ownership and branch authority remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

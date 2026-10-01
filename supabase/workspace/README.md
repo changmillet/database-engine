@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
-lastReviewedNote: "Reviewed combined Database #761/#762 on exact Dev merge 59f250a. Local five-schema snapshot contains both Flow payload bounds and current rejection-opinion scope with finalized compatibility. Deterministic generation and hosted provenance remain separate requirements."
+lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
+lastReviewedNote: "Reviewed Database #759/#761/#762 combined exact-local snapshot against Dev 4a4083a. Workload RPC/types, bounded Flow and current rejection-opinion scope coexist; deterministic generation and hosted provenance remain separate proofs."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

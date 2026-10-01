@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
-lastReviewedNote: "复核 Database #761/#762 与准确 Dev merge 59f250a 的组合：沿用五 schema 与 public/api 类型生成命令；脚本行为不变。"
+lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
+lastReviewedNote: "Reviewed Database #762 refresh against exact Dev merge 4a4083a (#759/#761). Workload classification/facade, bounded Flow reads and current rejection-opinion scope coexist; existing routes, ownership and branch authority remain unchanged."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml

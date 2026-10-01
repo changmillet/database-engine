@@ -1,8 +1,8 @@
 version: 1
 layout: repo
 lastReviewedAt: "2026-10-01"
-lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
-lastReviewedNote: "Reviewed combined Database #761/#762 on exact Dev merge 59f250a. Both existing migration/test/workspace routes remain unchanged; Flow payload bounds and current rejection opinion scope follow their owning contracts."
+lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
+lastReviewedNote: "Reviewed Database #762 refresh against exact Dev merge 4a4083a (#759/#761). Workload classification/facade, bounded Flow reads and current rejection-opinion scope coexist; existing routes, ownership and branch authority remain unchanged."
 
 # Keep deterministic governance facts here.
 # AGENTS.md remains the repo contract entrypoint.

@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
-lastReviewedNote: "复核 Database #761/#762 与准确 Dev merge 59f250a 的组合：本地五 schema 快照同时包含 Flow payload 限定与当前拒绝意见范围，并保留 finalized 兼容。确定性生成与托管来源仍为独立验证。"
+lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
+lastReviewedNote: "Reviewed Database #759/#761/#762 combined exact-local snapshot against Dev 4a4083a. Workload RPC/types, bounded Flow and current rejection-opinion scope coexist; deterministic generation and hosted provenance remain separate proofs."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
