@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: c5fc0522
-lastReviewedNote: "复核 Database #759，并合入截至 Database #761 的当前 Dev。生成的 public/api 快照匹配 Supabase CLI 2.117.0；通用 helper 格式及生成内容与稳定内容的归属规则不变。"
+lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
+lastReviewedNote: "Reviewed Database #759/#761/#762 combined exact-local snapshot against Dev 4a4083a. Workload RPC/types, bounded Flow and current rejection-opinion scope coexist; deterministic generation and hosted provenance remain separate proofs."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

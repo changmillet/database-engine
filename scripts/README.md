@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: c5fc0522
-lastReviewedNote: "Reviewed Database #759 after integrating current Dev through Database #761. Existing generation commands remain authoritative; the public/api snapshot must be regenerated with the CI-pinned Supabase CLI 2.117.0 and checked for deterministic output."
+lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
+lastReviewedNote: "Reviewed Database #762 refresh against exact Dev merge 4a4083a (#759/#761). Workload classification/facade, bounded Flow reads and current rejection-opinion scope coexist; existing routes, ownership and branch authority remain unchanged."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml

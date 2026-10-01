@@ -23,8 +23,8 @@ checkPaths:
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: eae0933d87cf83dbf160b2439c6de5431c758ab1
-lastReviewedNote: "复核 Database #761 CI 回归测试注册：过滤后的最新 Flow 测试接入现有 schema/capability 本地合同步骤；工作流权限、分支绑定及 SQL 行为不变。"
+lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
+lastReviewedNote: "复核 Database #761/#762 组合：两项定向 SQL 回归均加入 local-contract，不改变 Preview 权限、Dev 部署、Main 晋升或分支绑定。"
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

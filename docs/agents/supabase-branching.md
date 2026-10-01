@@ -23,8 +23,8 @@ checkPaths:
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: eae0933d87cf83dbf160b2439c6de5431c758ab1
-lastReviewedNote: "Reviewed Database #761 CI regression registration: the filtered latest-Flow suite runs in the existing schema/capability local-contract step; workflow authority, branch bindings and SQL behavior stay unchanged."
+lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
+lastReviewedNote: "Reviewed combined Database #761/#762. Registering both focused SQL suites in local-contract does not change Preview authority, persistent Dev deployment, Main promotion or branch bindings."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

@@ -63304,7 +63304,7 @@ CREATE OR REPLACE FUNCTION "private"."review_resolve_current_reference_targets_v
     from requested_roots as root_review
     join private.comments as comment_row
       on comment_row.review_id = root_review.id
-      and comment_row.state_code in (1, -3, 2)
+      and comment_row.state_code in (1, 2)
     cross join lateral api.cmd_review_extract_refs(
       coalesce(comment_row.json::jsonb, '{}'::jsonb)
     ) as ref
@@ -63437,7 +63437,7 @@ $$;
 ALTER FUNCTION "private"."review_resolve_current_reference_targets_v1"("p_root_review_ids" "uuid"[]) OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "private"."review_resolve_current_reference_targets_v1"("p_root_review_ids" "uuid"[]) IS 'Resolves current review references using exact Process owner versions with legacy same-version fallback.';
+COMMENT ON FUNCTION "private"."review_resolve_current_reference_targets_v1"("p_root_review_ids" "uuid"[]) IS 'Resolves exact current Root JSON, approving submissions (1) and retained finalized-Comment compatibility (2). Current rejection opinions (-3), drafts (0), revoked (-2) and terminal rejected (-1) Comments do not add dependencies. State 2 records finalization, not the original decision; exact current Reference Review guards remain intact.';
 
 
 

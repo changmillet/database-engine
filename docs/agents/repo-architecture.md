@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: c5fc0522
-lastReviewedNote: "Reviewed Database #759 member workload drill-down CI repair after integrating current Dev through Database #761. Generated type formatting does not change repository architecture or ownership."
+lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
+lastReviewedNote: "Reviewed Database #762 refresh against exact Dev merge 4a4083a (#759/#761). Workload classification/facade, bounded Flow reads and current rejection-opinion scope coexist; existing routes, ownership and branch authority remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -92,6 +92,24 @@ in `private.api_capability_grants`. That table records the owning capability ID
 and admitted caller roles; migrations first remove inherited grants and then
 rebuild the external ACL from this closed manifest. New or overloaded RPCs are
 therefore denied until their exact signature is deliberately classified.
+
+## Review opinion dependency scope
+
+Current Root/Reference derivation reads actual Root JSON, approving submissions
+(`1`), and retained finalized-Comment compatibility (`2`). A current reviewer
+rejection (`-3`) is an opinion awaiting final administrator action: submission
+preserves its report and reason without provisioning Reference Reviews or
+applying metadata to the Root. Draft (`0`), revoked (`-2`) and terminal rejected
+(`-1`) Comments likewise add no dependency.
+
+Final approval marks every non-revoked Comment as `2`, including an earlier
+rejection. State `2` therefore records finalization and does not prove an
+original approving decision. This fix preserves that finalized-comment
+compatibility and does not reinterpret historical opinions. Active Root JSON
+and eligible Comment dependencies retain their exact current Reference Review
+guard. Report Sources in approving submissions retain existing review admission.
+Rejected report download uses its separate actor-bound descriptor RPC and
+retains Source RLS; it does not publish the Source or add a business dependency.
 
 ## Protected Derivative Scheduling
 
