@@ -32,7 +32,7 @@ checkPaths:
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
 lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
-lastReviewedNote: "Reviewed Database #762. Current dependencies derive from Root JSON and approving Comment states 1/2; rejection opinions retain evidence without adding dependencies. Exact reference guards and rejected-report download/Source RLS remain intact."
+lastReviewedNote: "Reviewed Database #762. Current dependencies derive from Root JSON, approving submissions (1) and retained finalized-Comment compatibility (2); current rejection opinions (-3) retain evidence without adding dependencies. Exact reference guards and rejected-report download/Source RLS remain intact."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -95,17 +95,21 @@ therefore denied until their exact signature is deliberately classified.
 
 ## Review opinion dependency scope
 
-Current Root/Reference derivation reads actual Root JSON and approving Comment
-metadata in states `1` and `2`. A reviewer rejection (`-3`) is an opinion awaiting
-final administrator action: submission preserves its report and reason without
-provisioning Reference Reviews or applying metadata to the Root. Draft (`0`),
-revoked (`-2`) and terminal rejected (`-1`) Comments likewise add no dependency.
-This matches approval metadata admission and final approval; a genuine Root JSON
-or approving Comment reference still requires its exact current Reference Review.
-Report Sources referenced by approval metadata retain existing review admission.
-Rejected report download uses its separate actor-bound descriptor RPC and retains
-Source RLS; it does not publish the Source or turn rejection evidence into a
-business dependency.
+Current Root/Reference derivation reads actual Root JSON, approving submissions
+(`1`), and retained finalized-Comment compatibility (`2`). A current reviewer
+rejection (`-3`) is an opinion awaiting final administrator action: submission
+preserves its report and reason without provisioning Reference Reviews or
+applying metadata to the Root. Draft (`0`), revoked (`-2`) and terminal rejected
+(`-1`) Comments likewise add no dependency.
+
+Final approval marks every non-revoked Comment as `2`, including an earlier
+rejection. State `2` therefore records finalization and does not prove an
+original approving decision. This fix preserves that finalized-comment
+compatibility and does not reinterpret historical opinions. Active Root JSON
+and eligible Comment dependencies retain their exact current Reference Review
+guard. Report Sources in approving submissions retain existing review admission.
+Rejected report download uses its separate actor-bound descriptor RPC and
+retains Source RLS; it does not publish the Source or add a business dependency.
 
 ## Protected Derivative Scheduling
 

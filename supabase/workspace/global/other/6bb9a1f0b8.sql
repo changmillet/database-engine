@@ -1,1 +1,0 @@
-COMMENT ON FUNCTION "private"."review_resolve_current_reference_targets_v1"("p_root_review_ids" "uuid"[]) IS 'Resolves exact current Root JSON and approval Comment references (states 1, 2). Rejection opinions, drafts and revoked Comments do not create dependencies; real missing current Reference Reviews remain fail-closed.';

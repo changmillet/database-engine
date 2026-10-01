@@ -1,7 +1,7 @@
--- Database #762: rejection opinions are evidence, not approved metadata.
+-- Database #762: current rejection opinions (-3) do not admit dependencies.
 -- cmd_review_submit_comment provisions references only for state 1; final
 -- approval applies only that metadata. Match current derivation to those writes.
--- Keep real Root JSON and approval-comment dependencies fail-closed.
+-- Retain finalized Comment state 2 compatibility and real-reference guards.
 begin;
 
 do $migration$
@@ -25,6 +25,6 @@ end;
 $migration$;
 
 comment on function private.review_resolve_current_reference_targets_v1(uuid[]) is
-  'Resolves exact current Root JSON and approval Comment references (states 1, 2). Rejection opinions, drafts and revoked Comments do not create dependencies; real missing current Reference Reviews remain fail-closed.';
+  'Resolves exact current Root JSON, approving submissions (1) and retained finalized-Comment compatibility (2). Current rejection opinions (-3), drafts (0), revoked (-2) and terminal rejected (-1) Comments do not add dependencies. State 2 records finalization, not the original decision; exact current Reference Review guards remain intact.';
 
 commit;

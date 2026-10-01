@@ -63207,7 +63207,7 @@ $$;
 ALTER FUNCTION "private"."review_resolve_current_reference_targets_v1"("p_root_review_ids" "uuid"[]) OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "private"."review_resolve_current_reference_targets_v1"("p_root_review_ids" "uuid"[]) IS 'Resolves exact current Root JSON and approval Comment references (states 1, 2). Rejection opinions, drafts and revoked Comments do not create dependencies; real missing current Reference Reviews remain fail-closed.';
+COMMENT ON FUNCTION "private"."review_resolve_current_reference_targets_v1"("p_root_review_ids" "uuid"[]) IS 'Resolves exact current Root JSON, approving submissions (1) and retained finalized-Comment compatibility (2). Current rejection opinions (-3), drafts (0), revoked (-2) and terminal rejected (-1) Comments do not add dependencies. State 2 records finalization, not the original decision; exact current Reference Review guards remain intact.';
 
 
 

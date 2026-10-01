@@ -105,8 +105,8 @@ where review_id='59601000-0000-0000-0000-000000000001';
 select is((select count(*)::integer from private.review_resolve_current_reference_targets_v1(
  array['59601000-0000-0000-0000-000000000001'::uuid])),0,'terminal rejected comment stays excluded');
 
--- Approval metadata still fails closed for missing references, including report
--- Sources. This is a decision-state boundary, not a global report-key filter.
+-- Approving submissions and retained finalized-comment compatibility keep the
+-- exact-reference guard, including report Sources; this is not a report-key filter.
 update private.comments set state_code=1
 where review_id='59601000-0000-0000-0000-000000000001';
 select throws_ok($$select * from private.review_derive_current_references_v1(
@@ -116,7 +116,7 @@ update private.comments set state_code=2
 where review_id='59601000-0000-0000-0000-000000000001';
 select throws_ok($$select * from private.review_derive_current_references_v1(
  array['59601000-0000-0000-0000-000000000001'::uuid])$$,
- '55000','MISSING_CURRENT_REFERENCE_REVIEW','final approved metadata still requires an exact current reference');
+ '55000','MISSING_CURRENT_REFERENCE_REVIEW','retained finalized-comment compatibility still requires an exact current reference');
 update private.comments set state_code=-3
 where review_id='59601000-0000-0000-0000-000000000001';
 

@@ -39,7 +39,7 @@ checkPaths:
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
 lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
-lastReviewedNote: "Reviewed Database #762 rejected opinion dependency scope. Resolver reads approving Comment states 1/2 to match existing submission/final approval; repository ownership, Source RLS, actor-bound report download and delivery boundaries remain unchanged."
+lastReviewedNote: "Reviewed Database #762 rejected opinion dependency scope. Resolver reads approving submissions (1) and retained finalized-Comment compatibility (2), while excluding current rejection opinions (-3); repository ownership, Source RLS, actor-bound report download and delivery boundaries remain unchanged."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md
