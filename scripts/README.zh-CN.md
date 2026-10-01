@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
-lastReviewedNote: "复核 Database #762：按现有命令生成五 schema 本地快照与 public/api 类型，两次生成无漂移；脚本行为不变。"
+lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
+lastReviewedNote: "复核 Database #761/#762 与准确 Dev merge 59f250a 的组合：沿用五 schema 与 public/api 类型生成命令；脚本行为不变。"
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml

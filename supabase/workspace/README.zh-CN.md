@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
-lastReviewedNote: "复核 Database #762：准确本地五 schema 快照仅更新 resolver 意见状态过滤及注释；两次生成 1840 文件一致，public/api 类型不变。托管 Dev 来源验证仍为独立后续步骤。"
+lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
+lastReviewedNote: "复核 Database #761/#762 与准确 Dev merge 59f250a 的组合：本地五 schema 快照同时包含 Flow payload 限定与当前拒绝意见范围，并保留 finalized 兼容。确定性生成与托管来源仍为独立验证。"
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

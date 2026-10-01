@@ -23,8 +23,8 @@ checkPaths:
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
-lastReviewedNote: "复核 Database #762：将拒绝意见依赖范围回归加入 local-contract job，不改变 Preview 权限、Dev 部署、Main 晋升或分支绑定。"
+lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
+lastReviewedNote: "复核 Database #761/#762 组合：两项定向 SQL 回归均加入 local-contract，不改变 Preview 权限、Dev 部署、Main 晋升或分支绑定。"
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

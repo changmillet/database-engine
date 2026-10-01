@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
-lastReviewedNote: "Reviewed Database #762. Exact-local five-schema snapshot changes only the resolver Comment-state filter and its comment; two generations match across 1840 files and public/api types remain unchanged. Hosted Dev provenance remains deferred."
+lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
+lastReviewedNote: "Reviewed combined Database #761/#762 on exact Dev merge 59f250a. Local five-schema snapshot contains both Flow payload bounds and current rejection-opinion scope with finalized compatibility. Deterministic generation and hosted provenance remain separate requirements."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

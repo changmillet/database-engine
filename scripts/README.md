@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
-lastReviewedNote: "Reviewed Database #762. Five-schema local regeneration and public/api type generation follow existing commands; two runs are deterministic and helper semantics remain unchanged."
+lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
+lastReviewedNote: "Reviewed combined Database #761/#762 on exact Dev merge 59f250a. Existing five-schema and public/api type generation commands qualify both changes; helper behavior is unchanged."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml

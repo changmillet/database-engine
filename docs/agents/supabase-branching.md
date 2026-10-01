@@ -23,8 +23,8 @@ checkPaths:
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
 lastReviewedAt: 2026-10-01
-lastReviewedCommit: 40d92feb476fec4d8ccdea04edc9d3075333db8f
-lastReviewedNote: "Reviewed Database #762. Adding the focused rejection-scope suite to the local-contract job does not change Preview authority, Dev migration deployment, Main promotion or branch bindings."
+lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
+lastReviewedNote: "Reviewed combined Database #761/#762. Registering both focused SQL suites in local-contract does not change Preview authority, persistent Dev deployment, Main promotion or branch bindings."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
