@@ -30,9 +30,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-01
-lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
-lastReviewedNote: "Reviewed Database #762 refresh against exact Dev merge 4a4083a (#759/#761). Workload classification/facade, bounded Flow reads and current rejection-opinion scope coexist; existing routes, ownership and branch authority remain unchanged."
+lastReviewedAt: 2026-10-02
+lastReviewedCommit: 2fb543b17619ab925c0aa4c0f9f53d66b0af417f
+lastReviewedNote: 'Reviewed Database #767: exact ten CLI release RPC manifest classes repair OAuth admission; client grants, role flags, ACLs and manager checks stay authoritative. Focused regression joins local CI; Preview, Dev/Main and branch contracts remain unchanged.'
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -211,7 +211,17 @@ CLI commands retain `CLI-RPC-01`. The exact
 `cmd_lifecycle_model_bundle_save(jsonb)` and
 `cmd_lifecycle_model_bundle_delete(uuid,text)` signatures use
 `EDGE-BUNDLE-01`; a forward repair and exact-signature regression prevent
-either from falling back to `CLI-RPC-01`. Every PostgREST relation or RPC request is
+either from falling back to `CLI-RPC-01`.
+
+The ten exact actor RPCs consumed by the public CLI `release` commands use
+`CLI-RPC-01`: manager assertion, prepare/approve/publish/readback/unpublish,
+current/run lookup, artifact-download lookup, and Calculation Bundle projection.
+Their existing role flags, function ACLs and live manager checks remain authoritative.
+The authenticated current-Process result route retains `EDGE-REL-01`; it is not
+part of that CLI command family. Internal artifact finalization remains service-only.
+No CLI registration gains the broader `EDGE-ACTOR-01` class.
+
+Every PostgREST relation or RPC request is
 checked before execution by
 `api.oauth_client_pre_request()`, which resolves `/rpc/<name>` through the
 exact-signature API capability manifest and rejects unknown, ambiguous,

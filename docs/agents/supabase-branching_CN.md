@@ -22,9 +22,9 @@ checkPaths:
   - .github/workflows/supabase-dev.yml
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
-lastReviewedAt: 2026-10-01
-lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
-lastReviewedNote: "复核 Database #761/#762 组合：两项定向 SQL 回归均加入 local-contract，不改变 Preview 权限、Dev 部署、Main 晋升或分支绑定。"
+lastReviewedAt: 2026-10-02
+lastReviewedCommit: 2fb543b17619ab925c0aa4c0f9f53d66b0af417f
+lastReviewedNote: '复核 Database #767：仅修复十个 CLI release RPC 的 OAuth capability 分类，保留客户端授权、角色 ACL 与 manager 检查；定向回归纳入本地 CI，Preview、Dev/Main 与分支契约不变。'
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

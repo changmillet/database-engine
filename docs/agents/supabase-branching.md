@@ -22,9 +22,9 @@ checkPaths:
   - .github/workflows/supabase-dev.yml
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
-lastReviewedAt: 2026-10-01
-lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
-lastReviewedNote: "Reviewed combined Database #761/#762. Registering both focused SQL suites in local-contract does not change Preview authority, persistent Dev deployment, Main promotion or branch bindings."
+lastReviewedAt: 2026-10-02
+lastReviewedCommit: 2fb543b17619ab925c0aa4c0f9f53d66b0af417f
+lastReviewedNote: 'Reviewed Database #767: exact ten CLI release RPC manifest classes repair OAuth admission; client grants, role flags, ACLs and manager checks stay authoritative. Focused regression joins local CI; Preview, Dev/Main and branch contracts remain unchanged.'
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
