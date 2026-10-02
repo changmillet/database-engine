@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-02
-lastReviewedCommit: 2fb543b17619ab925c0aa4c0f9f53d66b0af417f
-lastReviewedNote: 'Reviewed Database #767: exact ten CLI release RPC manifest classes repair OAuth admission; client grants, role flags, ACLs and manager checks stay authoritative. Focused regression joins local CI; Preview, Dev/Main and branch contracts remain unchanged.'
+lastReviewedCommit: df8db416c69d3edee45cfd41496ffd01495eb2b8
+lastReviewedNote: "Reviewed Database #767 guard repair: exact row and distinct routine counts fail closed on balanced missing/alias duplicates. The actual migration block is exercised by rollback-only local CI; capability scope, ACLs, manager checks and generated schema contracts remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -286,6 +286,11 @@ object, not JSONB equality alone.
 
 After a clean reset, run `supabase/tests/20261002_oauth_release_cli_capabilities.sql`
 with the OAuth foundation/actor, API/full-schema, release-control-plane and semantic-download suites.
+Run `python3 scripts/test_oauth_release_migration_guard.py --local-container <isolated-container>`
+against the explicit task-owned local Database fixture. It loads the actual migration DO block
+client-side and rolls back every case: canonical/idempotent replay, missing target, duplicate
+semantic OID, and balanced missing-plus-duplicate rows. Require both exact row cardinality and
+distinct routine cardinality; textual identity uniqueness alone is insufficient.
 Use the official six-capability CLI class at the actual pre-request gate for all ten
 exact release RPCs. Prove a manager receives the five-role Calculation Bundle
 projection, while an ordinary actor still receives `not_data_product_manager`

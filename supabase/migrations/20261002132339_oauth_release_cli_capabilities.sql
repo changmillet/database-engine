@@ -19,13 +19,17 @@ declare
     'api.get_lcia_result_calculation_bundle(uuid)'::regprocedure::oid
   ];
   v_count integer;
+  v_distinct_count integer;
 begin
   lock table private.api_capability_grants in share row exclusive mode;
 
-  select count(*) into v_count
+  -- Text identities can alias one routine; row count alone can hide a missing target.
+  select count(*), count(distinct pg_catalog.to_regprocedure(manifest.routine_identity)::oid)
+    into v_count, v_distinct_count
   from private.api_capability_grants as manifest
   where pg_catalog.to_regprocedure(manifest.routine_identity)::oid = any(v_routines);
-  if v_count <> cardinality(v_routines) then
+  if v_count <> cardinality(v_routines)
+     or v_distinct_count <> cardinality(v_routines) then
     raise exception 'OAuth CLI release capability manifest is incomplete or duplicated';
   end if;
 

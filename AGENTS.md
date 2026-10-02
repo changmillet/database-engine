@@ -38,8 +38,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-02
-lastReviewedCommit: 2fb543b17619ab925c0aa4c0f9f53d66b0af417f
-lastReviewedNote: 'Reviewed Database #767: exact ten CLI release RPC manifest classes repair OAuth admission; client grants, role flags, ACLs and manager checks stay authoritative. Focused regression joins local CI; Preview, Dev/Main and branch contracts remain unchanged.'
+lastReviewedCommit: df8db416c69d3edee45cfd41496ffd01495eb2b8
+lastReviewedNote: "Reviewed Database #767 guard repair: exact row and distinct routine counts fail closed on balanced missing/alias duplicates. The actual migration block is exercised by rollback-only local CI; capability scope, ACLs, manager checks and generated schema contracts remain unchanged."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md

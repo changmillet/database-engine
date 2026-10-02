@@ -23,8 +23,8 @@ checkPaths:
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
 lastReviewedAt: 2026-10-02
-lastReviewedCommit: 2fb543b17619ab925c0aa4c0f9f53d66b0af417f
-lastReviewedNote: '复核 Database #767：仅修复十个 CLI release RPC 的 OAuth capability 分类，保留客户端授权、角色 ACL 与 manager 检查；定向回归纳入本地 CI，Preview、Dev/Main 与分支契约不变。'
+lastReviewedCommit: df8db416c69d3edee45cfd41496ffd01495eb2b8
+lastReviewedNote: "Reviewed Database #767 guard repair: exact row and distinct routine counts fail closed on balanced missing/alias duplicates. The actual migration block is exercised by rollback-only local CI; capability scope, ACLs, manager checks and generated schema contracts remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
