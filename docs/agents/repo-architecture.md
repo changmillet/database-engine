@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-02
-lastReviewedCommit: df8db416c69d3edee45cfd41496ffd01495eb2b8
-lastReviewedNote: "Reviewed Database #767 guard repair: exact row and distinct routine counts fail closed on balanced missing/alias duplicates. The actual migration block is exercised by rollback-only local CI; capability scope, ACLs, manager checks and generated schema contracts remain unchanged."
+lastReviewedCommit: "ff8f542b19c317970fe04f740ba260c77d2c3d39"
+lastReviewedNote: "Reviewed Database #766 over exact #767 Dev merge ff8f542: Source read-policy and CLI release-capability/actual-guard regressions coexist; invoker RLS, manager checks, ownership and branch contracts remain authoritative."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -513,6 +513,15 @@ pagination, new JSON GIN index, or synthetic 50,000-row benchmark is required.
 - the production Supabase project is migrated automatically by the Supabase GitHub integration when Git `main` advances
 
 This means branch behavior is part of the repo architecture, not just delivery process.
+
+## Source Review read policy
+
+Authenticated Source reads retain the existing owner, team, publication and
+state-20 Review visibility rules. The Source policy evaluates actor-visible
+Review targets and Review IDs as statement-scoped sets before comparing each
+Source's exact JSON target/version and Review hints. The Review sets still use
+`private.reviews` invoker RLS; they are not privileged authorization caches.
+The separate example-data and restrictive OAuth policies remain authoritative.
 
 ## Test Proof Layers
 

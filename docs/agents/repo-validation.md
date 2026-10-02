@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-02
-lastReviewedCommit: df8db416c69d3edee45cfd41496ffd01495eb2b8
-lastReviewedNote: "Reviewed Database #767 guard repair: exact row and distinct routine counts fail closed on balanced missing/alias duplicates. The actual migration block is exercised by rollback-only local CI; capability scope, ACLs, manager checks and generated schema contracts remain unchanged."
+lastReviewedCommit: "ff8f542b19c317970fe04f740ba260c77d2c3d39"
+lastReviewedNote: "Reviewed Database #766 over exact #767 Dev merge ff8f542: Source read-policy and CLI release-capability/actual-guard regressions coexist; invoker RLS, manager checks, ownership and branch contracts remain authoritative."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -564,6 +564,34 @@ Draft, revoked and terminal rejected Comments remain excluded. Compare resolver
 owner, security mode, search path and ACL with migration prestate; no Source RLS,
 report download or opinion lifecycle behavior changes. Preview, Dev deployment,
 Main promotion and workspace integration remain separate qualification phases.
+
+## Source Review read-policy performance
+
+After a blank local migration reset, run
+`supabase test db supabase/tests/20261002_sources_rls_performance.sql` plus the
+nearby rejected-report, RLS governance, API and OAuth capability suites. The
+differential assertions compare the exact retained predecessor policy with the
+deployed policy under authenticated actor reads. Preserve JSON target authority,
+exact versions, owner/team/admin/member boundaries, Review RLS, hint membership,
+duplicate/NULL hints, absent actors and the fixed malformed-input SQLSTATE cases.
+
+Run this only on an empty, explicitly owned local fixture:
+
+```bash
+python3 supabase/tests/benchmarks/20261002_sources_rls_performance.py \
+  --container supabase_db_database-engine-766-<isolated-suffix> \
+  --report <new-json-file>
+```
+
+It wraps
+synthetic writes and policy changes in one rollback-only transaction and
+refuses remote Docker endpoints. The representative cohort has 14,420 Sources,
+2,789 Reviews and 161 state-20 Sources; its separate stress cohort has 3,048
+state-20 Sources. Capture predecessor timeout and replacement plans/timings,
+including exactly one scan of each actor-visible Review set. These are local
+synthetic receipts; hosted latency, Preview, Dev and Main readback remain
+separate release proof. Never replay the expensive business query with
+`EXPLAIN ANALYZE` in production.
 
 ## Minimum PR Validation Note
 

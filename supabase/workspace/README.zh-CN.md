@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-02
-lastReviewedCommit: df8db416c69d3edee45cfd41496ffd01495eb2b8
-lastReviewedNote: "Reviewed Database #767 guard repair: exact row and distinct routine counts fail closed on balanced missing/alias duplicates. The actual migration block is exercised by rollback-only local CI; capability scope, ACLs, manager checks and generated schema contracts remain unchanged."
+lastReviewedCommit: "ff8f542b19c317970fe04f740ba260c77d2c3d39"
+lastReviewedNote: "Reviewed Database #766 over exact #767 Dev merge ff8f542: Source read-policy and CLI release-capability/actual-guard regressions coexist; invoker RLS, manager checks, ownership and branch contracts remain authoritative."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
