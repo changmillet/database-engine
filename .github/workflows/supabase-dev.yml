@@ -106,6 +106,7 @@ jobs:
           supabase test db supabase/tests/20260831_oauth_actor_command_capabilities.sql
           supabase test db supabase/tests/20261002_oauth_release_cli_capabilities.sql
           python3 scripts/test_oauth_release_migration_guard.py --local-container supabase_db_database-engine
+          python3 scripts/test_release_manifest_drift.py --local-container supabase_db_database-engine
           supabase test db supabase/tests/20260925_foundry60_cli_alias_oauth_capability.sql
           supabase test db supabase/tests/20260901_national_carbon_organization_contributions.sql
           supabase test db supabase/tests/20260825_portal_public_catalog_v1.sql

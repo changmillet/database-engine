@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-02
-lastReviewedCommit: "ff8f542b19c317970fe04f740ba260c77d2c3d39"
-lastReviewedNote: "Reviewed Database #766 over exact #767 Dev merge ff8f542: Source read-policy and CLI release-capability/actual-guard regressions coexist; invoker RLS, manager checks, ownership and branch contracts remain authoritative."
+lastReviewedAt: 2026-10-03
+lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
+lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -46,6 +46,17 @@ Those runners should keep their own `README.md` with dry-run, apply, and validat
 Local migration outputs and audit JSONL files should be written under `_artifacts/`, which is intentionally ignored by Git.
 
 ## Script List
+
+### `test_release_manifest_drift.py`
+
+Runs 23 rollback-only pgTAP assertions against the real forward release-manifest
+migration and frozen predecessors. It checks both known vectors, zero-write replay,
+the four-row legacy repair, exact identity/ACL refusal and unchanged client grants.
+It accepts only an explicitly selected task-owned local Database container.
+
+```bash
+python3 scripts/test_release_manifest_drift.py --local-container <isolated-container>
+```
 
 ### `test_oauth_release_migration_guard.py`
 
