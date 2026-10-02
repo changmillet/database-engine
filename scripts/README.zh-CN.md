@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-01
-lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
-lastReviewedNote: "Reviewed Database #762 refresh against exact Dev merge 4a4083a (#759/#761). Workload classification/facade, bounded Flow reads and current rejection-opinion scope coexist; existing routes, ownership and branch authority remain unchanged."
+lastReviewedAt: 2026-10-03
+lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
+lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -46,6 +46,30 @@ related:
 本地迁移输出和审计 JSONL 文件应写入 `_artifacts/`，该目录已被 Git 忽略。
 
 ## 脚本列表
+
+### `test_release_manifest_drift.py`
+
+对真实 forward release-manifest migration 与冻结的前序 migration 执行 23 项
+最终回滚的 pgTAP 断言。覆盖两种已知向量、零写入重放、仅四行的 legacy 修复、
+精确 identity／ACL 拒绝，以及客户端授权不变。只能明确选择本任务拥有的本地
+Database container。
+
+```bash
+python3 scripts/test_release_manifest_drift.py --local-container <isolated-container>
+```
+
+### `test_oauth_release_migration_guard.py`
+
+在客户端加载已提交 CLI release migration 的真实 DO block，执行七项 pgTAP 断言。
+覆盖正常／幂等重放、缺失目标、重复语义 OID，以及总行数相同的缺失与重复组合。
+fixture 修改、按需创建 pgTAP extension 和重放都在同一个最终回滚的事务内。
+
+```bash
+python3 scripts/test_oauth_release_migration_guard.py --local-container <isolated-container>
+```
+
+必须明确选择本任务拥有的本地 Database container；不支持 hosted DSN 或凭据参数。
+脚本输出 TAP 结果，local-contract CI 在 OAuth release capability suite 后运行它。
 
 ### `configure_derivative_scheduler.py`
 

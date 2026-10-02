@@ -22,9 +22,9 @@ checkPaths:
   - .github/workflows/supabase-dev.yml
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
-lastReviewedAt: 2026-10-01
-lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
-lastReviewedNote: "Reviewed combined Database #761/#762. Registering both focused SQL suites in local-contract does not change Preview authority, persistent Dev deployment, Main promotion or branch bindings."
+lastReviewedAt: 2026-10-03
+lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
+lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

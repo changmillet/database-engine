@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-01
-lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
-lastReviewedNote: "Reviewed Database #762 refresh against exact Dev merge 4a4083a (#759/#761). Workload classification/facade, bounded Flow reads and current rejection-opinion scope coexist; existing routes, ownership and branch authority remain unchanged."
+lastReviewedAt: 2026-10-03
+lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
+lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -46,6 +46,32 @@ Those runners should keep their own `README.md` with dry-run, apply, and validat
 Local migration outputs and audit JSONL files should be written under `_artifacts/`, which is intentionally ignored by Git.
 
 ## Script List
+
+### `test_release_manifest_drift.py`
+
+Runs 23 rollback-only pgTAP assertions against the real forward release-manifest
+migration and frozen predecessors. It checks both known vectors, zero-write replay,
+the four-row legacy repair, exact identity/ACL refusal and unchanged client grants.
+It accepts only an explicitly selected task-owned local Database container.
+
+```bash
+python3 scripts/test_release_manifest_drift.py --local-container <isolated-container>
+```
+
+### `test_oauth_release_migration_guard.py`
+
+Runs seven pgTAP assertions against the actual committed CLI release migration DO block,
+loaded on the client. It proves canonical replay and refuses missing, duplicate or balanced
+missing-plus-duplicate semantic routine identities. Every fixture edit, optional pgTAP
+extension creation and replay stays inside one transaction that rolls back.
+
+```bash
+python3 scripts/test_oauth_release_migration_guard.py --local-container <isolated-container>
+```
+
+Select an explicit task-owned local Database container. The harness supports no hosted DSN
+or credential arguments and emits TAP results; local-contract CI runs it after the OAuth
+release capability suite.
 
 ### `configure_derivative_scheduler.py`
 

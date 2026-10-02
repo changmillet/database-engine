@@ -20,9 +20,9 @@ checkPaths:
   - .githooks/pre-push
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-01
-lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
-lastReviewedNote: "Reviewed Database #759/#761/#762 combined exact-local snapshot against Dev 4a4083a. Workload RPC/types, bounded Flow and current rejection-opinion scope coexist; deterministic generation and hosted provenance remain separate proofs."
+lastReviewedAt: 2026-10-03
+lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
+lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

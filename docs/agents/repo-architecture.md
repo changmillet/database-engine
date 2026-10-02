@@ -30,9 +30,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-01
-lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
-lastReviewedNote: "Reviewed Database #762 refresh against exact Dev merge 4a4083a (#759/#761). Workload classification/facade, bounded Flow reads and current rejection-opinion scope coexist; existing routes, ownership and branch authority remain unchanged."
+lastReviewedAt: 2026-10-03
+lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
+lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -211,7 +211,25 @@ CLI commands retain `CLI-RPC-01`. The exact
 `cmd_lifecycle_model_bundle_save(jsonb)` and
 `cmd_lifecycle_model_bundle_delete(uuid,text)` signatures use
 `EDGE-BUNDLE-01`; a forward repair and exact-signature regression prevent
-either from falling back to `CLI-RPC-01`. Every PostgREST relation or RPC request is
+either from falling back to `CLI-RPC-01`.
+
+The ten exact actor RPCs consumed by the public CLI `release` commands use
+`CLI-RPC-01`: manager assertion, prepare/approve/publish/readback/unpublish,
+current/run lookup, artifact-download lookup, and Calculation Bundle projection.
+Their existing role flags, function ACLs and live manager checks remain authoritative.
+The authenticated current-Process result route retains `EDGE-REL-01`; it is not
+part of that CLI command family. Internal artifact finalization remains service-only.
+No CLI registration gains the broader `EDGE-ACTOR-01` class.
+
+The release-family manifest admits only its canonical eleven-signature vector or
+the exact authenticated-only `CLI-RPC-01` fallback vector for guarded reconciliation.
+The fallback is reproducible from the frozen authenticated-routine repair after
+missing rows, but a matching live shape does not prove its historical writer.
+Reconciliation requires unique exact OIDs and canonical live function ACLs, including
+closed `PUBLIC` execution. It restores metadata only; registrations, grants, manager
+checks and function bodies do not change. Canonical state performs zero row updates.
+
+Every PostgREST relation or RPC request is
 checked before execution by
 `api.oauth_client_pre_request()`, which resolves `/rpc/<name>` through the
 exact-signature API capability manifest and rejects unknown, ambiguous,
@@ -503,6 +521,15 @@ pagination, new JSON GIN index, or synthetic 50,000-row benchmark is required.
 - the production Supabase project is migrated automatically by the Supabase GitHub integration when Git `main` advances
 
 This means branch behavior is part of the repo architecture, not just delivery process.
+
+## Source Review read policy
+
+Authenticated Source reads retain the existing owner, team, publication and
+state-20 Review visibility rules. The Source policy evaluates actor-visible
+Review targets and Review IDs as statement-scoped sets before comparing each
+Source's exact JSON target/version and Review hints. The Review sets still use
+`private.reviews` invoker RLS; they are not privileged authorization caches.
+The separate example-data and restrictive OAuth policies remain authoritative.
 
 ## Test Proof Layers
 
