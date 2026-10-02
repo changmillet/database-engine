@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-01
-lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
-lastReviewedNote: "Reviewed Database #762 refresh against exact Dev merge 4a4083a (#759/#761). Workload classification/facade, bounded Flow reads and current rejection-opinion scope coexist; existing routes, ownership and branch authority remain unchanged."
+lastReviewedAt: 2026-10-02
+lastReviewedCommit: df8db416c69d3edee45cfd41496ffd01495eb2b8
+lastReviewedNote: "Reviewed Database #767 guard repair: exact row and distinct routine counts fail closed on balanced missing/alias duplicates. The actual migration block is exercised by rollback-only local CI; capability scope, ACLs, manager checks and generated schema contracts remain unchanged."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -46,6 +46,21 @@ Those runners should keep their own `README.md` with dry-run, apply, and validat
 Local migration outputs and audit JSONL files should be written under `_artifacts/`, which is intentionally ignored by Git.
 
 ## Script List
+
+### `test_oauth_release_migration_guard.py`
+
+Runs seven pgTAP assertions against the actual committed CLI release migration DO block,
+loaded on the client. It proves canonical replay and refuses missing, duplicate or balanced
+missing-plus-duplicate semantic routine identities. Every fixture edit, optional pgTAP
+extension creation and replay stays inside one transaction that rolls back.
+
+```bash
+python3 scripts/test_oauth_release_migration_guard.py --local-container <isolated-container>
+```
+
+Select an explicit task-owned local Database container. The harness supports no hosted DSN
+or credential arguments and emits TAP results; local-contract CI runs it after the OAuth
+release capability suite.
 
 ### `configure_derivative_scheduler.py`
 

@@ -37,9 +37,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-01
-lastReviewedCommit: 4a4083af537583a9378dd16d1a54eb736403fce4
-lastReviewedNote: "Reviewed Database #762 refresh against exact Dev merge 4a4083a (#759/#761). Workload classification/facade, bounded Flow reads and current rejection-opinion scope coexist; existing routes, ownership and branch authority remain unchanged."
+lastReviewedAt: 2026-10-02
+lastReviewedCommit: df8db416c69d3edee45cfd41496ffd01495eb2b8
+lastReviewedNote: "Reviewed Database #767 guard repair: exact row and distinct routine counts fail closed on balanced missing/alias duplicates. The actual migration block is exercised by rollback-only local CI; capability scope, ACLs, manager checks and generated schema contracts remain unchanged."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md

@@ -22,9 +22,9 @@ checkPaths:
   - .github/workflows/supabase-dev.yml
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
-lastReviewedAt: 2026-10-01
-lastReviewedCommit: 59f250a88cb9ac1c97d0ae035f5dab6cf378b4d1
-lastReviewedNote: "复核 Database #761/#762 组合：两项定向 SQL 回归均加入 local-contract，不改变 Preview 权限、Dev 部署、Main 晋升或分支绑定。"
+lastReviewedAt: 2026-10-02
+lastReviewedCommit: df8db416c69d3edee45cfd41496ffd01495eb2b8
+lastReviewedNote: "Reviewed Database #767 guard repair: exact row and distinct routine counts fail closed on balanced missing/alias duplicates. The actual migration block is exercised by rollback-only local CI; capability scope, ACLs, manager checks and generated schema contracts remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
