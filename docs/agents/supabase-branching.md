@@ -22,9 +22,9 @@ checkPaths:
   - .github/workflows/supabase-dev.yml
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
-lastReviewedAt: 2026-10-02
-lastReviewedCommit: "ff8f542b19c317970fe04f740ba260c77d2c3d39"
-lastReviewedNote: "Reviewed Database #766 over exact #767 Dev merge ff8f542: Source read-policy and CLI release-capability/actual-guard regressions coexist; invoker RLS, manager checks, ownership and branch contracts remain authoritative."
+lastReviewedAt: 2026-10-03
+lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
+lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

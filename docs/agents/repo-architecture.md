@@ -30,9 +30,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-02
-lastReviewedCommit: "ff8f542b19c317970fe04f740ba260c77d2c3d39"
-lastReviewedNote: "Reviewed Database #766 over exact #767 Dev merge ff8f542: Source read-policy and CLI release-capability/actual-guard regressions coexist; invoker RLS, manager checks, ownership and branch contracts remain authoritative."
+lastReviewedAt: 2026-10-03
+lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
+lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -220,6 +220,14 @@ Their existing role flags, function ACLs and live manager checks remain authorit
 The authenticated current-Process result route retains `EDGE-REL-01`; it is not
 part of that CLI command family. Internal artifact finalization remains service-only.
 No CLI registration gains the broader `EDGE-ACTOR-01` class.
+
+The release-family manifest admits only its canonical eleven-signature vector or
+the exact authenticated-only `CLI-RPC-01` fallback vector for guarded reconciliation.
+The fallback is reproducible from the frozen authenticated-routine repair after
+missing rows, but a matching live shape does not prove its historical writer.
+Reconciliation requires unique exact OIDs and canonical live function ACLs, including
+closed `PUBLIC` execution. It restores metadata only; registrations, grants, manager
+checks and function bodies do not change. Canonical state performs zero row updates.
 
 Every PostgREST relation or RPC request is
 checked before execution by

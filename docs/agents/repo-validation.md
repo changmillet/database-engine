@@ -32,9 +32,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-02
-lastReviewedCommit: "ff8f542b19c317970fe04f740ba260c77d2c3d39"
-lastReviewedNote: "Reviewed Database #766 over exact #767 Dev merge ff8f542: Source read-policy and CLI release-capability/actual-guard regressions coexist; invoker RLS, manager checks, ownership and branch contracts remain authoritative."
+lastReviewedAt: 2026-10-03
+lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
+lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -300,6 +300,16 @@ internal service finalization remain closed. Check the same allow flags and ACLs
 not only manifest membership. Repeat with a locally signed OAuth test JWT through
 PostgREST and on an exact disposable Preview before persistent Dev qualification.
 No environment-specific client UUID or grant change belongs in this migration.
+
+For release-family manifest drift, additionally run
+`python3 scripts/test_release_manifest_drift.py --local-container <isolated-container>`.
+The rollback-only harness loads the actual forward migration and immutable predecessors.
+Prove canonical and Main-before-through-767 no-op paths, the frozen fallback's eleven-row
+legacy vector repaired through exactly four changed rows, unchanged other manifest tuples,
+client registrations/grants and actual ACLs, and refusal on unknown/mixed state, missing or
+duplicate/balanced identities, missing routines, external ACL drift and `PUBLIC` exposure.
+Hosted readback must compare the exact eleven manifest classes and flags with actual ACLs;
+a migration-head or generic PostgREST success alone does not establish catalogue parity.
 
 ### Direct MCP OAuth operational proof
 
