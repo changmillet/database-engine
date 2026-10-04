@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-03
-lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
-lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
+lastReviewedAt: 2026-10-04
+lastReviewedCommit: 5b4b1fdfd3b5d947d7f5949da58b9896ad0f2f0c
+lastReviewedNote: "Reviewed Database #774 generated snapshot repair against runtime 5b4b1fdf: canonical helpers regenerate only the two Flow function snapshots, exposed types remain unchanged, and actual Supabase CLI 2.117.0 pgTAP transport retains all 274 required assertions. Runtime migration, ACLs and delivery gates are unchanged."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -154,6 +154,21 @@ Reset that isolated stack before and after. This diagnostic is not hosted
 relevance or production-cardinality release evidence.
 
 `node scripts/benchmark_hybrid_versions.mjs --help`
+
+### `benchmark_flow_lexical_payloads.py`
+
+Isolated legacy latest-Flow lexical before/after profile for an explicitly
+named isolated Database #774 container. Reset that project to migration
+`20261002154951` first. It commits 134,608 synthetic rows by default, vacuums
+them and dirties a bounded 16% range. The artifact reports actual heap visibility
+for this conservative partially-visible fixture. The candidate migration
+runs only inside a rollback transaction. The profile compares complete page
+payload/rank/version/total digests and captures natural `EXPLAIN (ANALYZE, BUFFERS)`
+plans. The profile rejects remote URLs and verifies page-bounded exact hydration
+and reduced temporary writes. `--output` saves machine-readable and raw synthetic
+evidence; reset the isolated project to head afterward.
+
+`python3 scripts/benchmark_flow_lexical_payloads.py --help`
 
 ### `benchmark_next_hybrid_v2.mjs`
 

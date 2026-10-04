@@ -30,9 +30,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-03
-lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
-lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
+lastReviewedAt: 2026-10-04
+lastReviewedCommit: 5b4b1fdfd3b5d947d7f5949da58b9896ad0f2f0c
+lastReviewedNote: "Reviewed Database #774 generated snapshot repair against runtime 5b4b1fdf: canonical helpers regenerate only the two Flow function snapshots, exposed types remain unchanged, and actual Supabase CLI 2.117.0 pgTAP transport retains all 274 required assertions. Runtime migration, ACLs and delivery gates are unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -581,6 +581,16 @@ chain stays owned by `api_internal_executor`, which has explicit execute
 permission on both leaves. This removes authenticated actor/team policy
 machinery from Portal ANN plans without disabling RLS or opening either private
 function to a browser role.
+
+Legacy latest-Flow lexical Search materializes PGroonga matches before content
+filters to preserve scoring. With no effective JSON/type/classification/emission
+filter, that working set carries no JSON. History matching, maximum score per ID,
+latest-visible exact version, global rank and exact total are computed on narrow
+keys; JSON and output team metadata hydration follow page selection. Content-filtered and UUID paths
+retain their historical-match/latest-visible semantics. This changes no index,
+projection, writer, ACL, executor or timeout. The Database #774 synthetic fixture/candidate comparison
+profile compares full page digests, natural plans and temporary blocks on the
+same synthetic inputs; it is not evidence that all hosted latency spikes are fixed.
 
 The global process/flow HNSW indexes remain necessary for owner/team and broad
 visibility paths. A smaller process partial HNSW index covers the measured
