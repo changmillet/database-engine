@@ -22,9 +22,9 @@ checkPaths:
   - .github/workflows/supabase-dev.yml
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
-lastReviewedAt: 2026-10-03
-lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
-lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
+lastReviewedAt: 2026-10-04
+lastReviewedCommit: 5e203116d57c971dee1f39faefecb502701538c2
+lastReviewedNote: "Reviewed Database #774: local CI adds the bounded legacy Flow lexical regression; persistent Dev, exact Preview, promotion and production integration deployment authority remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

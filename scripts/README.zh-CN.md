@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-03
-lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
-lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
+lastReviewedAt: 2026-10-04
+lastReviewedCommit: 5e203116d57c971dee1f39faefecb502701538c2
+lastReviewedNote: "Reviewed Database #774 against Dev 5e203116: legacy Flow lexical matching/rank/count and actor boundaries are retained while narrow keys precede exact-page hydration. Canonical reset, same-input digests/plans and adjacent Hybrid proof own validation; indexes, writers, ACLs and generated schema ownership are unchanged."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -139,6 +139,18 @@ Process 的 0、小集合、2,000、2,001、宽过滤、无过滤分段耗时，
 相关性或生产数据量发布证明。
 
 `node scripts/benchmark_hybrid_versions.mjs --help`
+
+### `benchmark_flow_lexical_payloads.py`
+
+仅限明确命名的 Database #774 隔离容器。候选迁移和比较函数最终回滚；
+合成数据先提交以便 VACUUM，再更新末尾 16% 数据以形成部分可见页。
+证据文件记录实际可见页比例，不假定固定比例。先将该项目
+重置到迁移 `20261002154951`。默认生成 134,608 条合成 Flow，在同一事务内
+比较迁移前后的完整分页内容、排名、精确版本和总数，并记录自然执行计划。
+脚本拒绝远程 URL，验证只按已选页精确读取 JSON 且减少临时块。`--output`
+保存 JSON 和合成测试原始证据；完成后将隔离项目重置到当前迁移头。
+
+`python3 scripts/benchmark_flow_lexical_payloads.py --help`
 
 ### `benchmark_next_hybrid_v2.mjs`
 

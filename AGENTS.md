@@ -37,9 +37,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-03
-lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
-lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
+lastReviewedAt: 2026-10-04
+lastReviewedCommit: 5e203116d57c971dee1f39faefecb502701538c2
+lastReviewedNote: "Reviewed Database #774 against Dev 5e203116: legacy Flow lexical matching/rank/count and actor boundaries are retained while narrow keys precede exact-page hydration. Canonical reset, rollback-only same-input digests/plans and adjacent Hybrid proof own validation; indexes, writers, ACLs and generated schema ownership are unchanged."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md
