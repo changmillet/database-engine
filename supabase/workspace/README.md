@@ -20,9 +20,9 @@ checkPaths:
   - .githooks/pre-push
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-03
-lastReviewedCommit: "37c2475f5d418ba37df1e34459c26dc450b17db6"
-lastReviewedNote: "Reviewed Database #770 over exact #766/#767 Dev merge 37c2475: metadata-only reconciliation and actual-block refusal/no-op proof coexist with Source invoker-policy proof and CLI capabilities. ACLs/client grants, branch and generated schema boundaries remain unchanged; historical writer is unknown."
+lastReviewedAt: 2026-10-04
+lastReviewedCommit: 5b4b1fdfd3b5d947d7f5949da58b9896ad0f2f0c
+lastReviewedNote: "Reviewed Database #774 generated snapshot repair against runtime 5b4b1fdf: canonical helpers regenerate only the two Flow function snapshots, exposed types remain unchanged, and actual Supabase CLI 2.117.0 pgTAP transport retains all 274 required assertions. Runtime migration, ACLs and delivery gates are unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
