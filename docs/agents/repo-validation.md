@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-04
-lastReviewedCommit: 5e203116d57c971dee1f39faefecb502701538c2
-lastReviewedNote: "Reviewed Database #774 against Dev 5e203116: legacy Flow lexical matching/rank/count and actor boundaries are retained while narrow keys precede exact-page hydration. Canonical reset, same-input digests/plans and adjacent Hybrid proof own validation; indexes, writers, ACLs and generated schema ownership are unchanged."
+lastReviewedCommit: 5b4b1fdfd3b5d947d7f5949da58b9896ad0f2f0c
+lastReviewedNote: "Reviewed Database #774 generated snapshot repair against runtime 5b4b1fdf: canonical helpers regenerate only the two Flow function snapshots, exposed types remain unchanged, and actual Supabase CLI 2.117.0 pgTAP transport retains all 274 required assertions. Runtime migration, ACLs and delivery gates are unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

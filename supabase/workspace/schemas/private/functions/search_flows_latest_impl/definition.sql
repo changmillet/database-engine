@@ -158,7 +158,9 @@ begin
   v_sql := format($sql$
     with text_matches as materialized (
       select f.id,
-             f.json,
+             case when $2 = '{}'::jsonb and $10 is null
+               and not coalesce($12, false) and jsonb_array_length($13) = 0
+               then null::jsonb else f.json end as json,
              f.state_code,
              f.team_id,
              f.user_id,
@@ -226,10 +228,10 @@ begin
       group by f.id
     ),
     latest_rows as (
-      select matched_ids.id, latest_row.json, latest_row.version, latest_row.modified_at, latest_row.team_id, matched_ids.search_score
+      select matched_ids.id, latest_row.version, latest_row.modified_at, matched_ids.search_score
       from matched_ids
       join lateral (
-        select f2.json, f2.version, f2.modified_at, f2.team_id
+        select f2.version, f2.modified_at
         from public.flows f2
         where f2.id = matched_ids.id
           and (
@@ -251,11 +253,19 @@ begin
              counted_rows.*
       from counted_rows
     )
-    select ranked_rows.rank, ranked_rows.id, ranked_rows.json, ranked_rows.version, ranked_rows.modified_at, ranked_rows.team_id, ranked_rows.total_count
-    from ranked_rows
-    order by ranked_rows.rank, ranked_rows.id
-    limit $3
-    offset ($4 - 1) * $3
+    , paged_rows as materialized (
+      select ranked_rows.*
+      from ranked_rows
+      order by ranked_rows.rank, ranked_rows.id
+      limit $3
+      offset ($4 - 1) * $3
+    )
+    select paged_rows.rank, paged_rows.id, payload.json, paged_rows.version,
+           paged_rows.modified_at, payload.team_id, paged_rows.total_count
+    from paged_rows
+    join public.flows payload on payload.id = paged_rows.id
+      and payload.version = paged_rows.version
+    order by paged_rows.rank, paged_rows.id
   $sql$, text_match_clause, json_filter_clause);
 
   return query execute v_sql
