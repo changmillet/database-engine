@@ -329,6 +329,25 @@ classes and capability sets, never environment IDs.
 
 ## SQL And Offline Node Contract Notes
 
+### Dataset search request identity
+
+After a blank rebuild, run `supabase/tests/20261006_search_request_identity.sql`,
+the existing `20260528_dataset_search_rls_private_helpers.sql` and
+`20260529_dataset_json_uuid_deep_search.sql`, plus the applicable canonical
+Search, API-closure and OAuth regressions. Prove actual anon/authenticated roles
+with JSON-only claims, conflicting legacy role claims, missing/malformed actor
+identity, current/revoked/non-member team access, unknown roles, explicit
+service-role compatibility and the narrowly admitted context-free postgres SQL
+path. Exercise nested definers and public RPCs, not only helper-source text.
+
+Run `python3 scripts/test_search_request_identity_http.py --workdir
+<absolute-isolated-workdir> --task-owned-local-stack` against an explicitly owned
+local project admitted by that harness. It uses real Auth password-grant JWTs
+and the explicit `api` profile, refuses shared/hosted targets, emits no credentials
+or raw responses, and must verify fixture and identity cleanup even after a failed
+assertion. Keep baseline failure and candidate success evidence separate. These
+local fixtures never authorize production test-user creation or hosted writes.
+
 ### Version-aware search proof
 
 For the additive Portal V2/Next matched-version APIs, use a uniquely named

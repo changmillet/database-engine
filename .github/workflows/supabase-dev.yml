@@ -37,6 +37,7 @@ jobs:
           python scripts/test_resolve_migration_head.py
           python3 scripts/test_configure_derivative_scheduler.py
           python scripts/test_supabase_dev_workflow_contract.py
+          python3 -B scripts/test_search_request_identity_http_contract.py
           python scripts/check_portal_projection_manifest.py
           python3 scripts/check_portal_card_schema_parity.py
           python3 scripts/generate_portal_navigation_vocabulary.py --check
@@ -56,6 +57,7 @@ jobs:
 
       - name: Verify schema and capability contracts
         run: |
+          supabase test db supabase/tests/20261006_search_request_identity.sql
           supabase test db supabase/tests/20260920_portal_china_administrative_navigation.sql
           supabase test db supabase/tests/20260805_full_schema_cutover.sql
           supabase test db supabase/tests/20260806_api_contract_closure.sql

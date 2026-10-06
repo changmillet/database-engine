@@ -47,6 +47,28 @@ Local migration outputs and audit JSONL files should be written under `_artifact
 
 ## Script List
 
+### `test_search_request_identity_http.py`
+
+Runs real Auth/PostgREST search-identity regressions only against an explicitly
+owned local Database #777 stack. The workdir config, project ID, loopback API
+port and Kong container must agree. It verifies anonymous/outsider denial,
+owner/team/public reads and immediate team-membership revocation, then signs out
+and removes its synthetic identities and fixtures with a zero-residue check.
+Credentials and raw HTTP bodies are never printed.
+Environment proxies are disabled. If session revocation or identity ownership
+cannot be verified, the harness retains the affected actor and reports an
+incomplete cleanup receipt instead of claiming zero residuals.
+
+```bash
+python3 scripts/test_search_request_identity_http.py \
+  --workdir <absolute-isolated-workdir> --task-owned-local-stack \
+  --supabase-cli <repository-pinned-supabase-executable>
+```
+
+The harness admits `database-engine-advisor-777` or `database-engine-777-*`
+project IDs. It does not reset a database and cannot target a hosted project or
+the shared `database-engine` stack. Run the SQL request-identity suite separately.
+
 ### `test_release_manifest_drift.py`
 
 Runs 23 rollback-only pgTAP assertions against the real forward release-manifest

@@ -47,6 +47,26 @@ related:
 
 ## 脚本列表
 
+### `test_search_request_identity_http.py`
+
+仅在明确归属 Database #777 的本地隔离栈上执行真实 Auth/PostgREST
+搜索身份回归。脚本核对 workdir 配置、project ID、loopback API 端口及
+Kong 容器的一致性，验证匿名/外部成员拒绝、owner/team/public 读取及团队
+成员资格撤销即时生效；最后登出并清理自己创建的合成身份与数据，确认零残留。
+凭据及原始 HTTP 响应不会输出。
+脚本禁用环境代理。若无法确认会话已撤销或身份归属，会保留相关测试身份并
+返回未完成的清理回执，不会宣称零残留。
+
+```bash
+python3 scripts/test_search_request_identity_http.py \
+  --workdir <absolute-isolated-workdir> --task-owned-local-stack \
+  --supabase-cli <repository-pinned-supabase-executable>
+```
+
+允许的 project ID 为 `database-engine-advisor-777` 或 `database-engine-777-*`。
+脚本不会重置数据库，也不接受远端项目或共享 `database-engine` 栈。
+SQL request-identity 套件须单独运行。
+
 ### `test_release_manifest_drift.py`
 
 对真实 forward release-manifest migration 与冻结的前序 migration 执行 23 项

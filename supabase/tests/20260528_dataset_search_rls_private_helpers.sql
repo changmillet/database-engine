@@ -30,7 +30,7 @@ select ok(
 );
 
 select ok(
-  strpos(pg_get_functiondef('api.search_processes_latest(text,jsonb,jsonb,bigint,bigint,text,text,uuid,integer,text,text[])'::regprocedure), 'private.search_processes_latest_impl') > 0,
+  strpos(pg_get_functiondef('api.search_processes_latest(text,jsonb,jsonb,bigint,bigint,text,text,uuid,integer,text,text[])'::regprocedure), 'private.search_processes_latest_v2_impl') > 0,
   'process public search wrapper delegates to private helper'
 );
 
@@ -45,7 +45,7 @@ select ok(
 );
 
 select ok(
-  (select prosecdef from pg_proc where oid = 'private.search_processes_latest_impl(text,jsonb,bigint,bigint,text,text,uuid,integer,text,text[])'::regprocedure),
+  (select prosecdef from pg_proc where oid = 'private.search_processes_latest_v2_impl(text,jsonb,bigint,bigint,text,text,uuid,integer,text,text[],boolean)'::regprocedure),
   'process private helper is security definer'
 );
 
@@ -149,31 +149,31 @@ select pg_temp.disable_trigger_if_exists('public.lifecyclemodels'::regclass, 'li
 select pg_temp.disable_trigger_if_exists('public.lifecyclemodels'::regclass, 'lifecyclemodel_extract_md_trigger_insert');
 
 insert into public.flows (
-  id, version, json, json_ordered, user_id, state_code, team_id, extracted_md, rule_verification, created_at, modified_at
+  id, version, json, json_ordered, user_id, state_code, team_id, extracted_md, search_text, rule_verification, created_at, modified_at
 )
 values
-  ('f1000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-public-flow-token"}'::jsonb, '{"search":"rls-public-flow-token"}'::json, 'a1000000-0000-0000-0000-000000000103', 100, null, 'rls-public-flow-token', true, now(), now()),
-  ('f2000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-owner-flow-token"}'::jsonb, '{"search":"rls-owner-flow-token"}'::json, 'a1000000-0000-0000-0000-000000000103', 0, null, 'rls-owner-flow-token', true, now(), now()),
-  ('f3000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-team-flow-token"}'::jsonb, '{"search":"rls-team-flow-token"}'::json, 'b2000000-0000-0000-0000-000000000103', 0, 'c3000000-0000-0000-0000-000000000103', 'rls-team-flow-token', true, now(), now()),
-  ('f4000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-outsider-flow-token"}'::jsonb, '{"search":"rls-outsider-flow-token"}'::json, 'b2000000-0000-0000-0000-000000000103', 0, null, 'rls-outsider-flow-token', true, now(), now());
+  ('f1000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-public-flow-token"}'::jsonb, '{"search":"rls-public-flow-token"}'::json, 'a1000000-0000-0000-0000-000000000103', 100, null, 'rls-public-flow-token', array['rls-public-flow-token'], true, now(), now()),
+  ('f2000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-owner-flow-token"}'::jsonb, '{"search":"rls-owner-flow-token"}'::json, 'a1000000-0000-0000-0000-000000000103', 0, null, 'rls-owner-flow-token', array['rls-owner-flow-token'], true, now(), now()),
+  ('f3000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-team-flow-token"}'::jsonb, '{"search":"rls-team-flow-token"}'::json, 'b2000000-0000-0000-0000-000000000103', 0, 'c3000000-0000-0000-0000-000000000103', 'rls-team-flow-token', array['rls-team-flow-token'], true, now(), now()),
+  ('f4000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-outsider-flow-token"}'::jsonb, '{"search":"rls-outsider-flow-token"}'::json, 'b2000000-0000-0000-0000-000000000103', 0, null, 'rls-outsider-flow-token', array['rls-outsider-flow-token'], true, now(), now());
 
 insert into public.processes (
-  id, version, json, json_ordered, user_id, state_code, team_id, extracted_md, rule_verification, created_at, modified_at
+  id, version, json, json_ordered, user_id, state_code, team_id, extracted_md, search_text, rule_verification, created_at, modified_at
 )
 values
-  ('e1000000-0000-0000-0000-000000000103', '01.00.000', '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-public-process-token"}'::jsonb, '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-public-process-token"}'::json, 'a1000000-0000-0000-0000-000000000103', 100, null, 'rls-public-process-token', true, now(), now()),
-  ('e2000000-0000-0000-0000-000000000103', '01.00.000', '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-owner-process-token"}'::jsonb, '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-owner-process-token"}'::json, 'a1000000-0000-0000-0000-000000000103', 0, null, 'rls-owner-process-token', true, now(), now()),
-  ('e3000000-0000-0000-0000-000000000103', '01.00.000', '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-team-process-token"}'::jsonb, '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-team-process-token"}'::json, 'b2000000-0000-0000-0000-000000000103', 0, 'c3000000-0000-0000-0000-000000000103', 'rls-team-process-token', true, now(), now()),
-  ('e4000000-0000-0000-0000-000000000103', '01.00.000', '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-outsider-process-token"}'::jsonb, '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-outsider-process-token"}'::json, 'b2000000-0000-0000-0000-000000000103', 0, null, 'rls-outsider-process-token', true, now(), now());
+  ('e1000000-0000-0000-0000-000000000103', '01.00.000', '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-public-process-token"}'::jsonb, '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-public-process-token"}'::json, 'a1000000-0000-0000-0000-000000000103', 100, null, 'rls-public-process-token', array['rls-public-process-token'], true, now(), now()),
+  ('e2000000-0000-0000-0000-000000000103', '01.00.000', '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-owner-process-token"}'::jsonb, '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-owner-process-token"}'::json, 'a1000000-0000-0000-0000-000000000103', 0, null, 'rls-owner-process-token', array['rls-owner-process-token'], true, now(), now()),
+  ('e3000000-0000-0000-0000-000000000103', '01.00.000', '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-team-process-token"}'::jsonb, '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-team-process-token"}'::json, 'b2000000-0000-0000-0000-000000000103', 0, 'c3000000-0000-0000-0000-000000000103', 'rls-team-process-token', array['rls-team-process-token'], true, now(), now()),
+  ('e4000000-0000-0000-0000-000000000103', '01.00.000', '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-outsider-process-token"}'::jsonb, '{"processDataSet":{"modellingAndValidation":{"LCIMethodAndAllocation":{"typeOfDataSet":"Unit process"}}},"search":"rls-outsider-process-token"}'::json, 'b2000000-0000-0000-0000-000000000103', 0, null, 'rls-outsider-process-token', array['rls-outsider-process-token'], true, now(), now());
 
 insert into public.lifecyclemodels (
-  id, version, json, json_ordered, user_id, state_code, team_id, extracted_md, rule_verification, created_at, modified_at
+  id, version, json, json_ordered, user_id, state_code, team_id, extracted_md, search_text, rule_verification, created_at, modified_at
 )
 values
-  ('d1000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-public-lifecycle-token"}'::jsonb, '{"search":"rls-public-lifecycle-token"}'::json, 'a1000000-0000-0000-0000-000000000103', 100, null, 'rls-public-lifecycle-token', true, now(), now()),
-  ('d2000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-owner-lifecycle-token"}'::jsonb, '{"search":"rls-owner-lifecycle-token"}'::json, 'a1000000-0000-0000-0000-000000000103', 0, null, 'rls-owner-lifecycle-token', true, now(), now()),
-  ('d3000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-team-lifecycle-token"}'::jsonb, '{"search":"rls-team-lifecycle-token"}'::json, 'b2000000-0000-0000-0000-000000000103', 0, 'c3000000-0000-0000-0000-000000000103', 'rls-team-lifecycle-token', true, now(), now()),
-  ('d4000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-outsider-lifecycle-token"}'::jsonb, '{"search":"rls-outsider-lifecycle-token"}'::json, 'b2000000-0000-0000-0000-000000000103', 0, null, 'rls-outsider-lifecycle-token', true, now(), now());
+  ('d1000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-public-lifecycle-token"}'::jsonb, '{"search":"rls-public-lifecycle-token"}'::json, 'a1000000-0000-0000-0000-000000000103', 100, null, 'rls-public-lifecycle-token', array['rls-public-lifecycle-token'], true, now(), now()),
+  ('d2000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-owner-lifecycle-token"}'::jsonb, '{"search":"rls-owner-lifecycle-token"}'::json, 'a1000000-0000-0000-0000-000000000103', 0, null, 'rls-owner-lifecycle-token', array['rls-owner-lifecycle-token'], true, now(), now()),
+  ('d3000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-team-lifecycle-token"}'::jsonb, '{"search":"rls-team-lifecycle-token"}'::json, 'b2000000-0000-0000-0000-000000000103', 0, 'c3000000-0000-0000-0000-000000000103', 'rls-team-lifecycle-token', array['rls-team-lifecycle-token'], true, now(), now()),
+  ('d4000000-0000-0000-0000-000000000103', '01.00.000', '{"search":"rls-outsider-lifecycle-token"}'::jsonb, '{"search":"rls-outsider-lifecycle-token"}'::json, 'b2000000-0000-0000-0000-000000000103', 0, null, 'rls-outsider-lifecycle-token', array['rls-outsider-lifecycle-token'], true, now(), now());
 
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);

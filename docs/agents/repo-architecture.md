@@ -93,6 +93,17 @@ and admitted caller roles; migrations first remove inherited grants and then
 rebuild the external ACL from this closed manifest. New or overloaded RPCs are
 therefore denied until their exact signature is deliberately classified.
 
+Dataset search derives its caller class from PostgreSQL's standard `role`
+setting, which retains the external request role across nested SECURITY DEFINER
+calls. `authenticated` visibility is bound to `auth.uid()` and current team
+membership; `anon`, unknown roles and missing or malformed actor identities
+cannot acquire owner/team visibility from caller-supplied IDs. Legacy JWT role
+settings never establish trusted-service authority. Explicit `service_role`
+requests retain their actor-first parameter fallback. Direct SQL compatibility
+is limited to `session_user = postgres`, role NONE, and no JWT/header/path/method
+request context. Function owners, signatures and private-helper ACLs remain
+unchanged; a definer's `current_user` is not evidence of the caller's identity.
+
 ## Review opinion dependency scope
 
 Current Root/Reference derivation reads actual Root JSON, approving submissions
