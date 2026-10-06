@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-06
-lastReviewedCommit: 124f01245173751e23942af6a2220ffe32550918
-lastReviewedNote: "Reviewed Database #777 request-role hardening at 124f0124: actual-role authorization and local SQL/HTTP refusal and cleanup proofs preserve signatures, owners, ACLs, branch/Hosted deployment boundaries and generated-workspace rules. CI adds only SQL and offline harness tests; no runtime schema/profile or exposed type changes."
+lastReviewedCommit: ea07ff43afe0bfc0468b2392710a47975ba8c697
+lastReviewedNote: "Reviewed Database #783 at ea07ff43: two empty Portal readers preserve signatures, owners, ACLs, forced RLS, budgets and writer/index boundaries. Clean 17.11.0.002 reset, 1018 SQL assertions, three DDL privilege prestates, 336 full-response comparisons with required real continuation cursors and deterministic 1845-file exports pass. Hosted 17.11.0.003 qualification and Dev/Main delivery remain separate."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -286,7 +286,7 @@ For Exchange support types whose TIDAS schemas do not carry a Process-style lice
 
 Reviewed parent corrections are separate data revisions. `data/portal-navigation-china-administrative.json` binds existing `TW`, `HK` and `MO` nodes to `CN` using the pinned GeoAtlas feature parent, level and adcode; codes, labels, aliases and authored data stay unchanged. `data/portal-navigation-revisions.json` pins the immutable bootstrap seed and the prior contract digests. The revision fences the narrow projection writers, updates exactly three parents, adds deduplicated country-ancestor memberships through the branch index, and restores the seed guard in one bounded transaction.
 
-`api.portal_navigation_v1` returns one byte-bounded, paginated branch with public-version counts, direct counts and full parent counts. Static taxonomy nodes may show zero; data-derived unknown nodes are only disclosed while public members remain. Search/Facets V3 admit node/subtree/direct filters before ordering and limits, retain V2 DTOs, and use separate cursor fingerprints. V2/Hybrid remain unchanged. The independent literal derivation manifest checks source functions, constrained execution, RLS, foreign keys and exact projection triggers; seeded meanings cannot be changed by runtime writers. Reader grants name individual columns. The summary facade retains its dataset-count semantics and two-second setting while reading the correct kind-specific projection with semi-join existence checks against latest identities.
+`api.portal_navigation_v1` returns one byte-bounded, paginated branch with public-version counts, direct counts and full parent counts. Empty-query, empty-filter totals aggregate the same forced-RLS version relation directly; filtered and lexical totals retain the matched-version helper. Empty Facets allow their first two single-consumer CTEs to fold into the existing aggregation. Static taxonomy nodes may show zero; data-derived unknown nodes are only disclosed while public members remain. Search/Facets V3 admit node/subtree/direct filters before ordering and limits, retain V2 DTOs, and use separate cursor fingerprints. V2/Hybrid remain unchanged. The independent literal derivation manifest checks source functions, constrained execution, RLS, foreign keys and exact projection triggers; seeded meanings cannot be changed by runtime writers. Reader grants name individual columns. The summary facade retains its dataset-count semantics and two-second setting while reading the correct kind-specific projection with semi-join existence checks against latest identities.
 
 The Portal executor is NOLOGIN/NOBYPASSRLS and receives only the minimum object privileges required by the façades. External wrapper ACLs are revoked from `PUBLIC` and classified by exact signature in `private.api_capability_grants`; raw core tables receive no new anon policy.
 

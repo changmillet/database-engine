@@ -6,7 +6,7 @@ CREATE OR REPLACE FUNCTION "private"."catalog_portal_facets_empty_v2_impl"("p_ki
     SET "plan_cache_mode" TO 'force_custom_plan'
     SET "row_security" TO 'on'
     AS $$
-  with visible_versions as materialized (
+  with visible_versions as not materialized (
     select
       facet.dataset_kind,
       facet.id,
@@ -19,7 +19,7 @@ CREATE OR REPLACE FUNCTION "private"."catalog_portal_facets_empty_v2_impl"("p_ki
     from private.portal_catalog_facet_rows_v1 as facet
     where facet.facet_contract_version = 1 and facet.state_code in (100,200)
       and (p_kind = 'all' or facet.dataset_kind = p_kind)
-  ), facts as materialized (
+  ), facts as not materialized (
     select visible_versions.dataset_kind,
       visible_versions.facet_access_level,
       visible_versions.facet_geography,

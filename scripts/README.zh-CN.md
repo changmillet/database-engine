@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-06
-lastReviewedCommit: 124f01245173751e23942af6a2220ffe32550918
-lastReviewedNote: "Reviewed Database #777 request-role hardening at 124f0124: actual-role authorization and local SQL/HTTP refusal and cleanup proofs preserve signatures, owners, ACLs, branch/Hosted deployment boundaries and generated-workspace rules. CI adds only SQL and offline harness tests; no runtime schema/profile or exposed type changes."
+lastReviewedCommit: ea07ff43afe0bfc0468b2392710a47975ba8c697
+lastReviewedNote: "Reviewed Database #783 at ea07ff43: two empty Portal readers preserve signatures, owners, ACLs, forced RLS, budgets and writer/index boundaries. Clean 17.11.0.002 reset, 1018 SQL assertions, three DDL privilege prestates, 336 full-response comparisons with required real continuation cursors and deterministic 1845-file exports pass. Hosted 17.11.0.003 qualification and Dev/Main delivery remain separate."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -754,3 +754,11 @@ python3 scripts/profile_portal_catalog_concurrency.py \
 
 两个入口都不接受 hosted URL，也不提高公共查询预算。语义与发布证明要求见
 `docs/agents/repo-validation.md`。
+
+## Portal 空查询对照
+
+`benchmark_portal_empty_reads.py` 交替执行精确的前序和候选 Navigation/Facets，
+比较完整响应并记录嵌套自然计划。它仅接受明确复用的 `workspace-1701`
+PostgreSQL17.11 本地栈和空投影表。通过 `--help` 查看有界 fixture 参数；
+报告、SQL 和计划日志必须使用新路径。合成 fixture 的所有变化回滚，
+只作为读取证据；真实 writer/RLS 测试与托管性能仍需分别验证。

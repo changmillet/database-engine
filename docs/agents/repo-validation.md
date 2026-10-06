@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-06
-lastReviewedCommit: 124f01245173751e23942af6a2220ffe32550918
-lastReviewedNote: "Reviewed Database #777 request-role hardening at 124f0124: actual-role authorization and local SQL/HTTP refusal and cleanup proofs preserve signatures, owners, ACLs, branch/Hosted deployment boundaries and generated-workspace rules. CI adds only SQL and offline harness tests; no runtime schema/profile or exposed type changes."
+lastReviewedCommit: ea07ff43afe0bfc0468b2392710a47975ba8c697
+lastReviewedNote: "Reviewed Database #783 at ea07ff43: two empty Portal readers preserve signatures, owners, ACLs, forced RLS, budgets and writer/index boundaries. Clean 17.11.0.002 reset, 1018 SQL assertions, three DDL privilege prestates, 336 full-response comparisons with required real continuation cursors and deterministic 1845-file exports pass. Hosted 17.11.0.003 qualification and Dev/Main delivery remain separate."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -348,6 +348,46 @@ or raw responses, and must verify fixture and identity cleanup even after a fail
 assertion. Keep baseline failure and candidate success evidence separate. These
 local fixtures never authorize production test-user creation or hosted writes.
 
+### Persistent PGroonga qualification and TEMP limitation
+
+`20260811_search_text_source_switch.sql` models production's ordinary logged
+relations for its two PGroonga-indexed fixtures. The original `BEGIN/ROLLBACK`
+isolates their DDL and data; its remaining TEMP helper tables are not indexed by
+PGroonga. Preserve all 25 assertions, data, opclass, tokenizer/normalizer,
+`ANALYZE`, natural index-plan and result checks. Verify zero fixture relations
+and indexes remain after the test; never delete a pre-existing name to admit it.
+
+PGroonga 3.2.5 / Groonga 14.0.5 has a confirmed TEMP-index cleanup incompatibility
+on the exact PostgreSQL 17.11.0.002 image. PostgreSQL 17.7 changed the filenumber
+resolver to exclude temporary relations; TEMP PGroonga Sources objects disappear
+after `ANALYZE` or `pgroonga_vacuum()`. The persistent-fixture qualification does
+not repair this extension defect or admit TEMP PGroonga indexes. See the
+[PostgreSQL 17.7 release note](https://www.postgresql.org/docs/release/17.7/) and
+[PGroonga 3.2.5 resolver](https://github.com/pgroonga/pgroonga/blob/3.2.5/src/pgrn-pg.c#L148).
+
+Retain both negative paths with the manual, non-pgTAP diagnostic
+`supabase/tests/diagnostics/20261006_pgroonga_temp_index_compatibility.sql`:
+
+```bash
+# Select exactly an already-owned disposable local stack, never a shared or hosted DB.
+docker exec -i <task-owned-db-container> psql -X -U postgres -d postgres \
+  < supabase/tests/diagnostics/20261006_pgroonga_temp_index_compatibility.sql
+docker exec -i <task-owned-db-container> psql -X -U postgres -d postgres \
+  -v run_vacuum=true \
+  < supabase/tests/diagnostics/20261006_pgroonga_temp_index_compatibility.sql
+```
+
+Use a fresh backend for each path. Preserve actual exit status, versions,
+Sources before/after, natural plans and hits/errors; the 17.11 error is unresolved
+negative evidence and must not be converted to an expected-pass CI check.
+Before upgrade qualification, also verify committed logged indexes across
+sessions through cleanup, `ANALYZE`, DML, natural plan and result readback, then
+drop only owned fixtures and prove zero catalog residue. Record the exact
+consumer repositories/revisions and entry points scanned for TEMP+PGroonga use;
+bounded source inspection does not establish absence of external ad-hoc SQL.
+The candidate runtime must not depend on TEMP PGroonga indexes until the original
+negative reproduction passes on a separately qualified extension/runtime.
+
 ### Version-aware search proof
 
 For the additive Portal V2/Next matched-version APIs, use a uniquely named
@@ -368,6 +408,26 @@ the predecessor HNSW route. The exact branch must reapply the complete canonical
 filter, preserve both versions of one ID, rank by exact cosine distance with
 deterministic ID/version ties, and return no row for an empty candidate set.
 ### Navigation and V3 proof
+
+For the Database #783 empty-read optimization, run
+`supabase/tests/20261006_portal_empty_reads.sql` alongside the original Navigation,
+China-administrative, bounded V2/V3, schema/API and Portal writer suites after a
+blank reset. Preserve exact full JSON and cursor behavior, both-kind historical
+version totals, virtual zero-match nodes, forced RLS, owners, ACLs and function
+budgets. Use `scripts/benchmark_portal_empty_reads.py --container
+supabase_db_database-engine-777-pg1711 --reuse-campaign workspace-1701 --base-ref
+<exact-predecessor-commit> --samples 20 --report <new-report.json>` only for the
+explicitly retained campaign stack. It refuses other containers, non-Unix Docker,
+wrong server versions and nonempty projection fixtures. Compare alternating
+baseline/candidate samples, require non-null Navigation continuation cursors,
+and retain nested natural plans, buffers and temp I/O;
+its synthetic direct-projection fixture is reader evidence, not writer or hosted
+p95 proof. All fixture/function changes roll back and require zero residual rows.
+Regenerate the five-schema workspace and exposed types twice without drift.
+Run `supabase/tests/upgrade/test_issue_783_portal_empty_reads_upgrade.py` with the
+same explicit container/reuse arguments to prove absent and pre-existing DDL
+membership/schema privileges restore exactly, including an existing SET=false
+grant. The migration's transaction never persists temporary DDL authority.
 
 For administrative parent revisions, first run `python3 scripts/test_portal_china_navigation_upgrade.py --local-container supabase_db_database-engine-662-isolated` against an empty disposable project at the pre-revision base. Then replay the complete migrations and run `supabase/tests/20260920_portal_china_administrative_navigation.sql` alongside the original navigation suite. Prove existing historical versions gain exactly one ancestor, direct placements and raw codes remain unchanged, TW/HK/MO and Tibet remain reachable at zero matches, anonymous V3 counts agree, withdrawals remove ancestors, and the seed guard and private ACLs remain intact. Regenerated five-schema workspace and Data API types must have no diff for this data-only revision.
 
