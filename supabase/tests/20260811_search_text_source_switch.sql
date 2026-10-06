@@ -261,10 +261,13 @@ select extensions.ok(
   'direct candidates do not use array position or element order as a ranking weight'
 );
 
-create temporary table issue_460_array_probe (
+-- Match production's logged PGroonga relations. PG17.7+ / PGroonga3.2.5
+-- TEMP-index cleanup is incompatible; retain its separate manual diagnostic.
+-- These two indexed fixtures remain isolated by this file's BEGIN/ROLLBACK.
+create table public.issue_460_array_probe (
   id integer primary key,
   search_text text[]
-) on commit drop;
+);
 
 create index issue_460_array_probe_search_text_pgroonga
   on issue_460_array_probe using pgroonga (
@@ -331,10 +334,10 @@ select extensions.is(
   'UUID-like search_text content is searchable'
 );
 
-create temporary table issue_460_explain_probe (
+create table public.issue_460_explain_probe (
   id integer primary key,
   search_text text[]
-) on commit drop;
+);
 
 create index issue_460_explain_probe_search_text_pgroonga
   on issue_460_explain_probe using pgroonga (

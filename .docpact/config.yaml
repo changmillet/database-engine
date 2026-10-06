@@ -1,8 +1,8 @@
 version: 1
 layout: repo
 lastReviewedAt: "2026-10-06"
-lastReviewedCommit: "124f01245173751e23942af6a2220ffe32550918"
-lastReviewedNote: "Reviewed Database #777 request-role hardening at 124f0124: actual-role authorization and local SQL/HTTP refusal and cleanup proofs preserve signatures, owners, ACLs, branch/Hosted deployment boundaries and generated-workspace rules. CI adds only SQL and offline harness tests; no runtime schema/profile or exposed type changes."
+lastReviewedCommit: "5a6323776c8b082ddaa4474f29b5b971dbfd28bd"
+lastReviewedNote: "Reviewed Database #781 logged PGroonga qualification at 5a632377: only the two indexed fixtures use logged public relations within rollback; all 25 assertions and natural plans remain. Manual TEMP incompatibility diagnostics and the exact PG17.11 limitation are documented. Ownership, runtime schema/ACLs and branch/deployment boundaries are unchanged."
 
 # Keep deterministic governance facts here.
 # AGENTS.md remains the repo contract entrypoint.
