@@ -25,10 +25,12 @@ insert into private.teams(id,json,rank,is_public) values
  ('77700000-0000-4000-8000-000000000003','{"name":"Issue 777 synthetic team"}',1,false);
 insert into private.roles(user_id,team_id,role) values
  ('77700000-0000-4000-8000-000000000001','77700000-0000-4000-8000-000000000003','owner');
-insert into public.processes(id,version,json,json_ordered,user_id,state_code,team_id,search_text,rule_verification,created_at,modified_at)
+insert into public.processes(id,version,json,json_ordered,user_id,state_code,team_id,search_text,embedding_ft,rule_verification,created_at,modified_at)
 select id::uuid,'01.00.000',document,document::json,
  '77700000-0000-4000-8000-000000000001',state_code,
- '77700000-0000-4000-8000-000000000003',array['issue777 synthetic'],true,now(),now()
+ '77700000-0000-4000-8000-000000000003',array['issue777 synthetic'],
+ case when state_code=0 then ('[1,' || repeat('0,',1022) || '0]')::extensions.vector(1024) else null end,
+ true,now(),now()
 from (values
  ('77700000-0000-4000-8000-000000000010',0),
  ('77700000-0000-4000-8000-000000000011',100),
@@ -82,6 +84,14 @@ select is(pg_temp.issue777_probe('', '77700000-0000-4000-8000-000000000002')->>'
 select is(pg_temp.issue777_probe('', '77700000-0000-4000-8000-000000000001')->>'member','false','authenticated outsider cannot spoof the helper member actor');
 select is((select count(*) from api.search_processes('77700000-0000-4000-8000-000000000010',data_source=>'te',team_id_filter=>'77700000-0000-4000-8000-000000000003')),0::bigint,'authenticated outsider lexical UUID cannot read team draft');
 select is((select count(*) from api.search_dataset_json_uuid_mentions('77700000-0000-4000-8000-000000000099',array['process'],'te','', '77700000-0000-4000-8000-000000000003',0)),0::bigint,'authenticated outsider UUID mentions cannot read team drafts');
+-- Hybrid V2 exercises the same team guard across lexical and semantic actor
+-- candidate helpers. Both channels are enabled and the owner positive below
+-- must retrieve this exact embedded draft, so rejection is not an empty-fixture pass.
+select is((select count(*) from api.hybrid_search_process_versions_v2(
+ 'issue777', '[1,' || repeat('0,',1022) || '0]',
+ data_source=>'te', state_code_filter=>0,
+ team_id_filter=>'77700000-0000-4000-8000-000000000003', query_terms=>array['issue777'])),
+ 0::bigint,'JSON-only authenticated outsider Hybrid V2 cannot read the embedded team draft');
 select set_config('request.jwt.claim.role','service_role',true);
 select is(pg_temp.issue777_probe('', '77700000-0000-4000-8000-000000000002')->>'member','false','legacy service claim cannot elevate authenticated outsider');
 select set_config('request.jwt.claim.role','',true);
@@ -100,6 +110,12 @@ select is(pg_temp.issue777_probe()->>'uid',null::text,'malformed legacy sub fail
 select set_config('request.jwt.claim.sub','',true);
 select is(pg_temp.issue777_probe('', '77700000-0000-4000-8000-000000000001')->>'member','true','legitimate team owner retains membership access');
 select is((select count(*) from api.search_processes('77700000-0000-4000-8000-000000000010',data_source=>'my',this_user_id=>'77700000-0000-4000-8000-000000000002')),1::bigint,'owner draft read retains actor identity despite conflicting parameter');
+select is((select array_agg(id::text || ':' || semantic_route || ':' || semantic_candidate_population::text || ':' || semantic_fallback_used::text order by id) from api.hybrid_search_process_versions_v2(
+ 'issue777', '[1,' || repeat('0,',1022) || '0]',
+ data_source=>'te', state_code_filter=>0,
+ team_id_filter=>'77700000-0000-4000-8000-000000000003', query_terms=>array['issue777'])),
+ array['77700000-0000-4000-8000-000000000010:exact:1:false']::text[],
+ 'JSON-only owner Hybrid V2 returns exactly the paired draft with a real semantic candidate and no fallback');
 select is((select count(*) from api.search_processes('77700000-0000-4000-8000-000000000013',data_source=>'ex')),1::bigint,'authenticated example scope remains readable');
 
 reset role;
