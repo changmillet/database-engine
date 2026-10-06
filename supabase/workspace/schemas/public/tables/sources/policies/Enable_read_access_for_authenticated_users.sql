@@ -14,4 +14,4 @@ CASE
        FROM "private"."reviews" "r"
       WHERE ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text")))))
     ELSE false
-END))));
+END)) OR (("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL))));

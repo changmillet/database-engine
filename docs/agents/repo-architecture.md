@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-06
-lastReviewedCommit: ea07ff43afe0bfc0468b2392710a47975ba8c697
-lastReviewedNote: "Reviewed Database #783 at ea07ff43: two empty Portal readers preserve signatures, owners, ACLs, forced RLS, budgets and writer/index boundaries. Clean 17.11.0.002 reset, 1018 SQL assertions, three DDL privilege prestates, 336 full-response comparisons with required real continuation cursors and deterministic 1845-file exports pass. Hosted 17.11.0.003 qualification and Dev/Main delivery remain separate."
+lastReviewedCommit: 10cc730b1463565279c6f2c10c3384bc972d19d9
+lastReviewedNote: "Reviewed Database #785 at 10cc730b: thirteen fixed private invokers preserve scalar inlining and closed ACLs; six same-role SELECT merges, two qualified Navigation indexes, single guarded typo-index removal and preexisting retention/helper ACL reconciliation preserve ownership and API boundaries. Canonical 414-migration local17.11.0.002 reset, ordinary-schema canaries, upgrade10/typo5 cases, full JSON/cursors, exact577 dispositions and deterministic1836-file exports pass; reported hosted17.11.0.003, deployment and integration proof remain Issue/PR-owned."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -92,6 +92,29 @@ in `private.api_capability_grants`. That table records the owning capability ID
 and admitted caller roles; migrations first remove inherited grants and then
 rebuild the external ACL from this closed manifest. New or overloaded RPCs are
 therefore denied until their exact signature is deliberately classified.
+
+Database #785 fixes the search path of thirteen private invokers without changing
+their bodies or ACLs. Twelve scalar SQL helpers retain deliberate closed-ACL
+exceptions because a function `SET` clause prevents their scalar inlining; their
+qualified dependencies are reached through fixed-path internal callers. The
+Navigation matcher already has `EXISTS` and retains a function call in both
+natural plans. Six core entity SELECT policy pairs with the exact same
+`authenticated` role set are one existing predicate OR example predicate;
+Contacts keeps its original PUBLIC-scoped policy and authenticated example
+companion. Restrictive OAuth and Process120 policies are independent guards.
+
+The hooks-retention absence guards reconcile a recorded May migration later
+edited for Preview. The closure-binding helper's existing production
+service/internal execution grants support the SECURITY INVOKER package trigger
+and are reproduced in source while browser execution remains denied.
+
+Navigation's supplementary indexes lead on membership `node_id` and nonnull
+node `parent_node_id`, serving existing node-only membership/hasChildren reads
+and complete nonnull FK lookups. They add no projection, writer or authorization
+path. The single obsolete LCIA Method JSON-version expression uses the erroneous
+`LCIAMethodDataSetDataSet` root; guarded removal retains the canonical
+`LCIAMethodDataSet` producer, typed `version`, primary key and sync trigger.
+No replacement expression index is implied by that correction.
 
 Dataset search derives its caller class from PostgreSQL's standard `role`
 setting, which retains the external request role across nested SECURITY DEFINER

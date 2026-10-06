@@ -4,6 +4,9 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, auth;
 select plan(44);
+create temp table source_policy_layout as select not exists(
+ select 1 from pg_policy where polrelid='public.sources'::regclass
+ and polname='authenticated_example_read') as merged_examples;
 create temporary table policy_variants(name text primary key, ddl text);
 insert into policy_variants
 select 'new',format('alter policy "Enable read access for authenticated users" on public.sources using (%s)',qual)
@@ -38,8 +41,16 @@ returns setof text language plpgsql as $$
 declare before_value jsonb; after_value jsonb;
 begin
  execute (select ddl from policy_variants where name='old');
+ -- #785 folded the old companion into the current policy. Reconstruct the
+ -- predecessor's original two-policy layout only while measuring it.
+ if (select merged_examples from source_policy_layout) then
+  execute 'create policy authenticated_example_read on public.sources for select to authenticated using (state_code=-1 and (select auth.uid()) is not null)';
+ end if;
  before_value:=pg_temp.capture_actor(p_actor,p_client,p_source);
  execute (select ddl from policy_variants where name='new');
+ if (select merged_examples from source_policy_layout) then
+  execute 'drop policy authenticated_example_read on public.sources';
+ end if;
  after_value:=pg_temp.capture_actor(p_actor,p_client,p_source);
  return next extensions.is(after_value,before_value,p_label||' preserves predecessor result or SQLSTATE');
  if p_expected is not null then
@@ -130,7 +141,9 @@ set local session_replication_role = origin;
 select * from pg_temp.parity('76600000-0000-4000-8000-000000000003','reversed Review insertion order','{"sqlstate":"22P02"}'::jsonb,null,'76610000-0000-4000-8000-000000000003');
 select * from pg_temp.parity('76600000-0000-4000-8000-000000000003','published Source short circuit','{"rows":[["76610000-0000-4000-8000-000000000001","00.00.001"]]}'::jsonb,null,'76610000-0000-4000-8000-000000000001');
 select * from pg_temp.parity('76600000-0000-4000-8000-000000000001','owner Source short circuit','{"rows":[["76610000-0000-4000-8000-000000000003","00.00.001"]]}'::jsonb,null,'76610000-0000-4000-8000-000000000003');
-select ok((select count(*)=3 from pg_policies where schemaname='public' and tablename='sources' and cmd='SELECT'),'Source SELECT policy set, including example and restrictive OAuth guards, remains unchanged');
+select ok((select count(*)=case when (select merged_examples from source_policy_layout) then 2 else 3 end
+ from pg_policies where schemaname='public' and tablename='sources' and cmd='SELECT'),
+ 'Source SELECT policy layout, including example semantics and restrictive OAuth guards, restores exactly');
 select set_config('app.review_legacy_migration','off',true);
 select * from finish();
 rollback;

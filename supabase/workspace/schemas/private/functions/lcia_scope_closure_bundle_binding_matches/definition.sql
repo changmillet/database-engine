@@ -41,3 +41,7 @@ $$;
 ALTER FUNCTION "private"."lcia_scope_closure_bundle_binding_matches"("p_check" "private"."lcia_scope_closure_checks", "p_bundle" "private"."worker_job_artifacts") OWNER TO "postgres";
 
 REVOKE ALL ON FUNCTION "private"."lcia_scope_closure_bundle_binding_matches"("p_check" "private"."lcia_scope_closure_checks", "p_bundle" "private"."worker_job_artifacts") FROM PUBLIC;
+
+GRANT ALL ON FUNCTION "private"."lcia_scope_closure_bundle_binding_matches"("p_check" "private"."lcia_scope_closure_checks", "p_bundle" "private"."worker_job_artifacts") TO "service_role";
+
+GRANT ALL ON FUNCTION "private"."lcia_scope_closure_bundle_binding_matches"("p_check" "private"."lcia_scope_closure_checks", "p_bundle" "private"."worker_job_artifacts") TO "api_internal_executor";

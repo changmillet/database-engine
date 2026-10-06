@@ -209,8 +209,8 @@ select is(
     select count(*)
     from pg_policy
   ),
-  114::bigint,
-  'Nine navigation policies plus: all RLS policies, nine OAuth guards and five composite-name policies plus seven authenticated example policies and the two restrictive Result read-isolation policies remain present'
+  108::bigint,
+  'All RLS guards remain present after six authenticated example companions merge into their same-role SELECT policies; Contacts, OAuth, navigation and restrictive Result guards remain separate'
 );
 
 select is(
