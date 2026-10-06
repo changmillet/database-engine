@@ -70,7 +70,10 @@ begin
     coalesce((select jsonb_agg(value order by rn) from paged where rn<=p_limit),'[]'::jsonb),
     (select case when count(*)>p_limit then (array_agg(node_id order by rn))[p_limit] else null end from paged),
     (select value from decorated where node_id=p_parent_node_id),
-    (select jsonb_build_object('process',count(*) filter(where dataset_kind='process'),'flow',count(*) filter(where dataset_kind='flow')) from matched)
+    (case when p_query='' and p_filters='{}'::jsonb then
+      (select jsonb_build_object('process',count(*) filter(where dataset_kind='process'),'flow',count(*) filter(where dataset_kind='flow'))
+       from private.portal_navigation_versions_v1)
+     else (select jsonb_build_object('process',count(*) filter(where dataset_kind='process'),'flow',count(*) filter(where dataset_kind='flow')) from matched) end)
   into v_nodes,v_next,v_parent,v_totals;
 
   with recursive ancestors as (

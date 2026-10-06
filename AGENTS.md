@@ -38,8 +38,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-06
-lastReviewedCommit: 5a6323776c8b082ddaa4474f29b5b971dbfd28bd
-lastReviewedNote: "Reviewed Database #781 logged PGroonga qualification at 5a632377: only the two indexed fixtures use logged public relations within rollback; all 25 assertions and natural plans remain. Manual TEMP incompatibility diagnostics and the exact PG17.11 limitation are documented. Ownership, runtime schema/ACLs and branch/deployment boundaries are unchanged."
+lastReviewedCommit: ea07ff43afe0bfc0468b2392710a47975ba8c697
+lastReviewedNote: "Reviewed Database #783 at ea07ff43: two empty Portal readers preserve signatures, owners, ACLs, forced RLS, budgets and writer/index boundaries. Clean 17.11.0.002 reset, 1018 SQL assertions, three DDL privilege prestates, 336 full-response comparisons with required real continuation cursors and deterministic 1845-file exports pass. Hosted 17.11.0.003 qualification and Dev/Main delivery remain separate."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md

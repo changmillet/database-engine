@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-06
-lastReviewedCommit: 5a6323776c8b082ddaa4474f29b5b971dbfd28bd
-lastReviewedNote: "Reviewed Database #781 logged PGroonga qualification at 5a632377: only the two indexed fixtures use logged public relations within rollback; all 25 assertions and natural plans remain. Manual TEMP incompatibility diagnostics and the exact PG17.11 limitation are documented. Ownership, runtime schema/ACLs and branch/deployment boundaries are unchanged."
+lastReviewedCommit: ea07ff43afe0bfc0468b2392710a47975ba8c697
+lastReviewedNote: "Reviewed Database #783 at ea07ff43: two empty Portal readers preserve signatures, owners, ACLs, forced RLS, budgets and writer/index boundaries. Clean 17.11.0.002 reset, 1018 SQL assertions, three DDL privilege prestates, 336 full-response comparisons with required real continuation cursors and deterministic 1845-file exports pass. Hosted 17.11.0.003 qualification and Dev/Main delivery remain separate."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -408,6 +408,26 @@ the predecessor HNSW route. The exact branch must reapply the complete canonical
 filter, preserve both versions of one ID, rank by exact cosine distance with
 deterministic ID/version ties, and return no row for an empty candidate set.
 ### Navigation and V3 proof
+
+For the Database #783 empty-read optimization, run
+`supabase/tests/20261006_portal_empty_reads.sql` alongside the original Navigation,
+China-administrative, bounded V2/V3, schema/API and Portal writer suites after a
+blank reset. Preserve exact full JSON and cursor behavior, both-kind historical
+version totals, virtual zero-match nodes, forced RLS, owners, ACLs and function
+budgets. Use `scripts/benchmark_portal_empty_reads.py --container
+supabase_db_database-engine-777-pg1711 --reuse-campaign workspace-1701 --base-ref
+<exact-predecessor-commit> --samples 20 --report <new-report.json>` only for the
+explicitly retained campaign stack. It refuses other containers, non-Unix Docker,
+wrong server versions and nonempty projection fixtures. Compare alternating
+baseline/candidate samples, require non-null Navigation continuation cursors,
+and retain nested natural plans, buffers and temp I/O;
+its synthetic direct-projection fixture is reader evidence, not writer or hosted
+p95 proof. All fixture/function changes roll back and require zero residual rows.
+Regenerate the five-schema workspace and exposed types twice without drift.
+Run `supabase/tests/upgrade/test_issue_783_portal_empty_reads_upgrade.py` with the
+same explicit container/reuse arguments to prove absent and pre-existing DDL
+membership/schema privileges restore exactly, including an existing SET=false
+grant. The migration's transaction never persists temporary DDL authority.
 
 For administrative parent revisions, first run `python3 scripts/test_portal_china_navigation_upgrade.py --local-container supabase_db_database-engine-662-isolated` against an empty disposable project at the pre-revision base. Then replay the complete migrations and run `supabase/tests/20260920_portal_china_administrative_navigation.sql` alongside the original navigation suite. Prove existing historical versions gain exactly one ancestor, direct placements and raw codes remain unchanged, TW/HK/MO and Tibet remain reachable at zero matches, anonymous V3 counts agree, withdrawals remove ancestors, and the seed guard and private ACLs remain intact. Regenerated five-schema workspace and Data API types must have no diff for this data-only revision.
 
