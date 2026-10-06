@@ -1,8 +1,8 @@
 version: 1
 layout: repo
-lastReviewedAt: "2026-10-04"
-lastReviewedCommit: "5b4b1fdfd3b5d947d7f5949da58b9896ad0f2f0c"
-lastReviewedNote: "Reviewed Database #774 generated snapshot repair against runtime 5b4b1fdf: canonical helpers regenerate only the two Flow function snapshots, exposed types remain unchanged, and actual Supabase CLI 2.117.0 pgTAP transport retains all 274 required assertions. Runtime migration, ACLs and delivery gates are unchanged."
+lastReviewedAt: "2026-10-06"
+lastReviewedCommit: "124f01245173751e23942af6a2220ffe32550918"
+lastReviewedNote: "Reviewed Database #777 request-role hardening at 124f0124: actual-role authorization and local SQL/HTTP refusal and cleanup proofs preserve signatures, owners, ACLs, branch/Hosted deployment boundaries and generated-workspace rules. CI adds only SQL and offline harness tests; no runtime schema/profile or exposed type changes."
 
 # Keep deterministic governance facts here.
 # AGENTS.md remains the repo contract entrypoint.
