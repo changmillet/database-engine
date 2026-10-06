@@ -32,9 +32,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-04
-lastReviewedCommit: 5b4b1fdfd3b5d947d7f5949da58b9896ad0f2f0c
-lastReviewedNote: "Reviewed Database #774 generated snapshot repair against runtime 5b4b1fdf: canonical helpers regenerate only the two Flow function snapshots, exposed types remain unchanged, and actual Supabase CLI 2.117.0 pgTAP transport retains all 274 required assertions. Runtime migration, ACLs and delivery gates are unchanged."
+lastReviewedAt: 2026-10-06
+lastReviewedCommit: 124f01245173751e23942af6a2220ffe32550918
+lastReviewedNote: "Reviewed Database #777 request-role hardening at 124f0124: actual-role authorization and local SQL/HTTP refusal and cleanup proofs preserve signatures, owners, ACLs, branch/Hosted deployment boundaries and generated-workspace rules. CI adds only SQL and offline harness tests; no runtime schema/profile or exposed type changes."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -328,6 +328,25 @@ service configuration only. Checked-in docs and migrations describe client
 classes and capability sets, never environment IDs.
 
 ## SQL And Offline Node Contract Notes
+
+### Dataset search request identity
+
+After a blank rebuild, run `supabase/tests/20261006_search_request_identity.sql`,
+the existing `20260528_dataset_search_rls_private_helpers.sql` and
+`20260529_dataset_json_uuid_deep_search.sql`, plus the applicable canonical
+Search, API-closure and OAuth regressions. Prove actual anon/authenticated roles
+with JSON-only claims, conflicting legacy role claims, missing/malformed actor
+identity, current/revoked/non-member team access, unknown roles, explicit
+service-role compatibility and the narrowly admitted context-free postgres SQL
+path. Exercise nested definers and public RPCs, not only helper-source text.
+
+Run `python3 scripts/test_search_request_identity_http.py --workdir
+<absolute-isolated-workdir> --task-owned-local-stack` against an explicitly owned
+local project admitted by that harness. It uses real Auth password-grant JWTs
+and the explicit `api` profile, refuses shared/hosted targets, emits no credentials
+or raw responses, and must verify fixture and identity cleanup even after a failed
+assertion. Keep baseline failure and candidate success evidence separate. These
+local fixtures never authorize production test-user creation or hosted writes.
 
 ### Version-aware search proof
 

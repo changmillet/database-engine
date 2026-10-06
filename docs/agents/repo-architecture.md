@@ -30,9 +30,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-04
-lastReviewedCommit: 5b4b1fdfd3b5d947d7f5949da58b9896ad0f2f0c
-lastReviewedNote: "Reviewed Database #774 generated snapshot repair against runtime 5b4b1fdf: canonical helpers regenerate only the two Flow function snapshots, exposed types remain unchanged, and actual Supabase CLI 2.117.0 pgTAP transport retains all 274 required assertions. Runtime migration, ACLs and delivery gates are unchanged."
+lastReviewedAt: 2026-10-06
+lastReviewedCommit: 124f01245173751e23942af6a2220ffe32550918
+lastReviewedNote: "Reviewed Database #777 request-role hardening at 124f0124: actual-role authorization and local SQL/HTTP refusal and cleanup proofs preserve signatures, owners, ACLs, branch/Hosted deployment boundaries and generated-workspace rules. CI adds only SQL and offline harness tests; no runtime schema/profile or exposed type changes."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -92,6 +92,17 @@ in `private.api_capability_grants`. That table records the owning capability ID
 and admitted caller roles; migrations first remove inherited grants and then
 rebuild the external ACL from this closed manifest. New or overloaded RPCs are
 therefore denied until their exact signature is deliberately classified.
+
+Dataset search derives its caller class from PostgreSQL's standard `role`
+setting, which retains the external request role across nested SECURITY DEFINER
+calls. `authenticated` visibility is bound to `auth.uid()` and current team
+membership; `anon`, unknown roles and missing or malformed actor identities
+cannot acquire owner/team visibility from caller-supplied IDs. Legacy JWT role
+settings never establish trusted-service authority. Explicit `service_role`
+requests retain their actor-first parameter fallback. Direct SQL compatibility
+is limited to `session_user = postgres`, role NONE, and no JWT/header/path/method
+request context. Function owners, signatures and private-helper ACLs remain
+unchanged; a definer's `current_user` is not evidence of the caller's identity.
 
 ## Review opinion dependency scope
 

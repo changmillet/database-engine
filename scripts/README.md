@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-04
-lastReviewedCommit: 5b4b1fdfd3b5d947d7f5949da58b9896ad0f2f0c
-lastReviewedNote: "Reviewed Database #774 generated snapshot repair against runtime 5b4b1fdf: canonical helpers regenerate only the two Flow function snapshots, exposed types remain unchanged, and actual Supabase CLI 2.117.0 pgTAP transport retains all 274 required assertions. Runtime migration, ACLs and delivery gates are unchanged."
+lastReviewedAt: 2026-10-06
+lastReviewedCommit: 124f01245173751e23942af6a2220ffe32550918
+lastReviewedNote: "Reviewed Database #777 request-role hardening at 124f0124: actual-role authorization and local SQL/HTTP refusal and cleanup proofs preserve signatures, owners, ACLs, branch/Hosted deployment boundaries and generated-workspace rules. CI adds only SQL and offline harness tests; no runtime schema/profile or exposed type changes."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -46,6 +46,28 @@ Those runners should keep their own `README.md` with dry-run, apply, and validat
 Local migration outputs and audit JSONL files should be written under `_artifacts/`, which is intentionally ignored by Git.
 
 ## Script List
+
+### `test_search_request_identity_http.py`
+
+Runs real Auth/PostgREST search-identity regressions only against an explicitly
+owned local Database #777 stack. The workdir config, project ID, loopback API
+port and Kong container must agree. It verifies anonymous/outsider denial,
+owner/team/public reads and immediate team-membership revocation, then signs out
+and removes its synthetic identities and fixtures with a zero-residue check.
+Credentials and raw HTTP bodies are never printed.
+Environment proxies are disabled. If session revocation or identity ownership
+cannot be verified, the harness retains the affected actor and reports an
+incomplete cleanup receipt instead of claiming zero residuals.
+
+```bash
+python3 scripts/test_search_request_identity_http.py \
+  --workdir <absolute-isolated-workdir> --task-owned-local-stack \
+  --supabase-cli <repository-pinned-supabase-executable>
+```
+
+The harness admits `database-engine-advisor-777` or `database-engine-777-*`
+project IDs. It does not reset a database and cannot target a hosted project or
+the shared `database-engine` stack. Run the SQL request-identity suite separately.
 
 ### `test_release_manifest_drift.py`
 
