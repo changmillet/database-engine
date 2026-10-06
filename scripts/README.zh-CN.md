@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-06
-lastReviewedCommit: ea07ff43afe0bfc0468b2392710a47975ba8c697
-lastReviewedNote: "Reviewed Database #783 at ea07ff43: two empty Portal readers preserve signatures, owners, ACLs, forced RLS, budgets and writer/index boundaries. Clean 17.11.0.002 reset, 1018 SQL assertions, three DDL privilege prestates, 336 full-response comparisons with required real continuation cursors and deterministic 1845-file exports pass. Hosted 17.11.0.003 qualification and Dev/Main delivery remain separate."
+lastReviewedCommit: 10cc730b1463565279c6f2c10c3384bc972d19d9
+lastReviewedNote: "Reviewed Database #785 at 10cc730b: thirteen fixed private invokers preserve scalar inlining and closed ACLs; six same-role SELECT merges, two qualified Navigation indexes, single guarded typo-index removal and preexisting retention/helper ACL reconciliation preserve ownership and API boundaries. Canonical 414-migration local17.11.0.002 reset, ordinary-schema canaries, upgrade10/typo5 cases, full JSON/cursors, exact577 dispositions and deterministic1836-file exports pass; reported hosted17.11.0.003, deployment and integration proof remain Issue/PR-owned."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -34,6 +34,19 @@ related:
 # Scripts
 
 这个目录包含用于远程 schema 导出、workspace 刷新、修改复制、migration 生成和受控数据迁移的命令行脚本。
+
+Database #785 的 `benchmark_advisor_invoker_paths.py` 与
+`benchmark_advisor_navigation_indexes.py` 仅接收明确复用的 `workspace-1701` /
+`supabase_db_database-engine-777-pg1711` 本地17.11栈及新的证据路径。两者把合成
+fixture 保留在回滚事务内、交替比较前序/候选、记录自然计划并验证清理。Invoker
+证明包含普通 schema 的 hostile canary 与真实 Alias 执行；Navigation 证明包含完整
+JSON/cursor 及索引存储/写成本。这些本地资格不代表 hosted 性能。
+
+`check_advisor_dispositions.py` 验证公开的逐对象 source contract；可选
+`--snapshot <private-cli-advisor.json>` 只检查基线对应关系，不打印或复制实际运营
+数值。逐项 source/release 决策与复审条件保存在
+`supabase/tests/fixtures/20261006_advisor_dispositions.json`；实际部署与 hosted
+资格状态以 Issue/PR receipts 为准。
 
 ## 目录结构
 

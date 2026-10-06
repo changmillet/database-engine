@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-06
-lastReviewedCommit: ea07ff43afe0bfc0468b2392710a47975ba8c697
-lastReviewedNote: "Reviewed Database #783 at ea07ff43: two empty Portal readers preserve signatures, owners, ACLs, forced RLS, budgets and writer/index boundaries. Clean 17.11.0.002 reset, 1018 SQL assertions, three DDL privilege prestates, 336 full-response comparisons with required real continuation cursors and deterministic 1845-file exports pass. Hosted 17.11.0.003 qualification and Dev/Main delivery remain separate."
+lastReviewedCommit: 10cc730b1463565279c6f2c10c3384bc972d19d9
+lastReviewedNote: "Reviewed Database #785 at 10cc730b: thirteen fixed private invokers preserve scalar inlining and closed ACLs; six same-role SELECT merges, two qualified Navigation indexes, single guarded typo-index removal and preexisting retention/helper ACL reconciliation preserve ownership and API boundaries. Canonical 414-migration local17.11.0.002 reset, ordinary-schema canaries, upgrade10/typo5 cases, full JSON/cursors, exact577 dispositions and deterministic1836-file exports pass; reported hosted17.11.0.003, deployment and integration proof remain Issue/PR-owned."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -34,6 +34,21 @@ related:
 # Scripts
 
 This directory contains the command-line helpers used for remote schema export, workspace refresh, change-copying, migration generation, and controlled data migrations.
+
+Database #785's `benchmark_advisor_invoker_paths.py` and
+`benchmark_advisor_navigation_indexes.py` accept only the explicitly reused
+`workspace-1701` / `supabase_db_database-engine-777-pg1711` local17.11 stack and
+new evidence paths. They keep synthetic fixtures in rollback transactions,
+alternate predecessor/candidate samples, preserve natural plans and verify
+cleanup. Invoker proof includes ordinary-schema hostile canaries and real Alias
+applications; Navigation proof includes full JSON/cursors plus storage/write
+cost. These are local qualification profiles, not hosted performance evidence.
+
+`check_advisor_dispositions.py` validates the public exact-object source contract.
+Its optional `--snapshot <private-cli-advisor.json>` checks baseline correspondence
+without printing or copying live operating values. Release/source decisions and
+future review conditions live in `supabase/tests/fixtures/20261006_advisor_dispositions.json`;
+actual deployment/hosted qualification state remains in Issue/PR receipts.
 
 ## Layout
 

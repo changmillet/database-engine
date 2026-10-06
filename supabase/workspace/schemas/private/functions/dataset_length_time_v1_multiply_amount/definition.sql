@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION "private"."dataset_length_time_v1_multiply_amount"("p_amount" "text") RETURNS "text"
     LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
 declare
   v_output text;

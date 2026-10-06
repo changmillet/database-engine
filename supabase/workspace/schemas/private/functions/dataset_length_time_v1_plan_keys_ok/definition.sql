@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION "private"."dataset_length_time_v1_plan_keys_ok"("p_plan" "jsonb") RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
   -- The closed key set is exact in both directions: the ten declared keys must all be present and
   -- nothing else may appear, so a missing required node is refused here rather than surfacing later

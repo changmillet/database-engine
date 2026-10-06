@@ -45329,6 +45329,7 @@ COMMENT ON FUNCTION "private"."dataset_alias_v2_amount_grammar_ok"("p_amount" "t
 
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_deny"("p_code" "text", "p_status" integer, "p_message" "text", "p_details" "jsonb" DEFAULT '{}'::"jsonb") RETURNS "void"
     LANGUAGE "plpgsql"
+    SET "search_path" TO ''
     AS $$
 begin
   raise exception using
@@ -45345,6 +45346,7 @@ ALTER FUNCTION "private"."dataset_alias_v2_deny"("p_code" "text", "p_status" int
 
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_derivative_chunks"("p_request_id" "uuid", "p_plan_sha256" "text", "p_targets" "jsonb") RETURNS "jsonb"
     LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
   select coalesce(jsonb_agg(jsonb_build_object(
     'ordinal', chunk.ordinal,
@@ -45375,6 +45377,7 @@ COMMENT ON FUNCTION "private"."dataset_alias_v2_derivative_chunks"("p_request_id
 
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_derivative_target_ok"("p_target" "jsonb") RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
     AS $_$
   select jsonb_typeof(p_target) = 'object'
     and not exists (
@@ -45411,6 +45414,7 @@ ALTER FUNCTION "private"."dataset_alias_v2_error"("p_code" "text", "p_status" in
 
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_exchange_keys_ok"("p_exchange" "jsonb") RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
   select jsonb_typeof(p_exchange) = 'object'
     and not exists (
@@ -45505,6 +45509,7 @@ COMMENT ON FUNCTION "private"."dataset_alias_v2_fu_path_ok"("p_path" "text") IS 
 
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_multiply_amount"("p_amount" "text", "p_factor" "text") RETURNS "text"
     LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
 declare
   v_output text;
@@ -45546,6 +45551,7 @@ ALTER FUNCTION "private"."dataset_alias_v2_payload_sha256"("p_payload" "jsonb") 
 
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_plan_keys_ok"("p_plan" "jsonb") RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
   select jsonb_typeof(p_plan) = 'object'
     and not exists (
@@ -45586,6 +45592,7 @@ COMMENT ON FUNCTION "private"."dataset_alias_v2_render_amount"("p_value" numeric
 
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_replace_exchange_amounts"("p_before" "jsonb", "p_exchange" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
 declare
   v_index integer := coalesce((p_exchange->>'index')::integer, -1);
@@ -45630,6 +45637,7 @@ ALTER FUNCTION "private"."dataset_alias_v2_replace_exchange_amounts"("p_before" 
 
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_replace_flow_reference"("p_before" "jsonb", "p_reference" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
 declare
   v_entry jsonb := p_before #> '{flowDataSet,flowProperties,flowProperty}';
@@ -45656,6 +45664,7 @@ ALTER FUNCTION "private"."dataset_alias_v2_replace_flow_reference"("p_before" "j
 
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_replace_fu_text"("p_before" "jsonb", "p_functional_unit" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
 declare
   v_path text := coalesce(p_functional_unit->>'path', '');
@@ -50189,6 +50198,7 @@ COMMENT ON FUNCTION "private"."dataset_length_time_v1_factor"() IS 'The reviewed
 
 CREATE OR REPLACE FUNCTION "private"."dataset_length_time_v1_multiply_amount"("p_amount" "text") RETURNS "text"
     LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
 declare
   v_output text;
@@ -50231,6 +50241,7 @@ COMMENT ON FUNCTION "private"."dataset_length_time_v1_nonneg_int_ok"("p_value" "
 
 CREATE OR REPLACE FUNCTION "private"."dataset_length_time_v1_plan_keys_ok"("p_plan" "jsonb") RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
   -- The closed key set is exact in both directions: the ten declared keys must all be present and
   -- nothing else may appear, so a missing required node is refused here rather than surfacing later
@@ -50258,6 +50269,7 @@ COMMENT ON FUNCTION "private"."dataset_length_time_v1_plan_keys_ok"("p_plan" "js
 
 CREATE OR REPLACE FUNCTION "private"."dataset_length_time_v1_replace_exchange_amounts"("p_before" "jsonb", "p_exchange" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
 declare
   v_index integer := coalesce((p_exchange->>'index')::integer, -1);
@@ -59339,6 +59351,7 @@ ALTER FUNCTION "private"."portal_navigation_v1"("p_kind" "text", "p_query" "text
 
 CREATE OR REPLACE FUNCTION "private"."portal_navigation_version_matches_v3"("p_kind" "text", "p_filters" "jsonb", "p_id" "uuid", "p_version" "text") RETURNS boolean
     LANGUAGE "sql" STABLE PARALLEL SAFE
+    SET "search_path" TO ''
     AS $$
   select
     (
@@ -87652,7 +87665,15 @@ CREATE INDEX "portal_navigation_membership_branch_v1_idx" ON "private"."portal_n
 
 
 
+CREATE INDEX "portal_navigation_membership_node_v1_idx" ON "private"."portal_navigation_membership_v1" USING "btree" ("node_id");
+
+
+
 CREATE INDEX "portal_navigation_node_alias_v1_idx" ON "private"."portal_navigation_node_v1" USING "gin" ("alias_codes") WHERE ("cardinality"("alias_codes") > 0);
+
+
+
+CREATE INDEX "portal_navigation_node_parent_only_v1_idx" ON "private"."portal_navigation_node_v1" USING "btree" ("parent_node_id") WHERE ("parent_node_id" IS NOT NULL);
 
 
 
@@ -87997,10 +88018,6 @@ CREATE INDEX "ilcd_user_id_created_at_idx" ON "public"."ilcd" USING "btree" ("us
 
 
 CREATE INDEX "lciamethods_created_at_idx" ON "public"."lciamethods" USING "btree" ("created_at" DESC);
-
-
-
-CREATE INDEX "lciamethods_json_dataversion" ON "public"."lciamethods" USING "btree" (((((("json" -> 'LCIAMethodDataSetDataSet'::"text") -> 'administrativeInformation'::"text") -> 'publicationAndOwnership'::"text") ->> 'common:dataSetVersion'::"text")));
 
 
 
@@ -90097,7 +90114,7 @@ CREATE POLICY "Enable read access for authenticated users" ON "public"."flowprop
   WHERE (("r"."state_code" > 0) AND (((("r"."json" -> 'data'::"text") ->> 'id'::"text"))::"uuid" = "flowproperties"."id") AND ((("r"."json" -> 'data'::"text") ->> 'version'::"text") = ("flowproperties"."version")::"text") AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text"))))) OR (EXISTS ( SELECT 1
    FROM "private"."reviews" "r"
   WHERE (("r"."id" IN ( SELECT (("review_item"."value" ->> 'id'::"text"))::"uuid" AS "uuid"
-           FROM "jsonb_array_elements"("flowproperties"."reviews") "review_item"("value"))) AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text")))))))));
+           FROM "jsonb_array_elements"("flowproperties"."reviews") "review_item"("value"))) AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text"))))))) OR (("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL))));
 
 
 
@@ -90110,7 +90127,7 @@ CREATE POLICY "Enable read access for authenticated users" ON "public"."flows" F
   WHERE (("r"."state_code" > 0) AND (((("r"."json" -> 'data'::"text") ->> 'id'::"text"))::"uuid" = "flows"."id") AND ((("r"."json" -> 'data'::"text") ->> 'version'::"text") = ("flows"."version")::"text") AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text"))))) OR (EXISTS ( SELECT 1
    FROM "private"."reviews" "r"
   WHERE (("r"."id" IN ( SELECT (("review_item"."value" ->> 'id'::"text"))::"uuid" AS "uuid"
-           FROM "jsonb_array_elements"("flows"."reviews") "review_item"("value"))) AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text")))))))));
+           FROM "jsonb_array_elements"("flows"."reviews") "review_item"("value"))) AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text"))))))) OR (("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL))));
 
 
 
@@ -90123,7 +90140,7 @@ CREATE POLICY "Enable read access for authenticated users" ON "public"."lifecycl
   WHERE (("r"."state_code" > 0) AND (((("r"."json" -> 'data'::"text") ->> 'id'::"text"))::"uuid" = "lifecyclemodels"."id") AND ((("r"."json" -> 'data'::"text") ->> 'version'::"text") = ("lifecyclemodels"."version")::"text") AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text"))))) OR (EXISTS ( SELECT 1
    FROM "private"."reviews" "r"
   WHERE (("r"."id" IN ( SELECT (("review_item"."value" ->> 'id'::"text"))::"uuid" AS "uuid"
-           FROM "jsonb_array_elements"("lifecyclemodels"."reviews") "review_item"("value"))) AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text")))))))));
+           FROM "jsonb_array_elements"("lifecyclemodels"."reviews") "review_item"("value"))) AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text"))))))) OR (("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL))));
 
 
 
@@ -90136,7 +90153,7 @@ CREATE POLICY "Enable read access for authenticated users" ON "public"."processe
   WHERE (("r"."state_code" > 0) AND (((("r"."json" -> 'data'::"text") ->> 'id'::"text"))::"uuid" = "processes"."id") AND ((("r"."json" -> 'data'::"text") ->> 'version'::"text") = ("processes"."version")::"text") AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text"))))) OR (EXISTS ( SELECT 1
    FROM "private"."reviews" "r"
   WHERE (("r"."id" IN ( SELECT (("review_item"."value" ->> 'id'::"text"))::"uuid" AS "uuid"
-           FROM "jsonb_array_elements"("processes"."reviews") "review_item"("value"))) AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text"))))))));
+           FROM "jsonb_array_elements"("processes"."reviews") "review_item"("value"))) AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text")))))) OR (("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL))));
 
 
 
@@ -90156,7 +90173,7 @@ CASE
        FROM "private"."reviews" "r"
       WHERE ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text")))))
     ELSE false
-END))));
+END)) OR (("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL))));
 
 
 
@@ -90169,35 +90186,11 @@ CREATE POLICY "Enable read access for authenticated users" ON "public"."unitgrou
   WHERE (("r"."state_code" > 0) AND (((("r"."json" -> 'data'::"text") ->> 'id'::"text"))::"uuid" = "unitgroups"."id") AND ((("r"."json" -> 'data'::"text") ->> 'version'::"text") = ("unitgroups"."version")::"text") AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text"))))) OR (EXISTS ( SELECT 1
    FROM "private"."reviews" "r"
   WHERE (("r"."id" IN ( SELECT (("review_item"."value" ->> 'id'::"text"))::"uuid" AS "uuid"
-           FROM "jsonb_array_elements"("unitgroups"."reviews") "review_item"("value"))) AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text")))))))));
+           FROM "jsonb_array_elements"("unitgroups"."reviews") "review_item"("value"))) AND ("r"."reviewer_id" @> "jsonb_build_array"((( SELECT "auth"."uid"() AS "uid"))::"text"))))))) OR (("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL))));
 
 
 
 CREATE POLICY "authenticated_example_read" ON "public"."contacts" FOR SELECT TO "authenticated" USING ((("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL)));
-
-
-
-CREATE POLICY "authenticated_example_read" ON "public"."flowproperties" FOR SELECT TO "authenticated" USING ((("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL)));
-
-
-
-CREATE POLICY "authenticated_example_read" ON "public"."flows" FOR SELECT TO "authenticated" USING ((("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL)));
-
-
-
-CREATE POLICY "authenticated_example_read" ON "public"."lifecyclemodels" FOR SELECT TO "authenticated" USING ((("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL)));
-
-
-
-CREATE POLICY "authenticated_example_read" ON "public"."processes" FOR SELECT TO "authenticated" USING ((("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL)));
-
-
-
-CREATE POLICY "authenticated_example_read" ON "public"."sources" FOR SELECT TO "authenticated" USING ((("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL)));
-
-
-
-CREATE POLICY "authenticated_example_read" ON "public"."unitgroups" FOR SELECT TO "authenticated" USING ((("state_code" = '-1'::integer) AND (( SELECT "auth"."uid"() AS "uid") IS NOT NULL)));
 
 
 
@@ -93099,6 +93092,8 @@ GRANT ALL ON FUNCTION "private"."lcia_scope_closure_build_admission_guard"() TO 
 
 
 REVOKE ALL ON FUNCTION "private"."lcia_scope_closure_bundle_binding_matches"("p_check" "private"."lcia_scope_closure_checks", "p_bundle" "private"."worker_job_artifacts") FROM PUBLIC;
+GRANT ALL ON FUNCTION "private"."lcia_scope_closure_bundle_binding_matches"("p_check" "private"."lcia_scope_closure_checks", "p_bundle" "private"."worker_job_artifacts") TO "service_role";
+GRANT ALL ON FUNCTION "private"."lcia_scope_closure_bundle_binding_matches"("p_check" "private"."lcia_scope_closure_checks", "p_bundle" "private"."worker_job_artifacts") TO "api_internal_executor";
 
 
 

@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_derivative_target_ok"("p_target" "jsonb") RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
     AS $_$
   select jsonb_typeof(p_target) = 'object'
     and not exists (

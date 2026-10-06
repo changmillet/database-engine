@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-06
-lastReviewedCommit: ea07ff43afe0bfc0468b2392710a47975ba8c697
-lastReviewedNote: "Reviewed Database #783 at ea07ff43: two empty Portal readers preserve signatures, owners, ACLs, forced RLS, budgets and writer/index boundaries. Clean 17.11.0.002 reset, 1018 SQL assertions, three DDL privilege prestates, 336 full-response comparisons with required real continuation cursors and deterministic 1845-file exports pass. Hosted 17.11.0.003 qualification and Dev/Main delivery remain separate."
+lastReviewedCommit: 10cc730b1463565279c6f2c10c3384bc972d19d9
+lastReviewedNote: "Reviewed Database #785 at 10cc730b: thirteen fixed private invokers preserve scalar inlining and closed ACLs; six same-role SELECT merges, two qualified Navigation indexes, single guarded typo-index removal and preexisting retention/helper ACL reconciliation preserve ownership and API boundaries. Canonical 414-migration local17.11.0.002 reset, ordinary-schema canaries, upgrade10/typo5 cases, full JSON/cursors, exact577 dispositions and deterministic1836-file exports pass; reported hosted17.11.0.003, deployment and integration proof remain Issue/PR-owned."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -329,6 +329,69 @@ classes and capability sets, never environment IDs.
 
 ## SQL And Offline Node Contract Notes
 
+### Advisor invokers and policy equivalence
+
+Run `python3 scripts/check_advisor_dispositions.py` for the exact-object source
+contract, including the complete retained/fixed mapping, overlap and review
+conditions. Private CLI snapshot correspondence uses its optional `--snapshot`
+argument; live rows, sizes, counters and request identifiers remain private
+operating evidence. Source dispositions are reviewed release decisions, while
+Issue/PR receipts own actual deployment, hosted qualification and integration.
+
+For Database #785, run `20261006_advisor_hardening.sql` alongside Alias
+math/vector/batch/protected/current-closure, length-time, example-scope,
+OAuth, API/full-schema, Process120 and Sources suites. Prove hostile caller
+namespaces cannot subvert the fixed helpers, metadata/OIDs and external ACLs
+are unchanged, role applicability is exact and restrictive policies remain
+effective. The Sources predecessor comparison reconstructs its original
+separate example policy only during predecessor reads, then restores the current
+merged layout; it must keep comparing real authorization results and SQLSTATEs.
+
+Use `scripts/benchmark_advisor_invoker_paths.py` and
+`supabase/tests/upgrade/test_issue_785_advisor_upgrade.py` only with the explicitly
+reused `supabase_db_database-engine-777-pg1711` container and
+`--reuse-campaign workspace-1701`. Both require empty local17.11 fixtures and new
+evidence paths. The benchmark alternates real Alias applications and retains
+natural verbose plans for scalar inlining and each SQL helper; the upgrade
+harness replays actual migration bodies inside rollback transactions, including
+absent/SET=false/SET=true membership, canonical and known-production bodies,
+and refusal of unknown definitions or browser grants. Verify no fixture or
+catalog/privilege residue. Local17.11.0.002 is not identical-image qualification
+for reported production17.11.0.003.
+
+Namespace tests must create an ordinary transaction-owned hostile schema and
+assert an unqualified canary actually resolves there. PostgreSQL does not look
+up functions/operators in `pg_temp`; temporary-schema tests cover relations and
+types instead. Compare an actual original configuration without altering its
+body, and report defensive governance honestly when an original call is already
+safe. Closed scalar exceptions require real fixed-path entrypoint behavior and
+exact external ACL/caller-path evidence, rather than arbitrary administrator-path
+safety claims.
+
+For Navigation indexes, `scripts/benchmark_advisor_navigation_indexes.py`
+requires the same explicit campaign/container admission and empty fixtures. Keep
+full JSON and each variant's real continuation cursor, direct node-only and
+parent-only natural plans, nested buffers/temp I/O, index bytes and measured
+membership maintenance cost. Synthetic direct projections are reader/index
+evidence; real writer/RLS suites remain independent. Each deployment build is a
+sole top-level concurrent-index statement. Verify exact leading key, predicate,
+opclass, owner and valid/ready/live state. After a failed build or COMMIT/history
+gap, inspect only that exact object's definition/flags and migration ledger;
+unknown drift or recorded objects require a reviewed forward recovery, never
+unbounded cleanup or manual history repair.
+
+`supabase/tests/upgrade/test_issue_785_lciamethod_index.py` exercises the actual
+single typo-index removal inside rollback fixtures, including canonical JSON/
+typed-version references, authenticated reads, sync maintenance and all remaining
+index/table metadata. A corrected same-name definition, dependent object or
+wrong-root row must refuse removal. Canonical absent-index replay is a no-op.
+
+The all-25 SET candidate is not accepted: scalar helper inlining and hot-loop
+cost must be preserved through exact-object exceptions. Query-statistics reset
+time does not establish each index counter's observation window. Retain the
+upgrade/recreation provenance and representative workload evidence; zero scans
+alone never authorize an index drop.
+
 ### Dataset search request identity
 
 After a blank rebuild, run `supabase/tests/20261006_search_request_identity.sql`,
@@ -349,6 +412,20 @@ assertion. Keep baseline failure and candidate success evidence separate. These
 local fixtures never authorize production test-user creation or hosted writes.
 
 ### Persistent PGroonga qualification and TEMP limitation
+
+Hosted upgrade/restore qualification must check PGroonga content separately
+from catalog `valid`/`ready` flags and a zero-error Health result. Compare Sources
+counts and representative queries with controlled heap counts for the exact
+same observer-visible rows; retain the reproducible read-only SQL and observer
+identity in the operations record. In [operations #778](https://github.com/tiangong-lca/database/issues/778),
+all eighteen Sources were empty while heap rows existed, with PGroonga WAL off
+at zero. Individual reviewed concurrent rebuilds restored eighteen exact
+Sources-to-heap counts and left zero invalid indexes or temporary artifacts.
+That is content evidence for the bounded repaired objects, not authority to
+rebuild every index or use extension CASCADE. This hosted content proof is
+separate from the local TEMP compatibility limitation below. A known
+`pg_stat_statements` reset does not establish the provenance or start time of
+each `idx_scan` counter.
 
 `20260811_search_text_source_switch.sql` models production's ordinary logged
 relations for its two PGroonga-indexed fixtures. The original `BEGIN/ROLLBACK`

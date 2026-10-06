@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_replace_flow_reference"("p_before" "jsonb", "p_reference" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
 declare
   v_entry jsonb := p_before #> '{flowDataSet,flowProperties,flowProperty}';
