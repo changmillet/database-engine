@@ -754,3 +754,11 @@ python3 scripts/profile_portal_catalog_concurrency.py \
 
 两个入口都不接受 hosted URL，也不提高公共查询预算。语义与发布证明要求见
 `docs/agents/repo-validation.md`。
+
+## Portal 空查询对照
+
+`benchmark_portal_empty_reads.py` 交替执行精确的前序和候选 Navigation/Facets，
+比较完整响应并记录嵌套自然计划。它仅接受明确复用的 `workspace-1701`
+PostgreSQL17.11 本地栈和空投影表。通过 `--help` 查看有界 fixture 参数；
+报告、SQL 和计划日志必须使用新路径。合成 fixture 的所有变化回滚，
+只作为读取证据；真实 writer/RLS 测试与托管性能仍需分别验证。

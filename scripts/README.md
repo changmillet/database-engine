@@ -842,3 +842,12 @@ python3 scripts/profile_portal_catalog_concurrency.py \
 
 Neither command accepts a hosted URL or raises public execution budgets. See
 `docs/agents/repo-validation.md` for required semantic and release proof.
+
+## Portal empty-read comparison
+
+`benchmark_portal_empty_reads.py` compares exact predecessor/candidate Navigation
+and Facets responses with alternating sample order and nested natural plans.
+It admits only the explicitly reused `workspace-1701` PostgreSQL17.11 local stack
+and empty projections. Use `--help` for bounded fixture options; the report, SQL
+and plan log must have new paths. The rollback-only synthetic fixture is reader
+evidence; real writer/RLS suites and hosted performance remain separate proof.
