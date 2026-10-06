@@ -108,6 +108,14 @@ edited for Preview. The closure-binding helper's existing production
 service/internal execution grants support the SECURITY INVOKER package trigger
 and are reproduced in source while browser execution remains denied.
 
+Navigation's supplementary indexes lead on membership `node_id` and nonnull
+node `parent_node_id`, serving existing node-only membership/hasChildren reads
+and complete nonnull FK lookups. They add no projection, writer or authorization
+path. The single obsolete LCIA Method JSON-version expression uses the erroneous
+`LCIAMethodDataSetDataSet` root; guarded removal retains the canonical
+`LCIAMethodDataSet` producer, typed `version`, primary key and sync trigger.
+No replacement expression index is implied by that correction.
+
 Dataset search derives its caller class from PostgreSQL's standard `role`
 setting, which retains the external request role across nested SECURITY DEFINER
 calls. `authenticated` visibility is bound to `auth.uid()` and current team

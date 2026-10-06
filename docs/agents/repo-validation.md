@@ -352,6 +352,33 @@ and refusal of unknown definitions or browser grants. Verify no fixture or
 catalog/privilege residue. Local17.11.0.002 is not identical-image qualification
 for reported production17.11.0.003.
 
+Namespace tests must create an ordinary transaction-owned hostile schema and
+assert an unqualified canary actually resolves there. PostgreSQL does not look
+up functions/operators in `pg_temp`; temporary-schema tests cover relations and
+types instead. Compare an actual original configuration without altering its
+body, and report defensive governance honestly when an original call is already
+safe. Closed scalar exceptions require real fixed-path entrypoint behavior and
+exact external ACL/caller-path evidence, rather than arbitrary administrator-path
+safety claims.
+
+For Navigation indexes, `scripts/benchmark_advisor_navigation_indexes.py`
+requires the same explicit campaign/container admission and empty fixtures. Keep
+full JSON and each variant's real continuation cursor, direct node-only and
+parent-only natural plans, nested buffers/temp I/O, index bytes and measured
+membership maintenance cost. Synthetic direct projections are reader/index
+evidence; real writer/RLS suites remain independent. Each deployment build is a
+sole top-level concurrent-index statement. Verify exact leading key, predicate,
+opclass, owner and valid/ready/live state. After a failed build or COMMIT/history
+gap, inspect only that exact object's definition/flags and migration ledger;
+unknown drift or recorded objects require a reviewed forward recovery, never
+unbounded cleanup or manual history repair.
+
+`supabase/tests/upgrade/test_issue_785_lciamethod_index.py` exercises the actual
+single typo-index removal inside rollback fixtures, including canonical JSON/
+typed-version references, authenticated reads, sync maintenance and all remaining
+index/table metadata. A corrected same-name definition, dependent object or
+wrong-root row must refuse removal. Canonical absent-index replay is a no-op.
+
 The all-25 SET candidate is not accepted: scalar helper inlining and hot-loop
 cost must be preserved through exact-object exceptions. Query-statistics reset
 time does not establish each index counter's observation window. Retain the
@@ -378,6 +405,20 @@ assertion. Keep baseline failure and candidate success evidence separate. These
 local fixtures never authorize production test-user creation or hosted writes.
 
 ### Persistent PGroonga qualification and TEMP limitation
+
+Hosted upgrade/restore qualification must check PGroonga content separately
+from catalog `valid`/`ready` flags and a zero-error Health result. Compare Sources
+counts and representative queries with controlled heap counts for the exact
+same observer-visible rows; retain the reproducible read-only SQL and observer
+identity in the operations record. In [operations #778](https://github.com/tiangong-lca/database/issues/778),
+all eighteen Sources were empty while heap rows existed, with PGroonga WAL off
+at zero. Individual reviewed concurrent rebuilds restored eighteen exact
+Sources-to-heap counts and left zero invalid indexes or temporary artifacts.
+That is content evidence for the bounded repaired objects, not authority to
+rebuild every index or use extension CASCADE. This hosted content proof is
+separate from the local TEMP compatibility limitation below. A known
+`pg_stat_statements` reset does not establish the provenance or start time of
+each `idx_scan` counter.
 
 `20260811_search_text_source_switch.sql` models production's ordinary logged
 relations for its two PGroonga-indexed fixtures. The original `BEGIN/ROLLBACK`

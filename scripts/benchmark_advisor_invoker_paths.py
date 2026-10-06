@@ -90,10 +90,17 @@ create temp table issue785_samples(variant text,label text,ordinal integer,elaps
 create temp table issue785_plans(variant text,label text,payload jsonb);
 create temp table issue785_scalars as select i,i::text amount,to_jsonb(i::text) val from generate_series(1,20000) i;
 grant select on issue785_scalars to portal_public_executor;
+create schema issue785_benchmark_hostile authorization postgres;
+create function issue785_benchmark_hostile.jsonb_typeof(jsonb) returns text language sql immutable as $$select 'hostile'::text$$;
+create function issue785_benchmark_hostile.jsonb_object_keys(jsonb) returns setof text language sql immutable as $$select 'hostile'::text$$;
 create function pg_temp.issue785_batch() returns jsonb language plpgsql as $$
 declare p jsonb; s jsonb;
 begin
  begin
+  perform set_config('search_path','issue785_benchmark_hostile,pg_catalog,extensions,public,pg_temp',true);
+  if jsonb_typeof('{{}}'::jsonb) is distinct from 'hostile' then
+   raise exception 'Hostile namespace canary did not resolve';
+  end if;
   p:=pg_temp.v2_call((select b from issue785_batch_input));
   if p->>'ok' is distinct from 'true' then raise exception 'Alias batch did not apply'; end if;
   s:=jsonb_build_object('ok',p->'ok','code',p->'code','counts',p->'counts',

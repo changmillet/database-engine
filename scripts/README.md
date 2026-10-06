@@ -35,6 +35,15 @@ related:
 
 This directory contains the command-line helpers used for remote schema export, workspace refresh, change-copying, migration generation, and controlled data migrations.
 
+Database #785's `benchmark_advisor_invoker_paths.py` and
+`benchmark_advisor_navigation_indexes.py` accept only the explicitly reused
+`workspace-1701` / `supabase_db_database-engine-777-pg1711` local17.11 stack and
+new evidence paths. They keep synthetic fixtures in rollback transactions,
+alternate predecessor/candidate samples, preserve natural plans and verify
+cleanup. Invoker proof includes ordinary-schema hostile canaries and real Alias
+applications; Navigation proof includes full JSON/cursors plus storage/write
+cost. These are local qualification profiles, not hosted performance evidence.
+
 ## Layout
 
 Durable helper entry points remain at the top level of this directory.

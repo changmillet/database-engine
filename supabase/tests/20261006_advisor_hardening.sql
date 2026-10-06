@@ -36,12 +36,21 @@ select ok(exists(select 1 from pg_policy where polrelid='public.contacts'::regcl
  and polname='authenticated_example_read' and polroles=array['authenticated'::regrole::oid]),
  'Contacts preserves its PUBLIC and authenticated role boundaries');
 
--- These names deliberately precede pg_catalog for this hostile caller. Each
--- hardened helper must resolve its own qualified/implicit catalog dependencies.
-create function pg_temp.jsonb_typeof(jsonb) returns text language sql immutable as $$select 'hostile'::text$$;
-create function pg_temp.jsonb_object_keys(jsonb) returns setof text language sql immutable as $$select 'hostile'::text$$;
-create function pg_temp.jsonb_array_elements(jsonb) returns setof jsonb language sql immutable as $$select '"hostile"'::jsonb$$;
-set local search_path=pg_temp,pg_catalog,extensions;
+-- PostgreSQL never searches pg_temp for functions/operators. Use an ordinary
+-- transaction-owned schema and prove lookup really reaches its hostile names.
+create schema issue785_hostile authorization postgres;
+create function issue785_hostile.jsonb_typeof(jsonb) returns text language sql immutable as $$select 'hostile'::text$$;
+create function issue785_hostile.jsonb_object_keys(jsonb) returns setof text language sql immutable as $$select 'hostile'::text$$;
+create function issue785_hostile.jsonb_array_elements(jsonb) returns setof jsonb language sql immutable as $$select '"hostile"'::jsonb$$;
+set local search_path=issue785_hostile,pg_catalog,extensions;
+select extensions.is(jsonb_typeof('{}'::jsonb),'hostile','ordinary-schema canary actually shadows catalog function lookup');
+select extensions.is((select array_agg(k) from jsonb_object_keys('{"meanAmount":"1"}') k),array['hostile'],
+ 'ordinary-schema set-returning canary actually shadows catalog function lookup');
+-- Restore only the exact original no-SET configuration, never change the body.
+alter function private.dataset_alias_v2_exchange_keys_ok(jsonb) reset search_path;
+select extensions.is(private.dataset_alias_v2_exchange_keys_ok('{"meanAmount":"1"}'),false,
+ 'original mutable caller path can change this owner-level helper result');
+alter function private.dataset_alias_v2_exchange_keys_ok(jsonb) set search_path='';
 select extensions.is(private.dataset_alias_v2_exchange_keys_ok('{"meanAmount":"1"}'),true,
  'fixed SQL invoker ignores hostile jsonb functions');
 select extensions.is(private.dataset_alias_v2_plan_keys_ok('{"hostile":true}'),false,
@@ -52,6 +61,12 @@ select extensions.is(private.dataset_length_time_v1_multiply_amount('0.0198'),'1
  'length-time derivation survives hostile caller search_path');
 select extensions.is(private.dataset_alias_v2_derivative_chunks('78500000-0000-4000-8000-000000000001',repeat('a',64),'[]'),
  '[]'::jsonb,'complex SQL invoker ignores hostile set-returning function');
+grant usage on schema issue785_hostile to authenticated;
+select set_config('request.jwt.claims','{"role":"authenticated","sub":"78500000-0000-4000-8000-000000000099","email":"fixture@example.invalid"}',true);
+set local role authenticated;
+select extensions.is(api.cmd_dataset_alias_execution_preflight_v2_guarded('{}')->>'code',
+ 'ALIAS_EXECUTION_PREFLIGHT_INVALID_REQUEST','real protected facade retains its fixed-path request validation under a hostile caller namespace');
+reset role;
 
 set local search_path=extensions,public;
 set local role service_role;

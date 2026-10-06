@@ -87665,7 +87665,15 @@ CREATE INDEX "portal_navigation_membership_branch_v1_idx" ON "private"."portal_n
 
 
 
+CREATE INDEX "portal_navigation_membership_node_v1_idx" ON "private"."portal_navigation_membership_v1" USING "btree" ("node_id");
+
+
+
 CREATE INDEX "portal_navigation_node_alias_v1_idx" ON "private"."portal_navigation_node_v1" USING "gin" ("alias_codes") WHERE ("cardinality"("alias_codes") > 0);
+
+
+
+CREATE INDEX "portal_navigation_node_parent_only_v1_idx" ON "private"."portal_navigation_node_v1" USING "btree" ("parent_node_id") WHERE ("parent_node_id" IS NOT NULL);
 
 
 
@@ -88010,10 +88018,6 @@ CREATE INDEX "ilcd_user_id_created_at_idx" ON "public"."ilcd" USING "btree" ("us
 
 
 CREATE INDEX "lciamethods_created_at_idx" ON "public"."lciamethods" USING "btree" ("created_at" DESC);
-
-
-
-CREATE INDEX "lciamethods_json_dataversion" ON "public"."lciamethods" USING "btree" (((((("json" -> 'LCIAMethodDataSetDataSet'::"text") -> 'administrativeInformation'::"text") -> 'publicationAndOwnership'::"text") ->> 'common:dataSetVersion'::"text")));
 
 
 

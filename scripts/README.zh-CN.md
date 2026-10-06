@@ -35,6 +35,13 @@ related:
 
 这个目录包含用于远程 schema 导出、workspace 刷新、修改复制、migration 生成和受控数据迁移的命令行脚本。
 
+Database #785 的 `benchmark_advisor_invoker_paths.py` 与
+`benchmark_advisor_navigation_indexes.py` 仅接收明确复用的 `workspace-1701` /
+`supabase_db_database-engine-777-pg1711` 本地17.11栈及新的证据路径。两者把合成
+fixture 保留在回滚事务内、交替比较前序/候选、记录自然计划并验证清理。Invoker
+证明包含普通 schema 的 hostile canary 与真实 Alias 执行；Navigation 证明包含完整
+JSON/cursor 及索引存储/写成本。这些本地资格不代表 hosted 性能。
+
 ## 目录结构
 
 长期维护的 helper 入口保留在本目录顶层。
