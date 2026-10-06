@@ -42,6 +42,12 @@ fixture 保留在回滚事务内、交替比较前序/候选、记录自然计�
 证明包含普通 schema 的 hostile canary 与真实 Alias 执行；Navigation 证明包含完整
 JSON/cursor 及索引存储/写成本。这些本地资格不代表 hosted 性能。
 
+`check_advisor_dispositions.py` 验证公开的逐对象 source contract；可选
+`--snapshot <private-cli-advisor.json>` 只检查基线对应关系，不打印或复制实际运营
+数值。逐项 source/release 决策与复审条件保存在
+`supabase/tests/fixtures/20261006_advisor_dispositions.json`；实际部署与 hosted
+资格状态以 Issue/PR receipts 为准。
+
 ## 目录结构
 
 长期维护的 helper 入口保留在本目录顶层。

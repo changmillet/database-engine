@@ -44,6 +44,12 @@ cleanup. Invoker proof includes ordinary-schema hostile canaries and real Alias
 applications; Navigation proof includes full JSON/cursors plus storage/write
 cost. These are local qualification profiles, not hosted performance evidence.
 
+`check_advisor_dispositions.py` validates the public exact-object source contract.
+Its optional `--snapshot <private-cli-advisor.json>` checks baseline correspondence
+without printing or copying live operating values. Release/source decisions and
+future review conditions live in `supabase/tests/fixtures/20261006_advisor_dispositions.json`;
+actual deployment/hosted qualification state remains in Issue/PR receipts.
+
 ## Layout
 
 Durable helper entry points remain at the top level of this directory.

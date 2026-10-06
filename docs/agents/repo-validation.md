@@ -331,6 +331,13 @@ classes and capability sets, never environment IDs.
 
 ### Advisor invokers and policy equivalence
 
+Run `python3 scripts/check_advisor_dispositions.py` for the exact-object source
+contract, including the complete retained/fixed mapping, overlap and review
+conditions. Private CLI snapshot correspondence uses its optional `--snapshot`
+argument; live rows, sizes, counters and request identifiers remain private
+operating evidence. Source dispositions are reviewed release decisions, while
+Issue/PR receipts own actual deployment, hosted qualification and integration.
+
 For Database #785, run `20261006_advisor_hardening.sql` alongside Alias
 math/vector/batch/protected/current-closure, length-time, example-scope,
 OAuth, API/full-schema, Process120 and Sources suites. Prove hostile caller
