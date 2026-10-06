@@ -348,6 +348,46 @@ or raw responses, and must verify fixture and identity cleanup even after a fail
 assertion. Keep baseline failure and candidate success evidence separate. These
 local fixtures never authorize production test-user creation or hosted writes.
 
+### Persistent PGroonga qualification and TEMP limitation
+
+`20260811_search_text_source_switch.sql` models production's ordinary logged
+relations for its two PGroonga-indexed fixtures. The original `BEGIN/ROLLBACK`
+isolates their DDL and data; its remaining TEMP helper tables are not indexed by
+PGroonga. Preserve all 25 assertions, data, opclass, tokenizer/normalizer,
+`ANALYZE`, natural index-plan and result checks. Verify zero fixture relations
+and indexes remain after the test; never delete a pre-existing name to admit it.
+
+PGroonga 3.2.5 / Groonga 14.0.5 has a confirmed TEMP-index cleanup incompatibility
+on the exact PostgreSQL 17.11.0.002 image. PostgreSQL 17.7 changed the filenumber
+resolver to exclude temporary relations; TEMP PGroonga Sources objects disappear
+after `ANALYZE` or `pgroonga_vacuum()`. The persistent-fixture qualification does
+not repair this extension defect or admit TEMP PGroonga indexes. See the
+[PostgreSQL 17.7 release note](https://www.postgresql.org/docs/release/17.7/) and
+[PGroonga 3.2.5 resolver](https://github.com/pgroonga/pgroonga/blob/3.2.5/src/pgrn-pg.c#L148).
+
+Retain both negative paths with the manual, non-pgTAP diagnostic
+`supabase/tests/diagnostics/20261006_pgroonga_temp_index_compatibility.sql`:
+
+```bash
+# Select exactly an already-owned disposable local stack, never a shared or hosted DB.
+docker exec -i <task-owned-db-container> psql -X -U postgres -d postgres \
+  < supabase/tests/diagnostics/20261006_pgroonga_temp_index_compatibility.sql
+docker exec -i <task-owned-db-container> psql -X -U postgres -d postgres \
+  -v run_vacuum=true \
+  < supabase/tests/diagnostics/20261006_pgroonga_temp_index_compatibility.sql
+```
+
+Use a fresh backend for each path. Preserve actual exit status, versions,
+Sources before/after, natural plans and hits/errors; the 17.11 error is unresolved
+negative evidence and must not be converted to an expected-pass CI check.
+Before upgrade qualification, also verify committed logged indexes across
+sessions through cleanup, `ANALYZE`, DML, natural plan and result readback, then
+drop only owned fixtures and prove zero catalog residue. Record the exact
+consumer repositories/revisions and entry points scanned for TEMP+PGroonga use;
+bounded source inspection does not establish absence of external ad-hoc SQL.
+The candidate runtime must not depend on TEMP PGroonga indexes until the original
+negative reproduction passes on a separately qualified extension/runtime.
+
 ### Version-aware search proof
 
 For the additive Portal V2/Next matched-version APIs, use a uniquely named
