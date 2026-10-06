@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-04
-lastReviewedCommit: 5b4b1fdfd3b5d947d7f5949da58b9896ad0f2f0c
-lastReviewedNote: "Reviewed Database #774 generated snapshot repair against runtime 5b4b1fdf: canonical helpers regenerate only the two Flow function snapshots, exposed types remain unchanged, and actual Supabase CLI 2.117.0 pgTAP transport retains all 274 required assertions. Runtime migration, ACLs and delivery gates are unchanged."
+lastReviewedAt: 2026-10-06
+lastReviewedCommit: 124f01245173751e23942af6a2220ffe32550918
+lastReviewedNote: "Reviewed Database #777 request-role hardening at 124f0124: actual-role authorization and local SQL/HTTP refusal and cleanup proofs preserve signatures, owners, ACLs, branch/Hosted deployment boundaries and generated-workspace rules. CI adds only SQL and offline harness tests; no runtime schema/profile or exposed type changes."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -46,6 +46,26 @@ related:
 本地迁移输出和审计 JSONL 文件应写入 `_artifacts/`，该目录已被 Git 忽略。
 
 ## 脚本列表
+
+### `test_search_request_identity_http.py`
+
+仅在明确归属 Database #777 的本地隔离栈上执行真实 Auth/PostgREST
+搜索身份回归。脚本核对 workdir 配置、project ID、loopback API 端口及
+Kong 容器的一致性，验证匿名/外部成员拒绝、owner/team/public 读取及团队
+成员资格撤销即时生效；最后登出并清理自己创建的合成身份与数据，确认零残留。
+凭据及原始 HTTP 响应不会输出。
+脚本禁用环境代理。若无法确认会话已撤销或身份归属，会保留相关测试身份并
+返回未完成的清理回执，不会宣称零残留。
+
+```bash
+python3 scripts/test_search_request_identity_http.py \
+  --workdir <absolute-isolated-workdir> --task-owned-local-stack \
+  --supabase-cli <repository-pinned-supabase-executable>
+```
+
+允许的 project ID 为 `database-engine-advisor-777` 或 `database-engine-777-*`。
+脚本不会重置数据库，也不接受远端项目或共享 `database-engine` 栈。
+SQL request-identity 套件须单独运行。
 
 ### `test_release_manifest_drift.py`
 

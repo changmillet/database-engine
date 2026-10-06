@@ -50378,17 +50378,28 @@ CREATE OR REPLACE FUNCTION "private"."dataset_search_can_read_team_filter"("p_te
     SET "search_path" TO 'private', 'api', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     AS $$
 declare
-  v_request_role text := nullif(current_setting('request.jwt.claim.role', true), '');
+  v_request_role text := nullif(pg_catalog.current_setting('role', true), '');
+  v_trusted_sql boolean :=
+    coalesce(v_request_role, 'none') = 'none'
+    and session_user = 'postgres'
+    and nullif(pg_catalog.current_setting('request.jwt.claims', true), '') is null
+    and nullif(pg_catalog.current_setting('request.jwt.claim.role', true), '') is null
+    and nullif(pg_catalog.current_setting('request.jwt.claim.sub', true), '') is null
+    and nullif(pg_catalog.current_setting('request.headers', true), '') is null
+    and nullif(pg_catalog.current_setting('request.method', true), '') is null
+    and nullif(pg_catalog.current_setting('request.path', true), '') is null;
 begin
   if p_team_id is null then
     return false;
   end if;
 
-  if coalesce(v_request_role, '') not in ('anon', 'authenticated') then
+  if v_request_role = 'service_role' or v_trusted_sql then
     return true;
   end if;
 
-  if p_actor_id is null then
+  if v_request_role is distinct from 'authenticated'
+     or p_actor_id is null
+     or p_actor_id is distinct from private.dataset_search_effective_user_id('') then
     return false;
   end if;
 
@@ -50411,25 +50422,45 @@ CREATE OR REPLACE FUNCTION "private"."dataset_search_effective_user_id"("p_this_
     SET "search_path" TO 'private', 'api', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     AS $_$
 declare
-  v_actor_id uuid := auth.uid();
-  v_request_role text := nullif(current_setting('request.jwt.claim.role', true), '');
-  v_param_user_id uuid;
+  v_request_role text := nullif(pg_catalog.current_setting('role', true), '');
+  v_actor_id uuid;
+  v_trusted_sql boolean :=
+    coalesce(v_request_role, 'none') = 'none'
+    and session_user = 'postgres'
+    and nullif(pg_catalog.current_setting('request.jwt.claims', true), '') is null
+    and nullif(pg_catalog.current_setting('request.jwt.claim.role', true), '') is null
+    and nullif(pg_catalog.current_setting('request.jwt.claim.sub', true), '') is null
+    and nullif(pg_catalog.current_setting('request.headers', true), '') is null
+    and nullif(pg_catalog.current_setting('request.method', true), '') is null
+    and nullif(pg_catalog.current_setting('request.path', true), '') is null;
 begin
+  if v_request_role = 'authenticated' then
+    begin
+      return auth.uid();
+    exception when invalid_text_representation then
+      return null::uuid;
+    end;
+  end if;
+
+  if v_request_role is distinct from 'service_role' and not v_trusted_sql then
+    return null::uuid;
+  end if;
+
+  -- Explicit service-role requests retain their actor-first compatibility.
+  begin
+    v_actor_id := auth.uid();
+  exception when invalid_text_representation then
+    return null::uuid;
+  end;
   if v_actor_id is not null then
     return v_actor_id;
   end if;
 
-  if coalesce(v_request_role, '') in ('anon', 'authenticated') then
-    return null::uuid;
-  end if;
-
-  v_param_user_id := case
+  return case
     when coalesce(btrim(p_this_user_id) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', false)
       then btrim(p_this_user_id)::uuid
     else null::uuid
   end;
-
-  return v_param_user_id;
 end;
 $_$;
 

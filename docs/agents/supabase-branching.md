@@ -22,9 +22,9 @@ checkPaths:
   - .github/workflows/supabase-dev.yml
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
-lastReviewedAt: 2026-10-04
-lastReviewedCommit: 5e203116d57c971dee1f39faefecb502701538c2
-lastReviewedNote: "Reviewed Database #774: local CI adds the bounded legacy Flow lexical regression; persistent Dev, exact Preview, promotion and production integration deployment authority remain unchanged."
+lastReviewedAt: 2026-10-06
+lastReviewedCommit: 124f01245173751e23942af6a2220ffe32550918
+lastReviewedNote: "Reviewed Database #777 request-role hardening at 124f0124: actual-role authorization and local SQL/HTTP refusal and cleanup proofs preserve signatures, owners, ACLs, branch/Hosted deployment boundaries and generated-workspace rules. CI adds only SQL and offline harness tests; no runtime schema/profile or exposed type changes."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
