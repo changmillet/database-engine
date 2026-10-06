@@ -44,6 +44,7 @@ def statements() -> dict[str, str]:
     cases = {k: v for k, v in fixture_source.cases().items()
              if k.startswith(('facets_', 'navigation_'))}
     cases.update({
+        'navigation_world': "select api.portal_navigation_v1('all','','{}','geography',null,null,100)",
         'navigation_process_class': "select api.portal_navigation_v1('process','','{}','classification','class:isic',null,100)",
         'navigation_process_geo': "select api.portal_navigation_v1('process','','{}','geography','geo:cn',null,100)",
         'navigation_flow_class': "select api.portal_navigation_v1('flow','','{}','classification','class:cpc',null,100)",
@@ -99,6 +100,16 @@ def main() -> int:
     definitions = {'baseline': baseline_definitions(base), 'candidate': '\n'.join(candidate_definitions)}
     cases = statements()
     sql = fixture_source.fixture(args.process_datasets, args.flow_datasets, 0)
+    sql += """
+create function pg_temp.issue783_next_cursor(v text,i integer) returns text language plpgsql stable as $$
+declare c text;
+begin
+ select payload->>'nextCursor' into c from measurements
+ where variant=v and label='navigation_world' and ordinal=i;
+ if c is null then raise exception using errcode='P7830',message='Expected a real navigation continuation cursor'; end if;
+ return c;
+end $$;
+"""
     # Unmeasured warm-up, then alternate predecessor/candidate order per sample.
     for ordinal in range(-1, args.samples):
         order = ('baseline', 'candidate') if ordinal % 2 == 0 else ('candidate', 'baseline')
@@ -107,7 +118,7 @@ def main() -> int:
             for label, statement in cases.items():
                 sql += f'select pg_temp.measure({fixture_source.sql_literal(variant)},{fixture_source.sql_literal(label)},{ordinal},{fixture_source.sql_literal(statement)});\n'
             # Feed each variant its own cursor, so continuation differences are observable.
-            cursor_statement = "select api.portal_navigation_v1('all','','{}','geography',null,(select payload->>'nextCursor' from measurements where variant=" + fixture_source.sql_literal(variant) + " and label='navigation_world' and ordinal=" + str(ordinal) + "),100)"
+            cursor_statement = "select api.portal_navigation_v1('all','','{}','geography',null,pg_temp.issue783_next_cursor(" + fixture_source.sql_literal(variant) + "," + str(ordinal) + "),100)"
             sql += f"select pg_temp.measure('{variant}','navigation_page2',{ordinal},{fixture_source.sql_literal(cursor_statement)});\n"
     for variant in ('baseline', 'candidate'):
         sql += '\nset local role portal_public_executor;\n' + definitions[variant] + '\nreset role;\n'
@@ -117,6 +128,7 @@ def main() -> int:
         sql += 'reset role; set local auto_explain.log_min_duration=-1;\n'
     sql += """
 select jsonb_build_object(
+ 'cursorProof',(select bool_and(payload->>'nextCursor' is not null) from measurements where label='navigation_world'),
  'samples',(select jsonb_agg(jsonb_build_object('variant',variant,'label',label,'ordinal',ordinal,'elapsedMs',elapsed_ms,'error',error) order by label,ordinal,variant) from measurements where ordinal>=0),
  'equivalence',(select jsonb_agg(jsonb_build_object('label',b.label,'ordinal',b.ordinal,'equal',b.payload=c.payload,'baselineError',b.error,'candidateError',c.error) order by b.label,b.ordinal) from measurements b join measurements c using(label,ordinal) where b.variant='baseline' and c.variant='candidate'),
  'plans',(select jsonb_agg(jsonb_build_object('variant',variant,'label',label,'plan',payload,'error',error) order by label,variant) from plans));
@@ -152,7 +164,7 @@ rollback;
     errors = [r for r in report['plans'] if r['error']]
     print(json.dumps({'report': str(args.report), 'comparisons': len(report['equivalence']),
                       'failures': failures, 'planErrors': errors, 'medians': report['medians'], 'cleanupRows': 0}, indent=2))
-    return int(bool(failures or errors))
+    return int(bool(failures or errors or report['cursorProof'] is not True))
 
 
 if __name__ == '__main__':

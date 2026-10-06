@@ -419,7 +419,8 @@ supabase_db_database-engine-777-pg1711 --reuse-campaign workspace-1701 --base-re
 <exact-predecessor-commit> --samples 20 --report <new-report.json>` only for the
 explicitly retained campaign stack. It refuses other containers, non-Unix Docker,
 wrong server versions and nonempty projection fixtures. Compare alternating
-baseline/candidate samples and retain nested natural plans, buffers and temp I/O;
+baseline/candidate samples, require non-null Navigation continuation cursors,
+and retain nested natural plans, buffers and temp I/O;
 its synthetic direct-projection fixture is reader evidence, not writer or hosted
 p95 proof. All fixture/function changes roll back and require zero residual rows.
 Regenerate the five-schema workspace and exposed types twice without drift.
