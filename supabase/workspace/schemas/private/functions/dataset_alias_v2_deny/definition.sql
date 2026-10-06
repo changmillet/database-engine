@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_deny"("p_code" "text", "p_status" integer, "p_message" "text", "p_details" "jsonb" DEFAULT '{}'::"jsonb") RETURNS "void"
     LANGUAGE "plpgsql"
+    SET "search_path" TO ''
     AS $$
 begin
   raise exception using

@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_replace_exchange_amounts"("p_before" "jsonb", "p_exchange" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
 declare
   v_index integer := coalesce((p_exchange->>'index')::integer, -1);

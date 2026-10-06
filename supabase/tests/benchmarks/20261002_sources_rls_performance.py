@@ -34,6 +34,9 @@ do $$ begin
  then raise exception 'EMPTY_LOCAL_FIXTURE_REQUIRED'; end if;
 end $$;
 create temporary table benchmark_policies(name text primary key, ddl text);
+create temp table source_policy_layout as select not exists(
+ select 1 from pg_policy where polrelid='public.sources'::regclass
+ and polname='authenticated_example_read') as merged_examples;
 insert into benchmark_policies
 select 'new',format('alter policy "Enable read access for authenticated users" on public.sources using (%s)',qual)
 from pg_policies where schemaname='public' and tablename='sources' and policyname='Enable read access for authenticated users';
@@ -64,7 +67,16 @@ begin
  return result;
 end $$;
 create function pg_temp.policy(p_name text) returns void language plpgsql as $$
-begin execute (select ddl from benchmark_policies where name=p_name); end $$;
+begin
+ execute (select ddl from benchmark_policies where name=p_name);
+ if (select merged_examples from source_policy_layout) then
+  if p_name='old' then
+   execute 'create policy authenticated_example_read on public.sources for select to authenticated using (state_code=-1 and (select auth.uid()) is not null)';
+  else
+   execute 'drop policy authenticated_example_read on public.sources';
+  end if;
+ end if;
+end $$;
 set local statement_timeout='20s';
 """
     statements = []

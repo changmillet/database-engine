@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_replace_fu_text"("p_before" "jsonb", "p_functional_unit" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
 declare
   v_path text := coalesce(p_functional_unit->>'path', '');

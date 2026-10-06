@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_exchange_keys_ok"("p_exchange" "jsonb") RETURNS boolean
     LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
   select jsonb_typeof(p_exchange) = 'object'
     and not exists (

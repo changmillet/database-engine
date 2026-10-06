@@ -329,6 +329,35 @@ classes and capability sets, never environment IDs.
 
 ## SQL And Offline Node Contract Notes
 
+### Advisor invokers and policy equivalence
+
+For Database #785, run `20261006_advisor_hardening.sql` alongside Alias
+math/vector/batch/protected/current-closure, length-time, example-scope,
+OAuth, API/full-schema, Process120 and Sources suites. Prove hostile caller
+namespaces cannot subvert the fixed helpers, metadata/OIDs and external ACLs
+are unchanged, role applicability is exact and restrictive policies remain
+effective. The Sources predecessor comparison reconstructs its original
+separate example policy only during predecessor reads, then restores the current
+merged layout; it must keep comparing real authorization results and SQLSTATEs.
+
+Use `scripts/benchmark_advisor_invoker_paths.py` and
+`supabase/tests/upgrade/test_issue_785_advisor_upgrade.py` only with the explicitly
+reused `supabase_db_database-engine-777-pg1711` container and
+`--reuse-campaign workspace-1701`. Both require empty local17.11 fixtures and new
+evidence paths. The benchmark alternates real Alias applications and retains
+natural verbose plans for scalar inlining and each SQL helper; the upgrade
+harness replays actual migration bodies inside rollback transactions, including
+absent/SET=false/SET=true membership, canonical and known-production bodies,
+and refusal of unknown definitions or browser grants. Verify no fixture or
+catalog/privilege residue. Local17.11.0.002 is not identical-image qualification
+for reported production17.11.0.003.
+
+The all-25 SET candidate is not accepted: scalar helper inlining and hot-loop
+cost must be preserved through exact-object exceptions. Query-statistics reset
+time does not establish each index counter's observation window. Retain the
+upgrade/recreation provenance and representative workload evidence; zero scans
+alone never authorize an index drop.
+
 ### Dataset search request identity
 
 After a blank rebuild, run `supabase/tests/20261006_search_request_identity.sql`,

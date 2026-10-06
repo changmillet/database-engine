@@ -93,6 +93,21 @@ and admitted caller roles; migrations first remove inherited grants and then
 rebuild the external ACL from this closed manifest. New or overloaded RPCs are
 therefore denied until their exact signature is deliberately classified.
 
+Database #785 fixes the search path of thirteen private invokers without changing
+their bodies or ACLs. Twelve scalar SQL helpers retain deliberate closed-ACL
+exceptions because a function `SET` clause prevents their scalar inlining; their
+qualified dependencies are reached through fixed-path internal callers. The
+Navigation matcher already has `EXISTS` and retains a function call in both
+natural plans. Six core entity SELECT policy pairs with the exact same
+`authenticated` role set are one existing predicate OR example predicate;
+Contacts keeps its original PUBLIC-scoped policy and authenticated example
+companion. Restrictive OAuth and Process120 policies are independent guards.
+
+The hooks-retention absence guards reconcile a recorded May migration later
+edited for Preview. The closure-binding helper's existing production
+service/internal execution grants support the SECURITY INVOKER package trigger
+and are reproduced in source while browser execution remains denied.
+
 Dataset search derives its caller class from PostgreSQL's standard `role`
 setting, which retains the external request role across nested SECURITY DEFINER
 calls. `authenticated` visibility is bound to `auth.uid()` and current team

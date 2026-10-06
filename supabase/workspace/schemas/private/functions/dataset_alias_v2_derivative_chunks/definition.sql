@@ -1,5 +1,6 @@
 CREATE OR REPLACE FUNCTION "private"."dataset_alias_v2_derivative_chunks"("p_request_id" "uuid", "p_plan_sha256" "text", "p_targets" "jsonb") RETURNS "jsonb"
     LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO ''
     AS $$
   select coalesce(jsonb_agg(jsonb_build_object(
     'ordinal', chunk.ordinal,
