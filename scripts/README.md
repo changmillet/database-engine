@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-06
-lastReviewedCommit: 124f01245173751e23942af6a2220ffe32550918
-lastReviewedNote: "Reviewed Database #777 request-role hardening at 124f0124: actual-role authorization and local SQL/HTTP refusal and cleanup proofs preserve signatures, owners, ACLs, branch/Hosted deployment boundaries and generated-workspace rules. CI adds only SQL and offline harness tests; no runtime schema/profile or exposed type changes."
+lastReviewedCommit: 198f6180f2257d587c5995a6e48dd502dc3a8de8
+lastReviewedNote: "Reviewed Database #783 at 198f6180: two empty Portal readers preserve signatures, owners, ACLs, forced RLS, budgets and writer/index boundaries. Clean 17.11.0.002 reset, 1018 SQL assertions, three DDL privilege prestates, 336 full-response/cursor comparisons and deterministic 1845-file exports pass. Hosted 17.11.0.003 qualification and Dev/Main delivery remain separate."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
