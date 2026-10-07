@@ -294,6 +294,24 @@ def _scale_metrics(output: str) -> dict[int, dict[str, Any]]:
     return metrics
 
 
+def _sql_transport_assertion_count(output: str) -> int:
+    try:
+        transport_proof = json.loads(output)
+    except (ValueError, TypeError) as error:
+        raise QualificationError("current SQL transport proof was not JSON") from error
+    if (
+        not isinstance(transport_proof, dict)
+        or transport_proof.get("schemaVersion") != "lcia.scope-closure-staged-write-set-sql-proof.v1"
+        or transport_proof.get("sqlStoredStatusEqual") is not True
+        or transport_proof.get("postgrestHelpersIsolated") is not True
+        or transport_proof.get("concurrentRegisterSealSerialized") is not True
+        or type(transport_proof.get("assertions")) is not int
+        or transport_proof["assertions"] <= 0
+    ):
+        raise QualificationError("current SQL transport proof was incomplete")
+    return transport_proof["assertions"]
+
+
 def run_database(run_id: str) -> dict[str, Any]:
     _validate_common_environment("database")
     tests = (
@@ -315,8 +333,8 @@ def run_database(run_id: str) -> dict[str, Any]:
     metrics = _scale_metrics(database_output)
     if assertions < 100:
         raise QualificationError("database proof did not execute the complete contract suites")
-    _run(("node", "supabase/tests/20260730_scope_closure_staged_write_set_v2_rest_contract.mjs"))
-    assertions += 10
+    transport = _run(("node", "supabase/tests/20260730_scope_closure_staged_write_set_v2_sql_contract.mjs"))
+    assertions += _sql_transport_assertion_count(transport.stdout)
     maximum_count = max(metrics)
     maximum_bytes = metrics[maximum_count]["descriptorBytes"]
     evidence = {

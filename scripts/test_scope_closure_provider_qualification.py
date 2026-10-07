@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import sys
@@ -16,6 +17,26 @@ SHA = "1" * 40
 
 
 class QualificationTests(unittest.TestCase):
+    def test_current_transport_receipt_requires_real_complete_assertions(self) -> None:
+        proof = {
+            "schemaVersion": "lcia.scope-closure-staged-write-set-sql-proof.v1",
+            "sqlStoredStatusEqual": True, "postgrestHelpersIsolated": True,
+            "concurrentRegisterSealSerialized": True, "assertions": 81,
+        }
+        self.assertEqual(qualification._sql_transport_assertion_count(json.dumps(proof)), 81)
+        for field in proof:
+            incomplete = {key: value for key, value in proof.items() if key != field}
+            with self.subTest(missing=field), self.assertRaises(qualification.QualificationError):
+                qualification._sql_transport_assertion_count(json.dumps(incomplete))
+        for invalid in [True, 0, -1, "81", None]:
+            with self.subTest(assertions=invalid), self.assertRaises(qualification.QualificationError):
+                qualification._sql_transport_assertion_count(json.dumps({**proof, "assertions": invalid}))
+        with self.assertRaises(qualification.QualificationError):
+            qualification._sql_transport_assertion_count("not JSON")
+        for invalid in ["null", "[]", '"value"']:
+            with self.subTest(root=invalid), self.assertRaises(qualification.QualificationError):
+                qualification._sql_transport_assertion_count(invalid)
+
     def test_owner_result_is_deterministic_and_exact(self) -> None:
         evidence = {"descriptors": {"count": 1501}}
         with patch.object(qualification, "_component_sha", return_value=SHA):

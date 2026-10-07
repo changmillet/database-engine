@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-07
-lastReviewedCommit: aed46bef1dc61c4ace40e65dea5b14627ef44d97
-lastReviewedNote: "Reviewed Database #785 at 10cc730b: thirteen fixed private invokers preserve scalar inlining and closed ACLs; six same-role SELECT merges, two qualified Navigation indexes, single guarded typo-index removal and preexisting retention/helper ACL reconciliation preserve ownership and API boundaries. Canonical 414-migration local17.11.0.002 reset, ordinary-schema canaries, upgrade10/typo5 cases, full JSON/cursors, exact577 dispositions and deterministic1836-file exports pass; reported hosted17.11.0.003, deployment and integration proof remain Issue/PR-owned."
+lastReviewedAt: 2026-10-08
+lastReviewedCommit: 6e9d8d357c6baa20e8f1ee086e739af8eb5a393d
+lastReviewedNote: "Reviewed Database #794 current private SQL provider transport, independent stored-state status, lock-observed asynchronous register/seal, replay/fences and mutation-verified PostgREST isolation; atomic setup preserves deferred Auth profile mirroring and rolls back late failure. No production migrations, RPCs, schema, grants or deployment changes."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -751,7 +751,7 @@ loopback targets or positively allowlisted non-production target fingerprints,
 reject production or ambiguous targets, and emit `productionMutation=false`.
 
 The database adapter runs the #308/#316 pgTAP contracts against the explicit
-`QUALIFICATION_DATABASE_URL`. The storage adapter uses an explicit
+`QUALIFICATION_DATABASE_URL`, then the current private SQL service-role fixture with real asynchronous register/seal sessions, independent stored-state status checks and negative PostgREST isolation. Its setup is atomic under the deferred Auth profile mirror. The storage adapter uses an explicit
 S3-compatible endpoint, bounded generated files, live and expired signed
 HEAD/range requests, multipart boundaries, retries, and exact-prefix garbage
 collection.
