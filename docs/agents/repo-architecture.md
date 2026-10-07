@@ -30,9 +30,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-06
-lastReviewedCommit: 10cc730b1463565279c6f2c10c3384bc972d19d9
-lastReviewedNote: "Reviewed Database #785 at 10cc730b: thirteen fixed private invokers preserve scalar inlining and closed ACLs; six same-role SELECT merges, two qualified Navigation indexes, single guarded typo-index removal and preexisting retention/helper ACL reconciliation preserve ownership and API boundaries. Canonical 414-migration local17.11.0.002 reset, ordinary-schema canaries, upgrade10/typo5 cases, full JSON/cursors, exact577 dispositions and deterministic1836-file exports pass; reported hosted17.11.0.003, deployment and integration proof remain Issue/PR-owned."
+lastReviewedAt: 2026-10-07
+lastReviewedCommit: aed46bef1dc61c4ace40e65dea5b14627ef44d97
+lastReviewedNote: "Reviewed allocation v5 companion contract, exact request identity and coordinated rollout with Worker #311; existing ownership and branch boundaries remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -40,7 +40,7 @@ related:
   - ./supabase-branching.md
 ---
 
-Allocation contract update (Database #755): `private.lcia_scope_closure_normalize_request` freezes omitted/explicit v4 allocation intent as `tidas-reference-allocation-v4`, rejects explicit stale/unknown versions, and preserves cutoff, numerical eligibility and ACLs. Historical manifests/certificates are not rewritten. Coordinate with Worker #305 and Edge #443; drain v3 work before switching admission, and obtain new v4 closure checks instead of reusing v3 evidence.
+Allocation contract update (Database #789): `private.lcia_scope_closure_normalize_request` freezes omitted/explicit v5 allocation intent as `tidas-reference-allocation-v5`, rejects explicit stale/unknown versions, and preserves cutoff, numerical eligibility and ACLs. Historical manifests/certificates are not rewritten. Coordinate with Worker #311 and Edge #454; drain v4 work before switching admission to v5-capable Workers, and obtain new v5 closure checks instead of reusing v4 evidence. The version identifies Product/Waste allocation targets in either exchange direction; numerical interpretation remains Worker-owned.
 
 ## Repo Shape
 
