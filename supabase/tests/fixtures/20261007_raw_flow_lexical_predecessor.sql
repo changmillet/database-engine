@@ -1,4 +1,6 @@
-CREATE OR REPLACE FUNCTION "private"."search_flows_latest_impl"("query_text" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "page_size" bigint DEFAULT 10, "page_current" bigint DEFAULT 1, "data_source" "text" DEFAULT 'tg'::"text", "this_user_id" "text" DEFAULT ''::"text", "team_id_filter" "uuid" DEFAULT NULL::"uuid", "state_code_filter" integer DEFAULT NULL::integer, "query_terms" "text"[] DEFAULT NULL::"text"[]) RETURNS TABLE("rank" bigint, "id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
+-- Frozen Main8f43de88 lexical callee, retaining postgres definer and original configuration.
+-- A rollback-only fixture; no hosted use.
+CREATE OR REPLACE FUNCTION pg_temp.raw_flow_lexical_predecessor("query_text" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "page_size" bigint DEFAULT 10, "page_current" bigint DEFAULT 1, "data_source" "text" DEFAULT 'tg'::"text", "this_user_id" "text" DEFAULT ''::"text", "team_id_filter" "uuid" DEFAULT NULL::"uuid", "state_code_filter" integer DEFAULT NULL::integer, "query_terms" "text"[] DEFAULT NULL::"text"[]) RETURNS TABLE("rank" bigint, "id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'private', 'api', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
@@ -19,7 +21,6 @@ declare
   v_sql text;
   escaped_query_terms text[];
   text_match_clause text;
-  use_type_keys boolean := false;
 begin
   normalized_page_size := greatest(coalesce(page_size, 10), 1);
   normalized_page_current := greatest(coalesce(page_current, 1), 1);
@@ -156,45 +157,23 @@ begin
     else 'and f.json @> $2'
   end;
 
-  -- Statistics choose only the execution strategy, never the result universe.
-  -- Retain the original filter path when type statistics are absent or broad.
-  if flow_type is not null then
-    select coalesce((
-      select sum(coalesce(
-        (select stats.most_common_freqs[item.ordinality::integer]
-         from unnest(stats.most_common_vals::text::text[]) with ordinality item(value,ordinality)
-         where item.value = requested.value limit 1),
-        greatest(1.0 - stats.null_frac - coalesce(
-          (select sum(frequency) from unnest(stats.most_common_freqs) frequency),0.0),0.0)
-        / greatest(stats.n_distinct - coalesce(array_length(stats.most_common_freqs,1),0),1.0)
-      ))
-      from (select distinct unnest(flow_type_array) as value) requested
-    ),1.0) <= 0.20
-    into use_type_keys
-    from pg_catalog.pg_stats stats
-    where stats.schemaname='public' and stats.tablename='flows_json_typeofdataset'
-      and stats.attname='expr' and stats.n_distinct>0
-      and stats.most_common_vals is not null
-    limit 1;
-    use_type_keys := coalesce(use_type_keys,false);
-  end if;
-
   v_sql := format($sql$
-    with type_keys as materialized (
-      select f.id, f.version
-      from public.flows f
-      where $15 and $10 is not null
-        and (
-          ((($5 = 'tg' AND f.state_code = 100) OR ($5 = 'ex' AND f.state_code = -1 AND (SELECT auth.uid()) IS NOT NULL)) and ($7 is null or f.team_id = $7))
-          or ($5 = 'co' and f.state_code = 200 and ($7 is null or f.team_id = $7))
-          or ($5 = 'my' and $6 is not null and f.user_id = $6 and ($8 is null or f.state_code = $8))
-          or ($5 = 'te' and $7 is not null and $9 and f.team_id = $7 and ($8 is null or f.state_code = $8))
-        )
-        and (f.json->'flowDataSet'->'modellingAndValidation'->'LCIMethod'->>'typeOfDataSet') = any($11)
-    ),
-    text_matches as materialized (
+    with text_matches as materialized (
       select f.id,
-             case when (
+             case when $2 = '{}'::jsonb and $10 is null
+               and not coalesce($12, false) and jsonb_array_length($13) = 0
+               then null::jsonb else f.json end as json,
+             f.state_code,
+             f.team_id,
+             f.user_id,
+             pgroonga_score(f.tableoid, f.ctid) as search_score
+      from public.flows f
+      %s
+    ),
+    matched_ids as (
+      select f.id, max(f.search_score) as search_score
+      from text_matches f
+      where (
           ((($5 = 'tg' AND f.state_code = 100) OR ($5 = 'ex' AND f.state_code = -1 AND (SELECT auth.uid()) IS NOT NULL)) and ($7 is null or f.team_id = $7))
           or ($5 = 'co' and f.state_code = 200 and ($7 is null or f.team_id = $7))
           or ($5 = 'my' and $6 is not null and f.user_id = $6 and ($8 is null or f.state_code = $8))
@@ -203,8 +182,7 @@ begin
         %s
         and (
           $10 is null
-          or case when $15 then (f.id, f.version) in (select type_keys.id, type_keys.version from type_keys)
-                  else (f.json #>> '{flowDataSet,modellingAndValidation,LCIMethod,typeOfDataSet}') = any($11) end
+          or (f.json #>> '{flowDataSet,modellingAndValidation,LCIMethod,typeOfDataSet}') = any($11)
         )
         and (
           $12 is null
@@ -248,15 +226,7 @@ begin
                 )
               )
           )
-        ) then true else false end as accepted,
-             pgroonga_score(f.tableoid, f.ctid) as search_score
-      from public.flows f
-      %s
-    ),
-    matched_ids as (
-      select f.id, max(f.search_score) as search_score
-      from text_matches f
-      where f.accepted
+        )
       group by f.id
     ),
     latest_rows as (
@@ -298,20 +268,14 @@ begin
     join public.flows payload on payload.id = paged_rows.id
       and payload.version = paged_rows.version
     order by paged_rows.rank, paged_rows.id
-  $sql$, json_filter_clause, text_match_clause);
+  $sql$, text_match_clause, json_filter_clause);
 
   return query execute v_sql
     using query_text, filter_condition_jsonb, normalized_page_size, normalized_page_current,
           normalized_data_source, effective_user_id, team_id_filter, state_code_filter,
           can_read_team_filter, flow_type, flow_type_array, as_input, classification_filter,
-          escaped_query_terms, use_type_keys;
+          escaped_query_terms;
 end;
 $_$;
 
-ALTER FUNCTION "private"."search_flows_latest_impl"("query_text" "text", "filter_condition" "jsonb", "page_size" bigint, "page_current" bigint, "data_source" "text", "this_user_id" "text", "team_id_filter" "uuid", "state_code_filter" integer, "query_terms" "text"[]) OWNER TO "postgres";
-
-REVOKE ALL ON FUNCTION "private"."search_flows_latest_impl"("query_text" "text", "filter_condition" "jsonb", "page_size" bigint, "page_current" bigint, "data_source" "text", "this_user_id" "text", "team_id_filter" "uuid", "state_code_filter" integer, "query_terms" "text"[]) FROM PUBLIC;
-
-GRANT ALL ON FUNCTION "private"."search_flows_latest_impl"("query_text" "text", "filter_condition" "jsonb", "page_size" bigint, "page_current" bigint, "data_source" "text", "this_user_id" "text", "team_id_filter" "uuid", "state_code_filter" integer, "query_terms" "text"[]) TO "service_role";
-
-GRANT ALL ON FUNCTION "private"."search_flows_latest_impl"("query_text" "text", "filter_condition" "jsonb", "page_size" bigint, "page_current" bigint, "data_source" "text", "this_user_id" "text", "team_id_filter" "uuid", "state_code_filter" integer, "query_terms" "text"[]) TO "api_internal_executor";
+grant execute on function pg_temp.raw_flow_lexical_predecessor(text,jsonb,bigint,bigint,text,text,uuid,integer,text[]) to api_internal_executor,authenticated,anon;

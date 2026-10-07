@@ -173,6 +173,17 @@ Process 的 0、小集合、2,000、2,001、宽过滤、无过滤分段耗时，
 
 `node scripts/benchmark_hybrid_versions.mjs --help`
 
+### Raw 搜索及索引后续验证
+
+Database #793 的工具仅允许明确归属的本地隔离环境，不接受托管数据库 URL 或共享本地栈。
+解释结果前先阅读架构及验证文档；合成基准不能替代生产发布核验。
+
+- `benchmark_raw_flow_hybrid.py`：创建并清理接近生产结构的 Flow 合成数据，比较完整 raw API、词法、向量及冻结候选后的融合阶段；首次调用与连续调用分开记录。候选 SQL、样本数和输出参数以 `--help` 为准。
+- `benchmark_search_index_retirement.py --local-container supabase_db_database-engine-793 --output <新的私有JSON文件>`：对比主键前缀路径与大嵌套 JSON 的 GIN 读写成本；已有测试命名空间会被拒绝，测试对象必须回滚清理。
+- `test_raw_search_request_bounds_http.py --workdir <隔离目录> --supabase-cli <准确CLI路径> --task-owned-local-stack`：使用真实 Auth 和 PostgREST 验证上限及正常边界，核实用户、会话和私有镜像清理。`--upgrade-authority-only` 在实际非超级用户迁移角色下验证临时 DDL 权限恢复。
+
+`supabase/tests/upgrade/test_issue_793_search_index_retirement.py` 验证索引退役、已知终态重放、漂移拒绝，以及自身角色授权不存在、SET=false、SET=true 三种状态的精确恢复；每个场景回滚。目标和证据目录参数以其帮助为准。旧的 299 条迁移 Portal 基准仍属于历史版本验证，不代表当前 V2 退役验证。
+
 ### `benchmark_flow_lexical_payloads.py`
 
 仅限明确命名的 Database #774 隔离容器。候选迁移和比较函数最终回滚；
@@ -775,3 +786,5 @@ python3 scripts/profile_portal_catalog_concurrency.py \
 PostgreSQL17.11 本地栈和空投影表。通过 `--help` 查看有界 fixture 参数；
 报告、SQL 和计划日志必须使用新路径。合成 fixture 的所有变化回滚，
 只作为读取证据；真实 writer/RLS 测试与托管性能仍需分别验证。
+
+旧 Process V1 排名读取路径的退役在 `check_portal_projection_manifest.py` 中使用精确的 DROP-only 例外。运行 `python3 scripts/test_portal_rank_retirement_governance.py`，验证该例外不会放行共享/当前 helper、替换定义或其他迁移文件。

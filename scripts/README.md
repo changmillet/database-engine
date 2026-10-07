@@ -192,6 +192,32 @@ relevance or production-cardinality release evidence.
 
 `node scripts/benchmark_hybrid_versions.mjs --help`
 
+### Raw search and index follow-up qualification
+
+Database #793 has three task-bound local entrypoints. They refuse hosted URLs
+and shared local stacks. Read the corresponding architecture and validation
+sections before interpreting synthetic results as release proof.
+
+- `benchmark_raw_flow_hybrid.py`: create and clean a production-shaped synthetic
+  Flow fixture; compare the full raw API and lexical/vector/frozen-fusion stages,
+  keeping first-call and repeated measurements separate. Inspect `--help` for
+  exact candidate-file, sample-count and output arguments.
+- `benchmark_search_index_retirement.py --local-container
+  supabase_db_database-engine-793 --output <new-private-json>`: rollback-only
+  PK-prefix and large nested JSON GIN read/write comparison. It refuses an
+  existing fixture namespace and verifies its removal.
+- `test_raw_search_request_bounds_http.py --workdir <isolated-workdir>
+  --supabase-cli <exact-cli> --task-owned-local-stack`: real Auth and PostgREST
+  boundary proof with exact actor/session/profile cleanup. Its
+  `--upgrade-authority-only` mode rehearses the migration's temporary DDL
+  authority under the actual non-superuser local migration role.
+
+`supabase/tests/upgrade/test_issue_793_search_index_retirement.py` exercises
+retirement/replay and refusal of drift under absent/SET-false/SET-true own
+membership grants. Every case rolls back; inspect its help for the exact target
+and new evidence output. The old 299-migration Portal benchmark remains a
+historical prefix runner and is not a terminal-head V2 retirement test.
+
 ### `benchmark_flow_lexical_payloads.py`
 
 Isolated legacy latest-Flow lexical before/after profile for an explicitly
@@ -866,3 +892,8 @@ It admits only the explicitly reused `workspace-1701` PostgreSQL17.11 local stac
 and empty projections. Use `--help` for bounded fixture options; the report, SQL
 and plan log must have new paths. The rollback-only synthetic fixture is reader
 evidence; real writer/RLS suites and hosted performance remain separate proof.
+
+The obsolete Process V1 rank-reader retirement has an exact DROP-only exception
+in `check_portal_projection_manifest.py`; run
+`python3 scripts/test_portal_rank_retirement_governance.py` to verify that it
+cannot waive shared/current helpers, replacement DDL or later migrations.

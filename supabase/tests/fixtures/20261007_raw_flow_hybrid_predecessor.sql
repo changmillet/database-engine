@@ -1,0 +1,106 @@
+-- Frozen Main8f43de88 predecessor; api_internal_executor definer reproduces the original API caller boundary.
+-- Use only within the calling rollback-only pgTAP transaction.
+CREATE OR REPLACE FUNCTION pg_temp.raw_flow_hybrid_predecessor("query_text" "text", "query_embedding" "text", "filter_condition" "text" DEFAULT ''::"text", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[]) RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "statement_timeout" TO '60s'
+    SET "search_path" TO 'private', 'api', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
+    AS $$
+declare
+  candidate_limit integer;
+  semantic_match_count integer;
+  filter_condition_jsonb jsonb;
+  text_weight double precision;
+begin
+  candidate_limit := greatest(coalesce(match_count, 20), coalesce(page_size, 10)) * 10;
+  semantic_match_count := greatest(coalesce(match_count, 20), coalesce(page_size, 10));
+  filter_condition_jsonb := coalesce(nullif(btrim(filter_condition), ''), '{}')::jsonb;
+  text_weight := coalesce(lexical_weight, 0);
+
+  return query
+    with text_matches as (
+      select ts.rank as text_rank, ts.id as text_id
+      from pg_temp.raw_flow_lexical_predecessor(
+        query_text,
+        filter_condition_jsonb,
+        candidate_limit,
+        1,
+        data_source,
+        '',
+        null::uuid,
+        null::integer,
+        query_terms
+      ) ts
+    ),
+    semantic as (
+      select ss.rank as ss_rank, ss.id as ss_id
+      from private.semantic_flow_candidates(
+        query_embedding,
+        filter_condition,
+        match_threshold,
+        semantic_match_count,
+        data_source
+      ) ss
+    ),
+    fused_raw as (
+      select
+        coalesce(text_matches.text_id, semantic.ss_id) as id,
+        coalesce(1.0 / (rrf_k + text_matches.text_rank), 0.0) * text_weight
+          + coalesce(1.0 / (rrf_k + semantic.ss_rank), 0.0) * semantic_weight as score
+      from text_matches
+      full outer join semantic on text_matches.text_id = semantic.ss_id
+    ),
+    fused as (
+      select fused_raw.id, sum(fused_raw.score) as score
+      from fused_raw
+      where fused_raw.id is not null
+      group by fused_raw.id
+    ),
+    visible_rows as (
+      select f.*
+      from public.flows f
+      join fused on fused.id = f.id
+      where (
+        (((data_source = 'tg' AND f.state_code = 100) OR (data_source = 'ex' AND f.state_code = -1 AND (SELECT auth.uid()) IS NOT NULL)))
+        or (data_source = 'co' and f.state_code = 200)
+        or (data_source = 'my' and f.user_id = auth.uid())
+        or (
+          data_source = 'te'
+          and exists (
+            select 1
+            from private.roles r
+            where r.user_id = auth.uid()
+              and r.team_id = f.team_id
+              and r.role::text in ('admin', 'member', 'owner')
+          )
+        )
+      )
+    ),
+    latest_rows as (
+      select distinct on (visible_rows.id)
+        visible_rows.id,
+        visible_rows.json,
+        visible_rows.version,
+        visible_rows.modified_at,
+        visible_rows.team_id,
+        fused.score
+      from visible_rows
+      join fused on fused.id = visible_rows.id
+      order by visible_rows.id, visible_rows.version desc, visible_rows.modified_at desc
+    ),
+    counted_rows as (
+      select latest_rows.*, count(*) over()::bigint as total_count
+      from latest_rows
+    )
+    select
+      counted_rows.id,
+      counted_rows.json,
+      counted_rows.version,
+      counted_rows.modified_at,
+      counted_rows.team_id,
+      counted_rows.total_count
+    from counted_rows
+    order by counted_rows.score desc, counted_rows.modified_at desc, counted_rows.id
+    limit greatest(coalesce(page_size, 10), 1)
+    offset (greatest(coalesce(page_current, 1), 1) - 1) * greatest(coalesce(page_size, 10), 1);
+end;
+$$;

@@ -20512,10 +20512,26 @@ ALTER FUNCTION "api"."get_task_summary_v2_feed"("p_category" "text", "p_job_kind
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_contacts"("query_text" "text", "query_embedding" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[], "state_code_filter" integer DEFAULT NULL::integer, "team_id_filter" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_simple_dataset_v2('public.contacts'::regclass,
     query_text,
@@ -20533,6 +20549,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_contacts"("query_text" "text", "
     state_code_filter,
     team_id_filter
   );
+end;
 $$;
 
 
@@ -20544,10 +20561,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_contacts"("query_text" "text", "query_e
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_contacts_v2"("query_text" "text", "query_embedding" "text", "filter_condition" "text" DEFAULT ''::"text", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[], "state_code_filter" integer DEFAULT NULL::integer, "team_id_filter" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_simple_dataset_v2('public.contacts'::regclass,
     query_text,
@@ -20565,6 +20598,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_contacts_v2"("query_text" "text"
     state_code_filter,
     team_id_filter
   );
+end;
 $$;
 
 
@@ -20837,10 +20871,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_flow_versions_v2"("query_text" "text", 
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_flowproperties"("query_text" "text", "query_embedding" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[], "state_code_filter" integer DEFAULT NULL::integer, "team_id_filter" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_simple_dataset_v2('public.flowproperties'::regclass,
     query_text,
@@ -20858,6 +20908,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_flowproperties"("query_text" "te
     state_code_filter,
     team_id_filter
   );
+end;
 $$;
 
 
@@ -20869,10 +20920,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_flowproperties"("query_text" "text", "q
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_flowproperties_v2"("query_text" "text", "query_embedding" "text", "filter_condition" "text" DEFAULT ''::"text", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[], "state_code_filter" integer DEFAULT NULL::integer, "team_id_filter" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_simple_dataset_v2('public.flowproperties'::regclass,
     query_text,
@@ -20890,6 +20957,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_flowproperties_v2"("query_text" 
     state_code_filter,
     team_id_filter
   );
+end;
 $$;
 
 
@@ -20901,10 +20969,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_flowproperties_v2"("query_text" "text",
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_flows"("query_text" "text", "query_embedding" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[]) RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_flows_v2_impl(
     query_text,
@@ -20920,6 +21004,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_flows"("query_text" "text", "que
     page_current,
     query_terms
   );
+end;
 $$;
 
 
@@ -20931,10 +21016,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_flows"("query_text" "text", "query_embe
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_flows_v2"("query_text" "text", "query_embedding" "text", "filter_condition" "text" DEFAULT ''::"text", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[]) RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_flows_v2_impl(
     query_text,
@@ -20950,6 +21051,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_flows_v2"("query_text" "text", "
     page_current,
     query_terms
   );
+end;
 $$;
 
 
@@ -20961,10 +21063,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_flows_v2"("query_text" "text", "query_e
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_lifecyclemodels"("query_text" "text", "query_embedding" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[]) RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_lifecyclemodels_v2_impl(
     query_text,
@@ -20980,6 +21098,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_lifecyclemodels"("query_text" "t
     page_current,
     query_terms
   );
+end;
 $$;
 
 
@@ -20991,10 +21110,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_lifecyclemodels"("query_text" "text", "
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_lifecyclemodels_v2"("query_text" "text", "query_embedding" "text", "filter_condition" "text" DEFAULT ''::"text", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[]) RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_lifecyclemodels_v2_impl(
     query_text,
@@ -21010,6 +21145,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_lifecyclemodels_v2"("query_text"
     page_current,
     query_terms
   );
+end;
 $$;
 
 
@@ -21385,10 +21521,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_process_versions_v2"("query_text" "text
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_processes"("query_text" "text", "query_embedding" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[]) RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "model_id" "uuid", "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_processes_v2_impl(
     query_text,
@@ -21404,6 +21556,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_processes"("query_text" "text", 
     page_current,
     query_terms
   );
+end;
 $$;
 
 
@@ -21415,10 +21568,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_processes"("query_text" "text", "query_
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_processes_v2"("query_text" "text", "query_embedding" "text", "filter_condition" "text" DEFAULT ''::"text", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[]) RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "model_id" "uuid", "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_processes_v2_impl(
     query_text,
@@ -21434,6 +21603,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_processes_v2"("query_text" "text
     page_current,
     query_terms
   );
+end;
 $$;
 
 
@@ -21445,10 +21615,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_processes_v2"("query_text" "text", "que
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_sources"("query_text" "text", "query_embedding" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[], "state_code_filter" integer DEFAULT NULL::integer, "team_id_filter" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_simple_dataset_v2('public.sources'::regclass,
     query_text,
@@ -21466,6 +21652,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_sources"("query_text" "text", "q
     state_code_filter,
     team_id_filter
   );
+end;
 $$;
 
 
@@ -21477,10 +21664,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_sources"("query_text" "text", "query_em
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_sources_v2"("query_text" "text", "query_embedding" "text", "filter_condition" "text" DEFAULT ''::"text", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[], "state_code_filter" integer DEFAULT NULL::integer, "team_id_filter" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_simple_dataset_v2('public.sources'::regclass,
     query_text,
@@ -21498,6 +21701,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_sources_v2"("query_text" "text",
     state_code_filter,
     team_id_filter
   );
+end;
 $$;
 
 
@@ -21509,10 +21713,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_sources_v2"("query_text" "text", "query
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_unitgroups"("query_text" "text", "query_embedding" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[], "state_code_filter" integer DEFAULT NULL::integer, "team_id_filter" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_simple_dataset_v2('public.unitgroups'::regclass,
     query_text,
@@ -21530,6 +21750,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_unitgroups"("query_text" "text",
     state_code_filter,
     team_id_filter
   );
+end;
 $$;
 
 
@@ -21541,10 +21762,26 @@ COMMENT ON FUNCTION "api"."hybrid_search_unitgroups"("query_text" "text", "query
 
 
 CREATE OR REPLACE FUNCTION "api"."hybrid_search_unitgroups_v2"("query_text" "text", "query_embedding" "text", "filter_condition" "text" DEFAULT ''::"text", "match_threshold" double precision DEFAULT 0.5, "match_count" integer DEFAULT 20, "lexical_weight" double precision DEFAULT 0.5, "semantic_weight" double precision DEFAULT 0.5, "rrf_k" integer DEFAULT 10, "data_source" "text" DEFAULT 'tg'::"text", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "query_terms" "text"[] DEFAULT NULL::"text"[], "state_code_filter" integer DEFAULT NULL::integer, "team_id_filter" "uuid" DEFAULT NULL::"uuid") RETURNS TABLE("id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 100 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 100';
+  end if;
+  if match_count > 100 then
+    raise exception using errcode='22023',message='Raw hybrid match_count exceeds 100';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select *
   from private.hybrid_search_simple_dataset_v2('public.unitgroups'::regclass,
     query_text,
@@ -21562,6 +21799,7 @@ CREATE OR REPLACE FUNCTION "api"."hybrid_search_unitgroups_v2"("query_text" "tex
     state_code_filter,
     team_id_filter
   );
+end;
 $$;
 
 
@@ -29141,6 +29379,16 @@ CREATE OR REPLACE FUNCTION "api"."search_contacts"("query_text" "text", "filter_
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from api._search_simple_dataset_latest(
@@ -29171,6 +29419,16 @@ CREATE OR REPLACE FUNCTION "api"."search_contacts_latest"("query_text" "text", "
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from api._search_simple_dataset_latest(
@@ -29221,6 +29479,16 @@ CREATE OR REPLACE FUNCTION "api"."search_flowproperties"("query_text" "text", "f
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from api._search_simple_dataset_latest(
@@ -29251,6 +29519,16 @@ CREATE OR REPLACE FUNCTION "api"."search_flowproperties_latest"("query_text" "te
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from api._search_simple_dataset_latest(
@@ -29277,6 +29555,16 @@ CREATE OR REPLACE FUNCTION "api"."search_flows"("query_text" "text", "filter_con
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from private.search_flows_latest_impl(
@@ -29307,6 +29595,16 @@ CREATE OR REPLACE FUNCTION "api"."search_flows_latest"("query_text" "text", "fil
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from private.search_flows_latest_impl(
@@ -29333,6 +29631,16 @@ CREATE OR REPLACE FUNCTION "api"."search_lifecyclemodels"("query_text" "text", "
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from private.search_lifecyclemodels_latest_impl(
@@ -29363,6 +29671,16 @@ CREATE OR REPLACE FUNCTION "api"."search_lifecyclemodels_latest"("query_text" "t
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from private.search_lifecyclemodels_latest_impl(
@@ -29541,10 +29859,23 @@ COMMENT ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p
 
 
 CREATE OR REPLACE FUNCTION "api"."search_processes"("query_text" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "page_size" integer DEFAULT 10, "page_current" integer DEFAULT 1, "data_source" "text" DEFAULT 'tg'::"text", "this_user_id" "text" DEFAULT ''::"text", "team_id_filter" "uuid" DEFAULT NULL::"uuid", "state_code_filter" integer DEFAULT NULL::integer, "type_of_data_set_filter" "text" DEFAULT 'all'::"text", "query_terms" "text"[] DEFAULT NULL::"text"[], "owner_draft_only" boolean DEFAULT false) RETURNS TABLE("rank" bigint, "id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "model_id" "uuid", "model_version" character, "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select
     result.rank,
     result.id,
@@ -29571,6 +29902,7 @@ CREATE OR REPLACE FUNCTION "api"."search_processes"("query_text" "text", "filter
   left join public.processes as process
     on process.id = result.id
    and process.version = result.version;
+end;
 $$;
 
 
@@ -29582,10 +29914,23 @@ COMMENT ON FUNCTION "api"."search_processes"("query_text" "text", "filter_condit
 
 
 CREATE OR REPLACE FUNCTION "api"."search_processes_latest"("query_text" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "order_by" "jsonb" DEFAULT '{}'::"jsonb", "page_size" bigint DEFAULT 10, "page_current" bigint DEFAULT 1, "data_source" "text" DEFAULT 'tg'::"text", "this_user_id" "text" DEFAULT ''::"text", "team_id_filter" "uuid" DEFAULT NULL::"uuid", "state_code_filter" integer DEFAULT NULL::integer, "type_of_data_set_filter" "text" DEFAULT 'all'::"text", "query_terms" "text"[] DEFAULT NULL::"text"[]) RETURNS TABLE("rank" bigint, "id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "model_id" "uuid", "model_version" character, "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select
     result.rank,
     result.id,
@@ -29603,7 +29948,8 @@ CREATE OR REPLACE FUNCTION "api"."search_processes_latest"("query_text" "text", 
   ) as result
   left join public.processes as process
     on process.id = result.id
-   and process.version = result.version
+   and process.version = result.version;
+end;
 $$;
 
 
@@ -29615,10 +29961,23 @@ COMMENT ON FUNCTION "api"."search_processes_latest"("query_text" "text", "filter
 
 
 CREATE OR REPLACE FUNCTION "api"."search_processes_latest_v2"("query_text" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "order_by" "jsonb" DEFAULT '{}'::"jsonb", "page_size" bigint DEFAULT 10, "page_current" bigint DEFAULT 1, "data_source" "text" DEFAULT 'tg'::"text", "this_user_id" "text" DEFAULT ''::"text", "team_id_filter" "uuid" DEFAULT NULL::"uuid", "state_code_filter" integer DEFAULT NULL::integer, "type_of_data_set_filter" "text" DEFAULT 'all'::"text", "query_terms" "text"[] DEFAULT NULL::"text"[], "owner_draft_only" boolean DEFAULT false) RETURNS TABLE("rank" bigint, "id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "model_id" "uuid", "model_version" character, "total_count" bigint)
-    LANGUAGE "sql" SECURITY DEFINER
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
     SET "statement_timeout" TO '60s'
     AS $$
+begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
+  return query
+
   select
     result.rank,
     result.id,
@@ -29645,6 +30004,7 @@ CREATE OR REPLACE FUNCTION "api"."search_processes_latest_v2"("query_text" "text
   left join public.processes as process
     on process.id = result.id
    and process.version = result.version;
+end;
 $$;
 
 
@@ -29661,6 +30021,16 @@ CREATE OR REPLACE FUNCTION "api"."search_sources"("query_text" "text", "filter_c
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from api._search_simple_dataset_latest(
@@ -29691,6 +30061,16 @@ CREATE OR REPLACE FUNCTION "api"."search_sources_latest"("query_text" "text", "f
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from api._search_simple_dataset_latest(
@@ -29717,6 +30097,16 @@ CREATE OR REPLACE FUNCTION "api"."search_unitgroups"("query_text" "text", "filte
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from api._search_simple_dataset_latest(
@@ -29747,6 +30137,16 @@ CREATE OR REPLACE FUNCTION "api"."search_unitgroups_latest"("query_text" "text",
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from api._search_simple_dataset_latest(
@@ -33002,54 +33402,6 @@ $$;
 ALTER FUNCTION "private"."assert_portal_process_keyword_rank_contract_cn1"() OWNER TO "portal_public_executor";
 
 
-CREATE OR REPLACE FUNCTION "private"."assert_portal_process_keyword_rank_contract_v1"() RETURNS "void"
-    LANGUAGE "plpgsql" STABLE SECURITY DEFINER PARALLEL RESTRICTED
-    SET "search_path" TO ''
-    SET "row_security" TO 'on'
-    AS $$
-declare
-  v_expected_digest constant text :=
-    '3dd65dc6b0dbd5ca8108d0a996610030bad1b5478d61ee9674a57580433e6bbf';
-  v_expected_index constant text :=
-    'CREATE INDEX portal_catalog_search_process_exact_rank_v1_gin ON private.portal_catalog_search_rows_v1 USING gin (private.portal_process_rank_name_keys_v1(card), private.portal_process_rank_classification_keys_v1(card)) WHERE (dataset_kind = ''process''::text)';
-begin
-  perform private.assert_portal_catalog_projection_contract_v1();
-  if private.portal_process_keyword_rank_manifest_sha256_v1()
-       is distinct from v_expected_digest
-     or pg_catalog.to_regclass(
-       'private.portal_catalog_search_process_exact_rank_v1_gin'
-     ) is null
-     or (
-       select not index_catalog.indisvalid
-         or not index_catalog.indisready
-         or not index_catalog.indislive
-         or index_catalog.indisunique
-         or access_method.amname <> 'gin'
-         or pg_catalog.pg_get_indexdef(index_relation.oid)
-           <> v_expected_index
-       from pg_catalog.pg_class as index_relation
-       join pg_catalog.pg_index as index_catalog
-         on index_catalog.indexrelid = index_relation.oid
-       join pg_catalog.pg_am as access_method
-         on access_method.oid = index_relation.relam
-       where index_relation.oid =
-         'private.portal_catalog_search_process_exact_rank_v1_gin'::regclass
-     ) is not false then
-    raise exception using
-      errcode = '55000',
-      message = 'Portal Process keyword rank contract drifted';
-  end if;
-end
-$$;
-
-
-ALTER FUNCTION "private"."assert_portal_process_keyword_rank_contract_v1"() OWNER TO "portal_public_executor";
-
-
-COMMENT ON FUNCTION "private"."assert_portal_process_keyword_rank_contract_v1"() IS 'Fails closed before the Process keyword fast path when helper or exact-rank GIN contract drifts.';
-
-
-
 CREATE OR REPLACE FUNCTION "private"."assert_portal_sitemap_projection_v1"() RETURNS "void"
     LANGUAGE "plpgsql" STABLE PARALLEL RESTRICTED
     SET "search_path" TO ''
@@ -35166,130 +35518,6 @@ $$;
 ALTER FUNCTION "private"."catalog_portal_process_keyword_keys_cn1"("p_query" "text", "p_cursor_rank" "text", "p_cursor_id" "uuid", "p_cursor_version" "text", "p_limit" integer) OWNER TO "portal_public_executor";
 
 
-CREATE OR REPLACE FUNCTION "private"."catalog_portal_process_keyword_keys_v1"("p_query" "text", "p_cursor_rank" "text", "p_cursor_id" "uuid", "p_cursor_version" "text", "p_limit" integer) RETURNS TABLE("id" "uuid", "version" "text", "score" numeric)
-    LANGUAGE "plpgsql" STABLE SECURITY DEFINER PARALLEL RESTRICTED
-    SET "search_path" TO ''
-    SET "statement_timeout" TO '8s'
-    SET "plan_cache_mode" TO 'force_custom_plan'
-    SET "row_security" TO 'on'
-    AS $$
-declare
-  v_like_pattern text;
-begin
-  v_like_pattern := '%' || pg_catalog.replace(
-    pg_catalog.replace(
-      pg_catalog.replace(
-        p_query,
-        pg_catalog.chr(92),
-        pg_catalog.chr(92) || pg_catalog.chr(92)
-      ),
-      '%',
-      pg_catalog.chr(92) || '%'
-    ),
-    '_',
-    pg_catalog.chr(92) || '_'
-  ) || '%';
-
-  return query
-  with matched_versions as materialized (
-    select matched.id, matched.version
-    from private.catalog_portal_process_pattern_versions_v1(
-      v_like_pattern
-    ) as matched
-  ), candidate_ids as materialized (
-    select distinct matched.id
-    from matched_versions as matched
-  ), latest_keys as materialized (
-    select distinct on (projection.id)
-      projection.id,
-      projection.version
-    from private.portal_catalog_search_rows_v1 as projection
-    join candidate_ids using (id)
-    where projection.dataset_kind = 'process'
-    order by projection.id,
-      projection.version desc,
-      projection.modified_at desc,
-      projection.state_code desc
-  ), eligible_keys as materialized (
-    select latest.id, latest.version
-    from latest_keys as latest
-    join matched_versions as matched
-      on matched.id = latest.id
-     and matched.version = latest.version
-  ), exact_source as materialized (
-    select projection.id,
-      projection.version,
-      case
-        when private.portal_process_rank_name_keys_v1(projection.card)
-          @> array[p_query] then 0.95::numeric
-        else 0.92::numeric
-      end as score
-    from private.portal_catalog_search_rows_v1 as projection
-    where projection.dataset_kind = 'process'
-      and (
-        private.portal_process_rank_name_keys_v1(projection.card)
-          @> array[p_query]
-        or private.portal_process_rank_classification_keys_v1(
-          projection.card
-        ) @> array[p_query]
-      )
-  ), exact_keys as materialized (
-    select exact_source.*
-    from exact_source
-    join eligible_keys using (id, version)
-    where p_cursor_rank is null
-      or exact_source.score < p_cursor_rank::numeric
-      or (
-        exact_source.score = p_cursor_rank::numeric
-        and (
-          exact_source.id > p_cursor_id
-          or (
-            exact_source.id = p_cursor_id
-            and exact_source.version < p_cursor_version
-          )
-        )
-      )
-  ), general_keys as materialized (
-    select eligible.id, eligible.version, 0.70::numeric as score
-    from eligible_keys as eligible
-    left join exact_source using (id, version)
-    where exact_source.id is null
-      and (
-        p_cursor_rank is null
-        or 0.70::numeric < p_cursor_rank::numeric
-        or (
-          0.70::numeric = p_cursor_rank::numeric
-          and (
-            eligible.id > p_cursor_id
-            or (
-              eligible.id = p_cursor_id
-              and eligible.version < p_cursor_version
-            )
-          )
-        )
-      )
-    order by eligible.id, eligible.version desc
-    limit p_limit + 1
-  ), combined as (
-    select exact_keys.* from exact_keys
-    union all
-    select general_keys.* from general_keys
-  )
-  select combined.id, combined.version, combined.score
-  from combined
-  order by combined.score desc, combined.id, combined.version desc
-  limit p_limit + 1;
-end
-$$;
-
-
-ALTER FUNCTION "private"."catalog_portal_process_keyword_keys_v1"("p_query" "text", "p_cursor_rank" "text", "p_cursor_id" "uuid", "p_cursor_version" "text", "p_limit" integer) OWNER TO "portal_public_executor";
-
-
-COMMENT ON FUNCTION "private"."catalog_portal_process_keyword_keys_v1"("p_query" "text", "p_cursor_rank" "text", "p_cursor_id" "uuid", "p_cursor_version" "text", "p_limit" integer) IS 'Selects exact-name/classification plus general Process keyword keys before reading wide cards, preserving the stable relevance cursor.';
-
-
-
 CREATE OR REPLACE FUNCTION "private"."catalog_portal_process_keyword_relevance_cn1_impl"("p_query" "text", "p_cursor_rank" "text", "p_cursor_id" "uuid", "p_cursor_version" "text", "p_limit" integer, "p_query_fingerprint" "text") RETURNS "jsonb"
     LANGUAGE "sql" STABLE SECURITY DEFINER PARALLEL RESTRICTED
     SET "search_path" TO ''
@@ -35395,117 +35623,6 @@ $$;
 
 
 ALTER FUNCTION "private"."catalog_portal_process_keyword_relevance_cn1_impl"("p_query" "text", "p_cursor_rank" "text", "p_cursor_id" "uuid", "p_cursor_version" "text", "p_limit" integer, "p_query_fingerprint" "text") OWNER TO "portal_public_executor";
-
-
-CREATE OR REPLACE FUNCTION "private"."catalog_portal_process_keyword_relevance_v1_impl"("p_query" "text", "p_cursor_rank" "text", "p_cursor_id" "uuid", "p_cursor_version" "text", "p_limit" integer, "p_query_fingerprint" "text") RETURNS "jsonb"
-    LANGUAGE "sql" STABLE SECURITY DEFINER PARALLEL RESTRICTED
-    SET "search_path" TO ''
-    SET "statement_timeout" TO '8s'
-    SET "plan_cache_mode" TO 'force_custom_plan'
-    SET "row_security" TO 'on'
-    AS $$
-  with selected_keys as materialized (
-    select selected.id, selected.version, selected.score,
-      pg_catalog.row_number() over (
-        order by selected.score desc, selected.id, selected.version desc
-      ) as page_rank
-    from private.catalog_portal_process_keyword_keys_v1(
-      p_query,
-      p_cursor_rank,
-      p_cursor_id,
-      p_cursor_version,
-      p_limit
-    ) as selected
-  ), hydrated as materialized (
-    select selected.page_rank,
-      projection.id,
-      projection.version,
-      projection.modified_at,
-      projection.card,
-      selected.score,
-      private.catalog_portal_card_facts_v1(
-        projection.card,
-        '{}'::jsonb,
-        p_query
-      ) as facts
-    from selected_keys as selected
-    join private.portal_catalog_search_rows_v1 as projection
-      on projection.dataset_kind = 'process'
-     and projection.id = selected.id
-     and projection.version = selected.version
-  ), result as (
-    select coalesce(
-      pg_catalog.jsonb_agg(
-        pg_catalog.jsonb_build_object(
-          'key', pg_catalog.jsonb_build_object(
-            'kind', 'process',
-            'id', hydrated.id::text,
-            'version', hydrated.version
-          ),
-          'accessLevel', hydrated.card -> 'accessLevel',
-          'capabilities', hydrated.card -> 'capabilities',
-          'names', hydrated.card -> 'names',
-          'summary', hydrated.card -> 'summary',
-          'geography', hydrated.card -> 'geography',
-          'referenceYear', hydrated.card -> 'referenceYear',
-          'modifiedAt', pg_catalog.to_char(
-            hydrated.modified_at at time zone 'UTC',
-            'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
-          ),
-          'match', pg_catalog.jsonb_build_object(
-            'kind', case
-              when (hydrated.facts ->> 'nameExact')::boolean
-                or (hydrated.facts ->> 'nameContains')::boolean
-                then 'lexical'
-              when (hydrated.facts ->> 'classificationExact')::boolean
-                or (hydrated.facts ->> 'classificationContains')::boolean
-                then 'identifier'
-              else 'lexical'
-            end,
-            'score', hydrated.score,
-            'reasonCodes', case
-              when (hydrated.facts ->> 'nameExact')::boolean
-                or (hydrated.facts ->> 'nameContains')::boolean
-                then pg_catalog.jsonb_build_array('name')
-              when (hydrated.facts ->> 'classificationExact')::boolean
-                or (hydrated.facts ->> 'classificationContains')::boolean
-                then pg_catalog.jsonb_build_array('classification')
-              else pg_catalog.jsonb_build_array('full_text')
-            end
-          )
-        ) order by hydrated.page_rank
-      ) filter (where hydrated.page_rank <= p_limit),
-      '[]'::jsonb
-    ) as items,
-    case when pg_catalog.max(hydrated.page_rank) > p_limit then
-      (
-        pg_catalog.jsonb_agg(
-          pg_catalog.jsonb_build_object(
-            'v', 1,
-            'fp', p_query_fingerprint,
-            'rankKey', hydrated.score::text,
-            'kind', 'process',
-            'id', hydrated.id::text,
-            'version', hydrated.version
-          ) order by hydrated.page_rank
-        ) filter (where hydrated.page_rank = p_limit)
-      ) -> 0
-    else null end as next_cursor_payload
-    from hydrated
-  )
-  select pg_catalog.jsonb_build_object(
-    'items', result.items,
-    'nextCursorPayload', result.next_cursor_payload
-  )
-  from result
-$$;
-
-
-ALTER FUNCTION "private"."catalog_portal_process_keyword_relevance_v1_impl"("p_query" "text", "p_cursor_rank" "text", "p_cursor_id" "uuid", "p_cursor_version" "text", "p_limit" integer, "p_query_fingerprint" "text") OWNER TO "portal_public_executor";
-
-
-COMMENT ON FUNCTION "private"."catalog_portal_process_keyword_relevance_v1_impl"("p_query" "text", "p_cursor_rank" "text", "p_cursor_id" "uuid", "p_cursor_version" "text", "p_limit" integer, "p_query_fingerprint" "text") IS 'Hydrates only the bounded Process keyword relevance page after exact-rank and general-key selection.';
-
 
 
 CREATE OR REPLACE FUNCTION "private"."catalog_portal_process_pattern_versions_v1"("p_like_pattern" "text") RETURNS TABLE("id" "uuid", "version" "text")
@@ -59536,63 +59653,6 @@ $$;
 ALTER FUNCTION "private"."portal_process_keyword_rank_manifest_sha256_cn1"() OWNER TO "portal_public_executor";
 
 
-CREATE OR REPLACE FUNCTION "private"."portal_process_keyword_rank_manifest_sha256_v1"() RETURNS "text"
-    LANGUAGE "sql" STABLE SECURITY DEFINER PARALLEL RESTRICTED
-    SET "search_path" TO ''
-    SET "row_security" TO 'on'
-    AS $$
-  with expected(identity) as (
-    values
-      ('private.portal_process_rank_name_keys_v1(jsonb)'::text),
-      ('private.portal_process_rank_classification_keys_v1(jsonb)'),
-      ('private.catalog_portal_process_keyword_keys_v1(text,text,uuid,text,integer)'),
-      ('private.catalog_portal_process_keyword_relevance_v1_impl(text,text,uuid,text,integer,text)')
-  ), manifest_entries as (
-    select expected.identity,
-      pg_catalog.jsonb_build_object(
-        'identity', expected.identity,
-        'definition', pg_catalog.pg_get_functiondef(routine.oid),
-        'owner', pg_catalog.pg_get_userbyid(routine.proowner),
-        'language', language.lanname,
-        'volatility', routine.provolatile,
-        'parallel', routine.proparallel,
-        'securityDefiner', routine.prosecdef,
-        'config', coalesce(
-          pg_catalog.to_jsonb(routine.proconfig),
-          'null'::jsonb
-        )
-      )::text as entry
-    from expected
-    join pg_catalog.pg_proc as routine
-      on routine.oid = pg_catalog.to_regprocedure(expected.identity)
-    join pg_catalog.pg_language as language
-      on language.oid = routine.prolang
-  )
-  select pg_catalog.encode(
-    extensions.digest(
-      pg_catalog.convert_to(
-        pg_catalog.string_agg(
-          manifest_entries.entry,
-          E'\n'
-          order by manifest_entries.identity
-        ),
-        'UTF8'
-      ),
-      'sha256'
-    ),
-    'hex'
-  )
-  from manifest_entries
-$$;
-
-
-ALTER FUNCTION "private"."portal_process_keyword_rank_manifest_sha256_v1"() OWNER TO "portal_public_executor";
-
-
-COMMENT ON FUNCTION "private"."portal_process_keyword_rank_manifest_sha256_v1"() IS 'Live SHA-256 for the exact Process keyword rank helper closure.';
-
-
-
 CREATE OR REPLACE FUNCTION "private"."portal_process_names_v1"("p_json" "jsonb") RETURNS "jsonb"
     LANGUAGE "sql" IMMUTABLE PARALLEL SAFE
     SET "search_path" TO ''
@@ -64418,6 +64478,7 @@ declare
   v_sql text;
   escaped_query_terms text[];
   text_match_clause text;
+  use_type_keys boolean := false;
 begin
   normalized_page_size := greatest(coalesce(page_size, 10), 1);
   normalized_page_current := greatest(coalesce(page_current, 1), 1);
@@ -64554,23 +64615,45 @@ begin
     else 'and f.json @> $2'
   end;
 
+  -- Statistics choose only the execution strategy, never the result universe.
+  -- Retain the original filter path when type statistics are absent or broad.
+  if flow_type is not null then
+    select coalesce((
+      select sum(coalesce(
+        (select stats.most_common_freqs[item.ordinality::integer]
+         from unnest(stats.most_common_vals::text::text[]) with ordinality item(value,ordinality)
+         where item.value = requested.value limit 1),
+        greatest(1.0 - stats.null_frac - coalesce(
+          (select sum(frequency) from unnest(stats.most_common_freqs) frequency),0.0),0.0)
+        / greatest(stats.n_distinct - coalesce(array_length(stats.most_common_freqs,1),0),1.0)
+      ))
+      from (select distinct unnest(flow_type_array) as value) requested
+    ),1.0) <= 0.20
+    into use_type_keys
+    from pg_catalog.pg_stats stats
+    where stats.schemaname='public' and stats.tablename='flows_json_typeofdataset'
+      and stats.attname='expr' and stats.n_distinct>0
+      and stats.most_common_vals is not null
+    limit 1;
+    use_type_keys := coalesce(use_type_keys,false);
+  end if;
+
   v_sql := format($sql$
-    with text_matches as materialized (
-      select f.id,
-             case when $2 = '{}'::jsonb and $10 is null
-               and not coalesce($12, false) and jsonb_array_length($13) = 0
-               then null::jsonb else f.json end as json,
-             f.state_code,
-             f.team_id,
-             f.user_id,
-             pgroonga_score(f.tableoid, f.ctid) as search_score
+    with type_keys as materialized (
+      select f.id, f.version
       from public.flows f
-      %s
+      where $15 and $10 is not null
+        and (
+          ((($5 = 'tg' AND f.state_code = 100) OR ($5 = 'ex' AND f.state_code = -1 AND (SELECT auth.uid()) IS NOT NULL)) and ($7 is null or f.team_id = $7))
+          or ($5 = 'co' and f.state_code = 200 and ($7 is null or f.team_id = $7))
+          or ($5 = 'my' and $6 is not null and f.user_id = $6 and ($8 is null or f.state_code = $8))
+          or ($5 = 'te' and $7 is not null and $9 and f.team_id = $7 and ($8 is null or f.state_code = $8))
+        )
+        and (f.json->'flowDataSet'->'modellingAndValidation'->'LCIMethod'->>'typeOfDataSet') = any($11)
     ),
-    matched_ids as (
-      select f.id, max(f.search_score) as search_score
-      from text_matches f
-      where (
+    text_matches as materialized (
+      select f.id,
+             case when (
           ((($5 = 'tg' AND f.state_code = 100) OR ($5 = 'ex' AND f.state_code = -1 AND (SELECT auth.uid()) IS NOT NULL)) and ($7 is null or f.team_id = $7))
           or ($5 = 'co' and f.state_code = 200 and ($7 is null or f.team_id = $7))
           or ($5 = 'my' and $6 is not null and f.user_id = $6 and ($8 is null or f.state_code = $8))
@@ -64579,7 +64662,8 @@ begin
         %s
         and (
           $10 is null
-          or (f.json #>> '{flowDataSet,modellingAndValidation,LCIMethod,typeOfDataSet}') = any($11)
+          or case when $15 then (f.id, f.version) in (select type_keys.id, type_keys.version from type_keys)
+                  else (f.json #>> '{flowDataSet,modellingAndValidation,LCIMethod,typeOfDataSet}') = any($11) end
         )
         and (
           $12 is null
@@ -64623,7 +64707,15 @@ begin
                 )
               )
           )
-        )
+        ) then true else false end as accepted,
+             pgroonga_score(f.tableoid, f.ctid) as search_score
+      from public.flows f
+      %s
+    ),
+    matched_ids as (
+      select f.id, max(f.search_score) as search_score
+      from text_matches f
+      where f.accepted
       group by f.id
     ),
     latest_rows as (
@@ -64665,13 +64757,13 @@ begin
     join public.flows payload on payload.id = paged_rows.id
       and payload.version = paged_rows.version
     order by paged_rows.rank, paged_rows.id
-  $sql$, text_match_clause, json_filter_clause);
+  $sql$, json_filter_clause, text_match_clause);
 
   return query execute v_sql
     using query_text, filter_condition_jsonb, normalized_page_size, normalized_page_current,
           normalized_data_source, effective_user_id, team_id_filter, state_code_filter,
           can_read_team_filter, flow_type, flow_type_array, as_input, classification_filter,
-          escaped_query_terms;
+          escaped_query_terms, use_type_keys;
 end;
 $_$;
 
@@ -87505,10 +87597,6 @@ CREATE INDEX "lcia_scope_closure_issue_occurrences_issue_idx" ON "private"."lcia
 
 
 
-CREATE INDEX "lcia_scope_closure_issue_roots_issue_idx" ON "private"."lcia_scope_closure_issue_roots" USING "btree" ("closure_issue_id", "root_dataset_type", "root_dataset_id", "root_dataset_version");
-
-
-
 CREATE INDEX "lcia_scope_closure_issues_check_id_idx" ON "private"."lcia_scope_closure_issues" USING "btree" ("closure_check_id", "severity", "issue_code", "id");
 
 
@@ -87617,15 +87705,7 @@ CREATE INDEX "portal_catalog_search_flow_document_v1_pgroonga" ON "private"."por
 
 
 
-CREATE INDEX "portal_catalog_search_process_document_v1_pgroonga" ON "private"."portal_catalog_search_rows_v1" USING "pgroonga" ("document") WITH ("tokenizer"='TokenBigram', "normalizer"='NormalizerAuto') WHERE ("dataset_kind" = 'process'::"text");
-
-
-
 CREATE INDEX "portal_catalog_search_process_document_v2_pgroonga" ON "private"."portal_catalog_search_rows_v2" USING "pgroonga" ("document") WITH ("tokenizer"='TokenBigram', "normalizer"='NormalizerAuto') WHERE ("dataset_kind" = 'process'::"text");
-
-
-
-CREATE INDEX "portal_catalog_search_process_exact_rank_v1_gin" ON "private"."portal_catalog_search_rows_v1" USING "gin" ("private"."portal_process_rank_name_keys_v1"("card"), "private"."portal_process_rank_classification_keys_v1"("card")) WHERE ("dataset_kind" = 'process'::"text");
 
 
 
@@ -88018,14 +88098,6 @@ CREATE INDEX "ilcd_user_id_created_at_idx" ON "public"."ilcd" USING "btree" ("us
 
 
 CREATE INDEX "lciamethods_created_at_idx" ON "public"."lciamethods" USING "btree" ("created_at" DESC);
-
-
-
-CREATE INDEX "lciamethods_json_idx" ON "public"."lciamethods" USING "gin" ("json");
-
-
-
-CREATE INDEX "lciamethods_json_pgroonga" ON "public"."lciamethods" USING "pgroonga" ("json" "extensions"."pgroonga_jsonb_full_text_search_ops_v2");
 
 
 
@@ -92358,10 +92430,6 @@ REVOKE ALL ON FUNCTION "private"."assert_portal_process_keyword_rank_contract_cn
 
 
 
-REVOKE ALL ON FUNCTION "private"."assert_portal_process_keyword_rank_contract_v1"() FROM PUBLIC;
-
-
-
 REVOKE ALL ON FUNCTION "private"."assert_portal_sitemap_projection_v1"() FROM PUBLIC;
 
 
@@ -92436,15 +92504,7 @@ REVOKE ALL ON FUNCTION "private"."catalog_portal_process_keyword_keys_cn1"("p_qu
 
 
 
-REVOKE ALL ON FUNCTION "private"."catalog_portal_process_keyword_keys_v1"("p_query" "text", "p_cursor_rank" "text", "p_cursor_id" "uuid", "p_cursor_version" "text", "p_limit" integer) FROM PUBLIC;
-
-
-
 REVOKE ALL ON FUNCTION "private"."catalog_portal_process_keyword_relevance_cn1_impl"("p_query" "text", "p_cursor_rank" "text", "p_cursor_id" "uuid", "p_cursor_version" "text", "p_limit" integer, "p_query_fingerprint" "text") FROM PUBLIC;
-
-
-
-REVOKE ALL ON FUNCTION "private"."catalog_portal_process_keyword_relevance_v1_impl"("p_query" "text", "p_cursor_rank" "text", "p_cursor_id" "uuid", "p_cursor_version" "text", "p_limit" integer, "p_query_fingerprint" "text") FROM PUBLIC;
 
 
 
@@ -93554,10 +93614,6 @@ REVOKE ALL ON FUNCTION "private"."portal_process_functional_unit_v1"("p_state_co
 
 
 REVOKE ALL ON FUNCTION "private"."portal_process_keyword_rank_manifest_sha256_cn1"() FROM PUBLIC;
-
-
-
-REVOKE ALL ON FUNCTION "private"."portal_process_keyword_rank_manifest_sha256_v1"() FROM PUBLIC;
 
 
 

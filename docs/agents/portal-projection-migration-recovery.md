@@ -912,6 +912,33 @@ wrapper to call only `private.portal_projection_hybrid_search_v1_impl(...)`.
 
 ## Derived-semantics changes
 
+### Qualified retirement of the obsolete Process rank reader
+
+Database #793 retires only the Process V1 document/rank indexes and its four
+closed keyword key/relevance/manifest/assertion routines after proving current
+Process readers use cn1/V2. The shared V1 name/classification expressions remain
+required by the live V2 GIN. The base V1 projection, facet/context manifests,
+Flow V1, current cn1 guards and both Process writers are unchanged.
+
+`20261007143357_retire_qualified_search_indexes.sql` pins exact definitions,
+owners, closed ACLs, current routing and unexpected function/procedure callers;
+it acquires bounded table locks and uses only `DROP ... RESTRICT`. Temporary
+owner-role admission must restore every original grantor/options row and schema
+ACL. Unknown/mixed object state refuses retirement; fully verified poststate
+replay is a no-op. This is a reviewed retirement, not a same-name replacement or
+a card/document semantic change.
+
+The static manifest scanner admits exactly one literal `DROP FUNCTION` with
+the exact signature and `RESTRICT` for each of those four identities in that
+single migration. It still rejects CREATE/ALTER, overloads, duplicate mutations,
+CASCADE, later filenames and every shared/current helper mutation. Run
+`python3 scripts/test_portal_rank_retirement_governance.py` as well as the
+manifest check. Historical migration definitions/digests and the old prefix
+recovery harness remain unchanged; terminal-head tests instead verify current
+cn1/V2 behavior and explicit absence of the retired objects.
+
+### Retained projection semantics
+
 The registry row, its digest, the eleven-function v1 closure, and every v1 row
 label are immutable. A card/document semantic change must create a new helper
 closure and shadow projection, then use bounded backfill, a short source-write
