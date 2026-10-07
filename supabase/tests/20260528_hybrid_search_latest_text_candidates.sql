@@ -55,29 +55,31 @@ select pg_temp.disable_trigger_if_exists('public.processes'::regclass, 'process_
 select pg_temp.disable_trigger_if_exists('public.lifecyclemodels'::regclass, 'lifecyclemodels_json_sync_trigger');
 select pg_temp.disable_trigger_if_exists('public.lifecyclemodels'::regclass, 'lifecyclemodel_extract_md_trigger_insert');
 
+-- Lexical retrieval uses the canonical search_text derivative after Database B.
+-- Seed that derivative directly; these fixtures do not run asynchronous workers.
 insert into public.flows (
-  id, version, json, json_ordered, user_id, state_code, team_id, extracted_md, rule_verification, created_at, modified_at
+  id, version, json, json_ordered, user_id, state_code, team_id, search_text, rule_verification, created_at, modified_at
 )
 values
-  ('f1000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-public-flow-token"}'::jsonb, '{"search":"hybrid-public-flow-token"}'::json, 'b2000000-0000-0000-0000-000000000101', 100, null, 'hybrid-public-flow-token 电子器件', true, now(), now()),
-  ('f2000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-owner-flow-token"}'::jsonb, '{"search":"hybrid-owner-flow-token"}'::json, 'a1000000-0000-0000-0000-000000000101', 0, null, 'hybrid-owner-flow-token 电子器件', true, now(), now()),
-  ('f3000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-outsider-flow-token"}'::jsonb, '{"search":"hybrid-outsider-flow-token"}'::json, 'b2000000-0000-0000-0000-000000000101', 0, null, 'hybrid-outsider-flow-token 电子器件', true, now(), now());
+  ('f1000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-public-flow-token"}'::jsonb, '{"search":"hybrid-public-flow-token"}'::json, 'b2000000-0000-0000-0000-000000000101', 100, null, array['hybrid-public-flow-token 电子器件']::text[], true, now(), now()),
+  ('f2000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-owner-flow-token"}'::jsonb, '{"search":"hybrid-owner-flow-token"}'::json, 'a1000000-0000-0000-0000-000000000101', 0, null, array['hybrid-owner-flow-token 电子器件']::text[], true, now(), now()),
+  ('f3000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-outsider-flow-token"}'::jsonb, '{"search":"hybrid-outsider-flow-token"}'::json, 'b2000000-0000-0000-0000-000000000101', 0, null, array['hybrid-outsider-flow-token 电子器件']::text[], true, now(), now());
 
 insert into public.processes (
-  id, version, json, json_ordered, user_id, state_code, team_id, extracted_md, rule_verification, created_at, modified_at
+  id, version, json, json_ordered, user_id, state_code, team_id, search_text, rule_verification, created_at, modified_at
 )
 values
-  ('e1000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-public-process-token"}'::jsonb, '{"search":"hybrid-public-process-token"}'::json, 'b2000000-0000-0000-0000-000000000101', 100, null, 'hybrid-public-process-token 正极材料 cathode material', true, now(), now()),
-  ('e2000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-owner-process-token"}'::jsonb, '{"search":"hybrid-owner-process-token"}'::json, 'a1000000-0000-0000-0000-000000000101', 0, null, 'hybrid-owner-process-token 正极材料 cathode material', true, now(), now()),
-  ('e3000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-outsider-process-token"}'::jsonb, '{"search":"hybrid-outsider-process-token"}'::json, 'b2000000-0000-0000-0000-000000000101', 0, null, 'hybrid-outsider-process-token 正极材料 cathode material', true, now(), now());
+  ('e1000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-public-process-token"}'::jsonb, '{"search":"hybrid-public-process-token"}'::json, 'b2000000-0000-0000-0000-000000000101', 100, null, array['hybrid-public-process-token 正极材料 cathode material']::text[], true, now(), now()),
+  ('e2000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-owner-process-token"}'::jsonb, '{"search":"hybrid-owner-process-token"}'::json, 'a1000000-0000-0000-0000-000000000101', 0, null, array['hybrid-owner-process-token 正极材料 cathode material']::text[], true, now(), now()),
+  ('e3000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-outsider-process-token"}'::jsonb, '{"search":"hybrid-outsider-process-token"}'::json, 'b2000000-0000-0000-0000-000000000101', 0, null, array['hybrid-outsider-process-token 正极材料 cathode material']::text[], true, now(), now());
 
 insert into public.lifecyclemodels (
-  id, version, json, json_ordered, user_id, state_code, team_id, extracted_md, rule_verification, created_at, modified_at
+  id, version, json, json_ordered, user_id, state_code, team_id, search_text, rule_verification, created_at, modified_at
 )
 values
-  ('d1000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-public-lifecycle-token"}'::jsonb, '{"search":"hybrid-public-lifecycle-token"}'::json, 'b2000000-0000-0000-0000-000000000101', 100, null, 'hybrid-public-lifecycle-token 交流电', true, now(), now()),
-  ('d2000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-owner-lifecycle-token"}'::jsonb, '{"search":"hybrid-owner-lifecycle-token"}'::json, 'a1000000-0000-0000-0000-000000000101', 0, null, 'hybrid-owner-lifecycle-token 交流电', true, now(), now()),
-  ('d3000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-outsider-lifecycle-token"}'::jsonb, '{"search":"hybrid-outsider-lifecycle-token"}'::json, 'b2000000-0000-0000-0000-000000000101', 0, null, 'hybrid-outsider-lifecycle-token 交流电', true, now(), now());
+  ('d1000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-public-lifecycle-token"}'::jsonb, '{"search":"hybrid-public-lifecycle-token"}'::json, 'b2000000-0000-0000-0000-000000000101', 100, null, array['hybrid-public-lifecycle-token 交流电']::text[], true, now(), now()),
+  ('d2000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-owner-lifecycle-token"}'::jsonb, '{"search":"hybrid-owner-lifecycle-token"}'::json, 'a1000000-0000-0000-0000-000000000101', 0, null, array['hybrid-owner-lifecycle-token 交流电']::text[], true, now(), now()),
+  ('d3000000-0000-0000-0000-000000000101', '01.00.000', '{"search":"hybrid-outsider-lifecycle-token"}'::jsonb, '{"search":"hybrid-outsider-lifecycle-token"}'::json, 'b2000000-0000-0000-0000-000000000101', 0, null, array['hybrid-outsider-lifecycle-token 交流电']::text[], true, now(), now());
 
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);

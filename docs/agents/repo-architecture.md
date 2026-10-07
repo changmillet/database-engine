@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-08
-lastReviewedCommit: 6e9d8d357c6baa20e8f1ee086e739af8eb5a393d
-lastReviewedNote: "Reviewed Database #794 current private SQL provider transport, independent stored-state status, lock-observed asynchronous register/seal, replay/fences and mutation-verified PostgREST isolation; atomic setup preserves deferred Auth profile mirroring and rolls back late failure. No production migrations, RPCs, schema, grants or deployment changes."
+lastReviewedCommit: 5978151b8558adf15031316aa3600a1b1f4bedba
+lastReviewedNote: "Database #797 combines Main #793/#796 raw bounds, selective Flow retrieval and guarded retirement with Dev #789 allocation-v5 and #794/#795 private SQL fixture qualification. Owned local415-to-418 upgrade,9 SQL suites1598 assertions,161 private-SQL transport checks,14 static helper tests and exact1827-file generated schema equality pass. Both source contracts remain; exact-head CI and persistent-Dev readback are still required."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -1053,3 +1053,54 @@ exact id/version through the primary key under the same RLS. It preserves
 legacy object/array classification and Emissions containment, source scopes,
 count and sort semantics, the existing type-expression indexes, and the
 60-second function setting. No projection, index, writer or grant is added.
+
+## Raw Search/Hybrid bounds and qualified index retirement
+
+Raw Search remains distinct from Portal cursor readers, matched-version Hybrid
+and Open Data search. The 14 raw Hybrid facades (canonical JSONB and retained
+text-filter v2 aliases) reject original `page_size` or `match_count` above 100
+with SQLSTATE `22023` before retrieval. The 15 raw lexical facades allow up to
+1000 rows because the existing Hybrid call graph delegates ten times its normal
+candidate count through those same facades. These are rejection boundaries,
+never silent clipping. Existing defaults, NULL/nonpositive normalization,
+weights, filters and candidate multiplication stay in their owning kernels.
+Normalized offsets above 2147483647 are rejected by division before integer
+multiplication; this is not the matched API's separate 400-page limit.
+
+The consumer review for Database #793 includes Platform Analysis's 99-row merged
+lexical page and Foundry's 80-row latest Flow identity preflight. Platform's
+ordinary matched-version Hybrid uses its existing independent 200-candidate
+contract, and Portal V2/V3 uses its own bounded public contract. CLI's generic
+adapter can still send unsupported values; the database returns an explicit
+parameter error rather than returning silently truncated search evidence.
+
+Raw Flow Hybrid keeps its original fusion and semantic kernels. Its shared
+latest-Flow lexical reader materializes compact match/filter facts instead of
+full JSON. When the existing expression-index statistics estimate that the
+requested types occupy at most 20% of rows, a separate exact `id/version` type
+key set can use the existing type index; broad, absent-MCV or nonpositive-distinct
+statistics retain direct JSON filtering. These global statistics are only a
+performance heuristic and can be stale or differ from a caller's source scope.
+Both paths preserve the complete PGroonga match/score boundary, matching history,
+latest-visible payload/date ranking, counts and pagination. No match/candidate
+set is truncated. Semantic duplicate identities, RRF contributions, zero-weight
+branches and the existing source/filter contracts remain unchanged.
+
+Qualified index retirement removes the four-column closure issue-roots secondary
+B-tree while retaining the five-column primary key, whose first four keys are
+identical. Worker issue lookup, reused-scan copies, GC and parent cascades retain
+that primary access path. LCIA exact identity/version readers remain unchanged;
+JSON containment and existence still execute with their existing SQL/RLS
+semantics after the whole-JSON GIN is removed. A measured future containment
+workload or substantial method-population growth requires renewed index design,
+not an assumption that a small row count implies small documents.
+
+Current Process search uses V2 physical projections. Its V1-only document
+PGroonga and rank GIN, and four closed owner-only legacy rank/guard/manifest
+routines, are retired together. Shared V1 name/classification key functions are
+retained for the live V2 rank GIN. Flow V1, both frozen/current Process writers,
+current cn1 guards and their manifests remain. LCIA's unused JSON PGroonga is
+also retired; no registered LCIA full-text API is removed. The migration rejects
+unknown definitions, external grants, unexpected callers/dependencies and mixed
+partial state before dropping any object. Historical migrations and their
+prefix-bound recovery/benchmark contracts remain immutable history.

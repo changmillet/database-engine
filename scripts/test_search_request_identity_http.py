@@ -48,12 +48,15 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def request(base: str, path: str, key: str, *, token: str | None = None,
-            body: dict | None = None, method: str = "POST", api: bool = False) -> tuple[int, object]:
+            body: dict | None = None, method: str = "POST", api: bool = False,
+            profile: str | None = None) -> tuple[int, object]:
     headers = {"apikey": key, "Authorization": "Bearer " + (token or key),
                "Content-Type": "application/json"}
-    if api:
-        headers["Content-Profile"] = "api"
-        headers["Accept-Profile"] = "api"
+    selected_profile = profile if profile is not None else "api" if api else None
+    require(selected_profile in {None, "api", "public"}, "unsupported local API profile")
+    if selected_profile is not None:
+        headers["Content-Profile"] = selected_profile
+        headers["Accept-Profile"] = selected_profile
     req = urllib.request.Request(base + path, headers=headers, method=method,
                                  data=json.dumps(body).encode() if body is not None else None)
     try:

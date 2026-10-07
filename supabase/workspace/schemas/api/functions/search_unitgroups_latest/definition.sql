@@ -4,6 +4,16 @@ CREATE OR REPLACE FUNCTION "api"."search_unitgroups_latest"("query_text" "text",
     SET "statement_timeout" TO '60s'
     AS $$
 begin
+
+  -- raw793 bounds: validate original inputs before the existing delegate.
+  if page_size > 1000 then
+    raise exception using errcode='22023',message='Raw search page_size exceeds 1000';
+  end if;
+  if greatest(coalesce(page_current::bigint,1),1)-1
+       > 2147483647::bigint / greatest(coalesce(page_size::bigint,10),1) then
+    raise exception using errcode='22023',message='Raw search normalized offset exceeds 2147483647';
+  end if;
+  -- raw793 bounds end.
   return query
     select *
     from api._search_simple_dataset_latest(

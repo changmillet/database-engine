@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-08
-lastReviewedCommit: 6e9d8d357c6baa20e8f1ee086e739af8eb5a393d
-lastReviewedNote: "Reviewed Database #794 current private SQL provider transport, independent stored-state status, lock-observed asynchronous register/seal, replay/fences and mutation-verified PostgREST isolation; atomic setup preserves deferred Auth profile mirroring and rolls back late failure. No production migrations, RPCs, schema, grants or deployment changes."
+lastReviewedCommit: 5978151b8558adf15031316aa3600a1b1f4bedba
+lastReviewedNote: "Database #797 combines Main #793/#796 raw bounds, selective Flow retrieval and guarded retirement with Dev #789 allocation-v5 and #794/#795 private SQL fixture qualification. Owned local415-to-418 upgrade,9 SQL suites1598 assertions,161 private-SQL transport checks,14 static helper tests and exact1827-file generated schema equality pass. Both source contracts remain; exact-head CI and persistent-Dev readback are still required."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -546,8 +546,10 @@ reads the narrow projection tables rather than the
 byte-identical JSON: record `md5()` of the response before and after, and record
 representative timings. Do not run `EXPLAIN ANALYZE` against production.
 
-Existing V1 definitions and immutable projection/context/facet manifests must
-remain unchanged. Compile all Portal JSON Schemas in strict
+Existing V1 derivation definitions and immutable projection/context/facet
+manifests must remain unchanged. The separately qualified #793 retirement of
+four obsolete closed Process rank routines follows the exact DROP-only scanner
+exception and does not alter any retained derivation or current cn1 contract. Compile all Portal JSON Schemas in strict
 Draft 2020-12 mode and regenerate contracts and the five-schema workspace twice
 without drift.
 
@@ -878,3 +880,60 @@ A `pg_stats.avg_width` of 18 for an externally stored value is a TOAST pointer,
 not its payload size. Preserve invoker security and the 60-second setting;
 do not add an index or relax RLS to improve the measured plan. Local timing
 does not replace exact-head CI and disposable Preview proof.
+
+## Raw search follow-up qualification (Database #793)
+
+After a clean local reset, run `20261007_raw_search_request_bounds.sql`,
+`20261007_raw_flow_hybrid_payloads.sql` and `20261007_search_index_retirement.sql`
+with the existing Search identity, lexical, semantic/Hybrid, API/OAuth, Portal
+candidate-first/current cn1 and scope-closure GC/reuse suites. The raw Flow test
+uses an independently frozen Main predecessor under the same API executor,
+compares complete ordered payloads/counts across source/filter/page/weight
+cases, and includes invisible latest history, duplicate semantic identities,
+distance ties, NULL dates, actor changes and revoked team membership.
+
+`scripts/test_raw_search_request_bounds_http.py` runs only against the explicitly
+owned `database-engine-793` loopback stack. It creates one real Auth actor,
+checks anonymous/authenticated rejection and retained normal edges across all
+29 facades, and independently verifies Auth/profile/session cleanup. Oversized
+Hybrid inputs must fail with HTTP 400/SQLSTATE 22023 before invalid vector
+parsing. Existing API roles, capability manifests and the retired public RPC
+boundary must remain unchanged. Rehearse temporary DDL role admission with the
+actual non-superuser migration role and absent/SET-false/SET-true own grant;
+compare all membership rows including grantors and schema ACLs before and after.
+
+The task-bound `scripts/benchmark_raw_flow_hybrid.py` compares full serialized
+raw API results and lexical, semantic and frozen-candidate fusion stages on an
+isolated populated local 17.11 database. Keep real 1024-dimensional nonzero
+vectors, natural plans, realistic JSON/search-text width and version density,
+production-equivalent planner settings, repeated baseline stability and
+alternating before/after trials. For #793, reset the owned stack to baseline `20261006094513` and supply
+`--lexical-candidate-file` with the reviewed lexical definition; leaving the
+Hybrid candidate unset preserves its original kernel. Candidate and fixture SQL
+are private inputs;
+verify exact baseline function, index definitions/validity, trigger states and
+zero fixture residue after cleanup. Derive parameter 15 from the actual candidate PL/pgSQL prelude, compare
+complete ordered lexical payloads and full-corpus score/rank identities, and
+verify narrow-plus-type, combined-type and missing-statistics fallback. The
+20% strategy cutoff is a heuristic, not an independently established universal
+optimum. Separate cold/first samples from warmed measurements. Stage timings are not additive and synthetic gains are not hosted
+p95 claims. Production EXPLAIN ANALYZE and load tests remain excluded.
+
+`scripts/benchmark_search_index_retirement.py` requires the same explicitly
+owned local stack and refuses an existing fixture namespace. It compares
+natural PK-prefix lookup/copy/GC/delete/cascade plans over unrelated roots and
+large nested LCIA JSON reads/writes with and without GIN. It rolls back all
+fixture objects. Synthetic trigger-neutral index write cost is separate from
+real domain trigger/RPC correctness; run the actual retention and reused-scan
+suites with the secondary index absent. Freeze complete root/read digests and
+record both first and repeated latency plus buffers/WAL limitations.
+
+The 299-migration `run_portal_projection_benchmark.sh` and historical projection
+recovery harness remain prefix-bound historical evidence. They do not qualify
+terminal-head V2 routing after V1 rank-family retirement. Current tests must use
+the cn1/V2 guard/index and independently assert retired V1 objects are absent;
+never weaken the live V2 guard or rewrite historical migration source hashes.
+Before release, compare all affected function metadata, index definitions and
+external capability grants; qualify refusal of unexpected prestate plus known
+poststate replay. Hosted schema/Advisor and bounded normal-request readback,
+reviewed Main hotfix, Dev backmerge and root integration remain separate gates.
