@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, auth;
 
-select plan(8);
+select plan(9);
 
 -- Keep entity-trigger dispatch inside this rolled-back database test.
 create or replace function util.invoke_edge_function(
@@ -56,18 +56,20 @@ create temporary table allocation_scope_manifest on commit drop as
 select private.lcia_scope_closure_normalize_request(request) as manifest from allocation_scope_request;
 
 select is((select manifest #>> '{linkPolicy,allocationSemanticsVersion}' from allocation_scope_manifest),
-  'tidas-reference-allocation-v4', 'omitted allocation semantics freeze v4');
-select is((select private.lcia_scope_closure_normalize_request(request || '{"linkPolicy":{"allocationSemanticsVersion":"tidas-reference-allocation-v4"}}'::jsonb) from allocation_scope_request),
-  (select manifest from allocation_scope_manifest), 'explicit v4 and omitted policy have identical canonical manifests');
+  'tidas-reference-allocation-v5', 'omitted allocation semantics freeze v5');
+select is((select private.lcia_scope_closure_normalize_request(request || '{"linkPolicy":{"allocationSemanticsVersion":"tidas-reference-allocation-v5"}}'::jsonb) from allocation_scope_request),
+  (select manifest from allocation_scope_manifest), 'explicit v5 and omitted policy have identical canonical manifests');
 select is((select private.lcia_scope_closure_sha256(private.lcia_scope_closure_normalize_request(request)) from allocation_scope_request),
-  (select private.lcia_scope_closure_sha256(manifest) from allocation_scope_manifest), 'identical v4 requests have stable replay identity');
+  (select private.lcia_scope_closure_sha256(manifest) from allocation_scope_manifest), 'identical v5 requests have stable replay identity');
 select isnt((select private.lcia_scope_closure_sha256(manifest) from allocation_scope_manifest),
   (select private.lcia_scope_closure_sha256(jsonb_set(manifest, '{linkPolicy,allocationSemanticsVersion}', '"tidas-reference-allocation-v3"'::jsonb)) from allocation_scope_manifest),
-  'historical v3 manifest cannot share the v4 hash');
+  'historical v3 manifest cannot share the v5 hash');
 select throws_ok($sql$select private.lcia_scope_closure_normalize_request(request || '{"linkPolicy":{"allocationSemanticsVersion":"tidas-reference-allocation-v3"}}'::jsonb) from allocation_scope_request$sql$,
   '22023', 'invalid_closure_link_policy', 'explicit stale v3 intent is rejected rather than relabeled');
-select throws_ok($sql$select private.lcia_scope_closure_normalize_request(request || '{"linkPolicy":{"allocationSemanticsVersion":"tidas-reference-allocation-v5"}}'::jsonb) from allocation_scope_request$sql$,
+select throws_ok($sql$select private.lcia_scope_closure_normalize_request(request || '{"linkPolicy":{"allocationSemanticsVersion":"tidas-reference-allocation-v999"}}'::jsonb) from allocation_scope_request$sql$,
   '22023', 'invalid_closure_link_policy', 'unknown future semantics are rejected');
+select throws_ok($sql$select private.lcia_scope_closure_normalize_request(request || '{"linkPolicy":{"allocationSemanticsVersion":"tidas-reference-allocation-v4"}}'::jsonb) from allocation_scope_request$sql$,
+  '22023', 'invalid_closure_link_policy', 'explicit stale v4 intent is rejected rather than relabeled');
 select is((select manifest #>> '{linkPolicy,technosphereBoundaryPolicy}' from allocation_scope_manifest),
   'cutoff', 'allocation upgrade preserves the certificate cutoff boundary');
 select ok(not has_function_privilege('authenticated', 'private.lcia_scope_closure_normalize_request(jsonb)', 'EXECUTE')
