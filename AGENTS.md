@@ -37,9 +37,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-07
-lastReviewedCommit: aed46bef1dc61c4ace40e65dea5b14627ef44d97
-lastReviewedNote: "Reviewed Database #785 at 10cc730b: thirteen fixed private invokers preserve scalar inlining and closed ACLs; six same-role SELECT merges, two qualified Navigation indexes, single guarded typo-index removal and preexisting retention/helper ACL reconciliation preserve ownership and API boundaries. Canonical 414-migration local17.11.0.002 reset, ordinary-schema canaries, upgrade10/typo5 cases, full JSON/cursors, exact577 dispositions and deterministic1836-file exports pass; reported hosted17.11.0.003, deployment and integration proof remain Issue/PR-owned."
+lastReviewedAt: 2026-10-08
+lastReviewedCommit: 6e9d8d357c6baa20e8f1ee086e739af8eb5a393d
+lastReviewedNote: "Reviewed Database #794 current private SQL provider transport, independent stored-state status, asynchronous register/seal, replay/fences and PostgREST isolation; atomic setup preserves deferred Auth profile mirroring and rolls back late failure. No production migrations, RPCs, schema, grants or deployment changes."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md

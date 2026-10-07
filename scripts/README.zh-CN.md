@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-07
-lastReviewedCommit: aed46bef1dc61c4ace40e65dea5b14627ef44d97
-lastReviewedNote: "Reviewed Database #785 at 10cc730b: thirteen fixed private invokers preserve scalar inlining and closed ACLs; six same-role SELECT merges, two qualified Navigation indexes, single guarded typo-index removal and preexisting retention/helper ACL reconciliation preserve ownership and API boundaries. Canonical 414-migration local17.11.0.002 reset, ordinary-schema canaries, upgrade10/typo5 cases, full JSON/cursors, exact577 dispositions and deterministic1836-file exports pass; reported hosted17.11.0.003, deployment and integration proof remain Issue/PR-owned."
+lastReviewedAt: 2026-10-08
+lastReviewedCommit: 6e9d8d357c6baa20e8f1ee086e739af8eb5a393d
+lastReviewedNote: "Reviewed Database #794 current private SQL provider transport, independent stored-state status, asynchronous register/seal, replay/fences and PostgREST isolation; atomic setup preserves deferred Auth profile mirroring and rolls back late failure. No production migrations, RPCs, schema, grants or deployment changes."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -671,7 +671,7 @@ Worker 提供 `--run-id`，把 `componentSha` 绑定到当前 database-engine co
 目标，并固定输出 `productionMutation=false`。
 
 数据库适配器对显式 `QUALIFICATION_DATABASE_URL` 执行 #308/#316
-pgTAP 合同。存储适配器使用显式 S3-compatible endpoint，并验证 bounded 生成
+pgTAP 合同，并执行当前 private SQL service-role fixture：真实异步 register/seal、独立存储状态核对、PostgREST 隔离，以及延迟 Auth profile mirror 下的原子 setup。存储适配器使用显式 S3-compatible endpoint，并验证 bounded 生成
 文件、有效及过期签名 HEAD/range 请求、multipart 边界、重试和精确 prefix GC。
 结果中不会写入凭据、object locator、signed URL 或 payload 内容。
 
