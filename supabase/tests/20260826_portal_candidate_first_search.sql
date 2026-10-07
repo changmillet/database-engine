@@ -884,7 +884,8 @@ select extensions.ok(
 select extensions.is(
   (
     -- Database #636 adds authenticated ex scope to four private raw helpers.
-    -- Pin those reviewed definitions; retain every owner, security and ACL expectation.
+    -- Database #793 bounds the four API facades. Private fusion/semantic bodies
+    -- remain byte-identical; retain every owner, security and ACL expectation.
     with expected(
       routine_identity,
       definition_md5,
@@ -896,25 +897,25 @@ select extensions.is(
       values
         (
           'api.hybrid_search_flows_v2(text,text,text,double precision,integer,double precision,double precision,integer,text,integer,integer,text[])',
-          'a36294ce86731379f01c88ced5c37ca4', 'api_internal_executor', true,
+          'aa63aea21de592b7e46521124643a55e', 'api_internal_executor', true,
           '{"search_path=api, private, public, util, extensions, extensions, pg_temp",statement_timeout=60s}',
           '{api_internal_executor=X/api_internal_executor,anon=X/api_internal_executor,authenticated=X/api_internal_executor}'
         ),
         (
           'api.hybrid_search_flows(text,text,jsonb,double precision,integer,double precision,double precision,integer,text,integer,integer,text[])',
-          'd6a6eaa2291c53ce4c2301a98146f50b', 'api_internal_executor', true,
+          '359dcac53de5b84a153a7dddb8ff98ad', 'api_internal_executor', true,
           '{"search_path=api, private, public, util, extensions, extensions, pg_temp",statement_timeout=60s}',
           '{api_internal_executor=X/api_internal_executor,anon=X/api_internal_executor,authenticated=X/api_internal_executor}'
         ),
         (
           'api.hybrid_search_processes_v2(text,text,text,double precision,integer,double precision,double precision,integer,text,integer,integer,text[])',
-          'b4a75c92187f9a88e9db131590c1efd1', 'api_internal_executor', true,
+          '434fa8ccd0e5fa34bc8c061edb3340e5', 'api_internal_executor', true,
           '{"search_path=api, private, public, util, extensions, extensions, pg_temp",statement_timeout=60s}',
           '{api_internal_executor=X/api_internal_executor,anon=X/api_internal_executor,authenticated=X/api_internal_executor}'
         ),
         (
           'api.hybrid_search_processes(text,text,jsonb,double precision,integer,double precision,double precision,integer,text,integer,integer,text[])',
-          'a540312d04fda305d64c0c03e60ed6d3', 'api_internal_executor', true,
+          '06718268d24233ab245a056f680ffcb9', 'api_internal_executor', true,
           '{"search_path=api, private, public, util, extensions, extensions, pg_temp",statement_timeout=60s}',
           '{api_internal_executor=X/api_internal_executor,anon=X/api_internal_executor,authenticated=X/api_internal_executor}'
         ),
@@ -963,7 +964,7 @@ select extensions.is(
     ) as difference
   ),
   0::bigint,
-  'all eight legacy raw Hybrid definitions, owners, configs, and ACLs match the reviewed example-scope baseline'
+  'all eight legacy raw Hybrid definitions, owners, configs, and ACLs match the reviewed bounded-facade and unchanged private-kernel baseline'
 );
 
 -- Prove that synchronized projection maintenance does not become a hidden
@@ -1797,10 +1798,10 @@ select extensions.ok(
     where routine.oid in (
       'private.portal_process_rank_name_keys_v1(jsonb)'::regprocedure,
       'private.portal_process_rank_classification_keys_v1(jsonb)'::regprocedure,
-      'private.catalog_portal_process_keyword_keys_v1(text,text,uuid,text,integer)'::regprocedure,
-      'private.catalog_portal_process_keyword_relevance_v1_impl(text,text,uuid,text,integer,text)'::regprocedure,
-      'private.portal_process_keyword_rank_manifest_sha256_v1()'::regprocedure,
-      'private.assert_portal_process_keyword_rank_contract_v1()'::regprocedure
+      'private.catalog_portal_process_keyword_keys_cn1(text,text,uuid,text,integer)'::regprocedure,
+      'private.catalog_portal_process_keyword_relevance_cn1_impl(text,text,uuid,text,integer,text)'::regprocedure,
+      'private.portal_process_keyword_rank_manifest_sha256_cn1()'::regprocedure,
+      'private.assert_portal_process_keyword_rank_contract_cn1()'::regprocedure
     )
   )
   and (
@@ -1809,13 +1810,13 @@ select extensions.ok(
     where routine.oid in (
       'private.portal_process_rank_name_keys_v1(jsonb)'::regprocedure,
       'private.portal_process_rank_classification_keys_v1(jsonb)'::regprocedure,
-      'private.catalog_portal_process_keyword_keys_v1(text,text,uuid,text,integer)'::regprocedure,
-      'private.catalog_portal_process_keyword_relevance_v1_impl(text,text,uuid,text,integer,text)'::regprocedure,
-      'private.portal_process_keyword_rank_manifest_sha256_v1()'::regprocedure,
-      'private.assert_portal_process_keyword_rank_contract_v1()'::regprocedure
+      'private.catalog_portal_process_keyword_keys_cn1(text,text,uuid,text,integer)'::regprocedure,
+      'private.catalog_portal_process_keyword_relevance_cn1_impl(text,text,uuid,text,integer,text)'::regprocedure,
+      'private.portal_process_keyword_rank_manifest_sha256_cn1()'::regprocedure,
+      'private.assert_portal_process_keyword_rank_contract_cn1()'::regprocedure
     )
   ),
-  'Process keyword rank helpers retain exact owner, volatility, parallel, definer, search-path, and RLS metadata'
+  'Current Process V2 keyword rank helpers retain exact owner, volatility, parallel, definer, search-path, and RLS metadata'
 );
 
 select extensions.ok(
@@ -1826,14 +1827,14 @@ select extensions.ok(
       and not index_catalog.indisunique
       and access_method.amname = 'gin'
       and pg_catalog.pg_get_indexdef(index_relation.oid) =
-        'CREATE INDEX portal_catalog_search_process_exact_rank_v1_gin ON private.portal_catalog_search_rows_v1 USING gin (private.portal_process_rank_name_keys_v1(card), private.portal_process_rank_classification_keys_v1(card)) WHERE (dataset_kind = ''process''::text)'
+        'CREATE INDEX portal_catalog_search_process_exact_rank_v2_gin ON private.portal_catalog_search_rows_v2 USING gin (private.portal_process_rank_name_keys_v1(card), private.portal_process_rank_classification_keys_v1(card)) WHERE (dataset_kind = ''process''::text)'
     from pg_catalog.pg_class as index_relation
     join pg_catalog.pg_index as index_catalog
       on index_catalog.indexrelid = index_relation.oid
     join pg_catalog.pg_am as access_method
       on access_method.oid = index_relation.relam
     where index_relation.oid =
-      'private.portal_catalog_search_process_exact_rank_v1_gin'::regclass
+      'private.portal_catalog_search_process_exact_rank_v2_gin'::regclass
   )
   and (
     select pg_catalog.count(*)
@@ -1858,30 +1859,30 @@ select extensions.ok(
   )
   and not pg_catalog.has_function_privilege(
     'anon',
-    'private.catalog_portal_process_keyword_relevance_v1_impl(text,text,uuid,text,integer,text)',
+    'private.catalog_portal_process_keyword_relevance_cn1_impl(text,text,uuid,text,integer,text)',
     'EXECUTE'
   )
   and not pg_catalog.has_function_privilege(
     'authenticated',
-    'private.catalog_portal_process_keyword_relevance_v1_impl(text,text,uuid,text,integer,text)',
+    'private.catalog_portal_process_keyword_relevance_cn1_impl(text,text,uuid,text,integer,text)',
     'EXECUTE'
   )
   and not pg_catalog.has_function_privilege(
     'service_role',
-    'private.catalog_portal_process_keyword_relevance_v1_impl(text,text,uuid,text,integer,text)',
+    'private.catalog_portal_process_keyword_relevance_cn1_impl(text,text,uuid,text,integer,text)',
     'EXECUTE'
   )
   and not pg_catalog.has_function_privilege(
     'api_internal_executor',
-    'private.catalog_portal_process_keyword_relevance_v1_impl(text,text,uuid,text,integer,text)',
+    'private.catalog_portal_process_keyword_relevance_cn1_impl(text,text,uuid,text,integer,text)',
     'EXECUTE'
   ),
-  'the concurrent exact-rank GIN is live with only its required writer and database-maintenance execution edges'
+  'the current V2 exact-rank GIN is live with only its required writer and database-maintenance execution edges'
 );
 
 select extensions.lives_ok(
-  $$select private.assert_portal_process_keyword_rank_contract_v1()$$,
-  'the Process keyword rank manifest and exact index contract are live'
+  $$select private.assert_portal_process_keyword_rank_contract_cn1()$$,
+  'the current V2 Process keyword rank manifest and exact index contract are live'
 );
 
 select extensions.ok(
@@ -1908,7 +1909,7 @@ select extensions.ok(
             'process', cases.query_text, '{}'::jsonb, 'relevance'
           )
         ) as predecessor,
-        private.catalog_portal_process_keyword_relevance_v1_impl(
+        private.catalog_portal_process_keyword_relevance_cn1_impl(
           cases.query_text,
           null,
           null,
@@ -1964,7 +1965,7 @@ select extensions.ok(
           2,
           cursor_value.fingerprint
         ) as predecessor,
-        private.catalog_portal_process_keyword_relevance_v1_impl(
+        private.catalog_portal_process_keyword_relevance_cn1_impl(
           'filterfillneedle',
           cursor_value.value ->> 'rankKey',
           (cursor_value.value ->> 'id')::uuid,

@@ -3394,24 +3394,29 @@
       "level": "INFO",
       "object": "private.portal_catalog_search_process_document_v1_pgroonga",
       "table": "private.portal_catalog_search_rows_v1",
-      "disposition": "retained",
-      "classification": "legacy_process_v1_document_reader_not_found",
+      "disposition": "fixed",
+      "classification": "qualified_legacy_process_v1_access_method_retirement",
       "definition": "CREATE INDEX portal_catalog_search_process_document_v1_pgroonga ON private.portal_catalog_search_rows_v1 USING pgroonga (document) WITH (tokenizer='TokenBigram', normalizer='NormalizerAuto') WHERE (dataset_kind = 'process'::text)",
       "limits": [
-        "Live pg_depend/extension membership and complete external caller/dependency evidence are not included in this inventory.",
-        "No direct full-cycle natural-plan/index-use proof is collected by this read-only classification."
+        "Synthetic local warm comparison is not a hosted p95 or real production workload-cycle claim.",
+        "Hosted preflight/deployment and terminal migration-test receipts belong to Issue/PR #793; this disposition is not deployment proof."
       ],
-      "retentionConfidence": "current_release_risk_acceptance_after_bounded_review",
+      "retentionConfidence": "qualified_scoped_contraction",
       "sourceEvidence": [
         "source-25",
         "source-26",
         "source-27",
         "source-28"
       ],
-      "releaseDecision": "retain_legacy_pgroonga_for_this_release_until_scoped_contraction",
+      "releaseDecision": "retire_exact_guarded_index_in_database_793",
       "activeBusinessUsageClaimed": false,
-      "reason": "Retain for this release: Current Process V1/V2/V3 pattern reader uses current_v2 Process rows; v1 projection rows and their FKs remain, but the old v1 document index is a separate access method. Preserve this concrete interface/lifecycle until a separately qualified contraction demonstrates dependency, read and write parity; this does not assert active business usage or permanent design necessity.",
-      "reviewTrigger": "Before a separately reviewed contraction, close dynamic/private/operator and external caller dependencies, live source/manifest and extension membership; compare natural multilingual/literal/JSON plans, complete response/rank/cursor compatibility and writer plus PGroonga external-storage/WAL costs on a populated owned fixture."
+      "reason": "Current Process Search V1/V2/V3 and Hybrid pattern readers route to the V2 projection. The frozen writer and shared V1 relation remain; Flow V1 and current Process V2 access methods remain protected.",
+      "reviewTrigger": "Requalify before any new direct/external lexical or containment access path, cardinality/document-shape expansion, rollback to legacy Process V1 routing, or changed PK/RI/writer contract. No zero-scan counter grants removal authority.",
+      "migration": "supabase/migrations/20261007143357_retire_qualified_search_indexes.sql",
+      "qualificationContract": [
+        "scripts/benchmark_search_index_retirement.py",
+        "supabase/tests/20261007_search_index_retirement.sql"
+      ]
     },
     {
       "cacheKey": "unused_index_public_contacts_contacts_extracted_md_pgroonga",
@@ -3479,24 +3484,29 @@
       "level": "INFO",
       "object": "public.lciamethods_json_pgroonga",
       "table": "public.lciamethods",
-      "disposition": "retained",
-      "classification": "legacy_json_fts_reader_unproven",
+      "disposition": "fixed",
+      "classification": "qualified_legacy_lcia_fts_retirement",
       "definition": "CREATE INDEX lciamethods_json_pgroonga ON public.lciamethods USING pgroonga (\"json\" pgroonga_jsonb_full_text_search_ops_v2)",
       "limits": [
-        "Live pg_depend/extension membership and complete external caller/dependency evidence are not included in this inventory.",
-        "No direct full-cycle natural-plan/index-use proof is collected by this read-only classification."
+        "Synthetic local warm comparison is not a hosted p95 or real production workload-cycle claim.",
+        "Hosted preflight/deployment and terminal migration-test receipts belong to Issue/PR #793; this disposition is not deployment proof."
       ],
-      "retentionConfidence": "current_release_risk_acceptance_after_bounded_review",
+      "retentionConfidence": "qualified_scoped_contraction",
       "sourceEvidence": [
         "source-34",
         "source-35",
         "source-562",
         "source-563"
       ],
-      "releaseDecision": "retain_legacy_pgroonga_for_this_release_until_scoped_contraction",
+      "releaseDecision": "retire_exact_guarded_index_in_database_793",
       "activeBusinessUsageClaimed": false,
-      "reason": "Retain for this release: Current LCIAMethod consumers use typed ID/version, canonical JSON factors and supported JSON containment; PostgREST standard FTS is not automatically a PGroonga json &@~ caller. Preserve this concrete interface/lifecycle until a separately qualified contraction demonstrates dependency, read and write parity; this does not assert active business usage or permanent design necessity.",
-      "reviewTrigger": "Before a separately reviewed contraction, close dynamic/private/operator and external caller dependencies, live source/manifest and extension membership; compare natural multilingual/literal/JSON plans, complete response/rank/cursor compatibility and writer plus PGroonga external-storage/WAL costs on a populated owned fixture."
+      "reason": "Current LCIA consumers use exact identities/canonical JSON and no installed LCIA lexical RPC or admitted generic search path requires this JSON PGroonga index. Guarded dependency closure retires only the access method; JSON relation operators and writers remain supported.",
+      "reviewTrigger": "Requalify before any new direct/external lexical or containment access path, cardinality/document-shape expansion, rollback to legacy Process V1 routing, or changed PK/RI/writer contract. No zero-scan counter grants removal authority.",
+      "migration": "supabase/migrations/20261007143357_retire_qualified_search_indexes.sql",
+      "qualificationContract": [
+        "scripts/benchmark_search_index_retirement.py",
+        "supabase/tests/20261007_search_index_retirement.sql"
+      ]
     },
     {
       "cacheKey": "unused_index_public_lifecyclemodels_lifecyclemodels_extracted_md_pgroonga",
@@ -5249,17 +5259,26 @@
       "level": "INFO",
       "object": "private.lcia_scope_closure_issue_roots_issue_idx",
       "table": "private.lcia_scope_closure_issue_roots",
-      "disposition": "retained",
-      "classification": "fk_prefix_support",
-      "reason": "The live catalog key prefix exactly covers lcia_scope_closure_issue_roots_closure_issue_id_fkey. Keep referential delete/update checks bounded; zero scan does not revoke that purpose.",
+      "disposition": "fixed",
+      "classification": "qualified_primary_key_prefix_replacement",
+      "reason": "The exact five-key primary index supplies the retired four-key prefix for issue lookups, reused scans, bounded GC and RI cascades; populated natural plans and PK-only domain regressions qualify the replacement.",
       "definition": "CREATE INDEX lcia_scope_closure_issue_roots_issue_idx ON private.lcia_scope_closure_issue_roots USING btree (closure_issue_id, root_dataset_type, root_dataset_id, root_dataset_version)",
       "limits": [
-        "Live pg_depend/extension membership and complete external caller/dependency evidence are not included in this inventory."
+        "Synthetic local warm comparison is not a hosted p95 or real production workload-cycle claim.",
+        "Hosted preflight/deployment and terminal migration-test receipts belong to Issue/PR #793; this disposition is not deployment proof."
       ],
-      "retentionConfidence": "retain_with_evidence",
+      "retentionConfidence": "qualified_scoped_contraction",
       "sourceEvidence": [
         "source-203",
         "source-204"
+      ],
+      "releaseDecision": "retire_exact_guarded_index_in_database_793",
+      "activeBusinessUsageClaimed": false,
+      "reviewTrigger": "Requalify before any new direct/external lexical or containment access path, cardinality/document-shape expansion, rollback to legacy Process V1 routing, or changed PK/RI/writer contract. No zero-scan counter grants removal authority.",
+      "migration": "supabase/migrations/20261007143357_retire_qualified_search_indexes.sql",
+      "qualificationContract": [
+        "scripts/benchmark_search_index_retirement.py",
+        "supabase/tests/20261007_search_index_retirement.sql"
       ]
     },
     {
@@ -5616,24 +5635,29 @@
       "level": "INFO",
       "object": "private.portal_catalog_search_process_exact_rank_v1_gin",
       "table": "private.portal_catalog_search_rows_v1",
-      "disposition": "retained",
-      "classification": "legacy_exact_rank_path_unreached_in_bounded_graph",
+      "disposition": "fixed",
+      "classification": "qualified_legacy_rank_family_retirement",
       "definition": "CREATE INDEX portal_catalog_search_process_exact_rank_v1_gin ON private.portal_catalog_search_rows_v1 USING gin (private.portal_process_rank_name_keys_v1(card), private.portal_process_rank_classification_keys_v1(card)) WHERE (dataset_kind = 'process'::text)",
       "limits": [
-        "Live pg_depend/extension membership and complete external caller/dependency evidence are not included in this inventory.",
-        "No direct full-cycle natural-plan/index-use proof is collected by this read-only classification."
+        "Synthetic local warm comparison is not a hosted p95 or real production workload-cycle claim.",
+        "Hosted preflight/deployment and terminal migration-test receipts belong to Issue/PR #793; this disposition is not deployment proof."
       ],
-      "retentionConfidence": "current_release_risk_acceptance_after_bounded_review",
+      "retentionConfidence": "qualified_scoped_contraction",
       "sourceEvidence": [
         "source-242",
         "source-243",
         "source-244",
         "source-245"
       ],
-      "releaseDecision": "retain_explicit_legacy_private_rank_assertion_until_coupled_contraction",
+      "releaseDecision": "retire_exact_guarded_index_in_database_793",
       "activeBusinessUsageClaimed": false,
-      "reason": "Retain for this release: private.assert_portal_process_keyword_rank_contract_v1 -> exact definition and manifest for V1 name/classification rank GIN; public portal_search_v1 currently calls cn1/V2. Preserve this concrete interface/lifecycle until a separately qualified contraction demonstrates dependency, read and write parity; this does not assert active business usage or permanent design necessity.",
-      "reviewTrigger": "An explicit versioned contraction retires/updates the V1 helper+assertion+manifest and all direct/admin/legacy grants/callers together, proves rank/page/cursor and source-identity compatibility, then removes the index surgically. A standalone unused-index DROP fails this gate."
+      "reason": "The owner-only V1 rank keys reader, hydration helper, assertion and manifest retire together after exact caller, ACL and dependency preflight. Shared name/classification key functions and the current V2 rank guard/index remain.",
+      "reviewTrigger": "Requalify before any new direct/external lexical or containment access path, cardinality/document-shape expansion, rollback to legacy Process V1 routing, or changed PK/RI/writer contract. No zero-scan counter grants removal authority.",
+      "migration": "supabase/migrations/20261007143357_retire_qualified_search_indexes.sql",
+      "qualificationContract": [
+        "scripts/benchmark_search_index_retirement.py",
+        "supabase/tests/20261007_search_index_retirement.sql"
+      ]
     },
     {
       "cacheKey": "unused_index_private_portal_catalog_search_rows_v2_portal_catalog_search_process_exact_rank_v2_gin",
@@ -7086,16 +7110,16 @@
       "level": "INFO",
       "object": "public.lciamethods_json_idx",
       "table": "public.lciamethods",
-      "disposition": "retained",
-      "classification": "json_containment_source_or_consumer_audit",
-      "reason": "Retain for this release: authenticated public DataAPI /rest/v1/lciamethods?json=cs.<valid JSON object>, restricted by existing row/capability policies; publicEntity('lciamethods') explicitly selects the public schema. These catalogue namespaces have authenticated SELECT policy and are excluded from cmd_dataset_create actor table admission; service/admin imports remain possible. Preserve this concrete interface/lifecycle until a separately qualified contraction demonstrates dependency, read and write parity; this does not assert active business usage or permanent design necessity.",
-      "reviewTrigger": "At the first complete lciamethods publication/import/bundle cycle, bind actual normalized JSON containment requests and writes, then stage representative selective and empty/match-all cs filters under authenticated/OAuth scopes with/without this exact GIN. If the interface is narrowed/withdrawn or replacement meets budgets and write savings are demonstrated, perform a separately reviewed contraction.",
+      "disposition": "fixed",
+      "classification": "qualified_large_json_scan_replacement",
+      "reason": "Authenticated relation containment and key-existence remain supported. Large nested-JSON local comparisons preserve complete ordered read digests and demonstrate lower write/index cost without this GIN; bounded current consumers do not require its access path.",
+      "reviewTrigger": "Requalify before any new direct/external lexical or containment access path, cardinality/document-shape expansion, rollback to legacy Process V1 routing, or changed PK/RI/writer contract. No zero-scan counter grants removal authority.",
       "definition": "CREATE INDEX lciamethods_json_idx ON public.lciamethods USING gin (\"json\")",
       "limits": [
-        "Live pg_depend/extension membership and complete external caller/dependency evidence are not included in this inventory.",
-        "No direct full-cycle natural-plan/index-use proof is collected by this read-only classification."
+        "Synthetic local warm comparison is not a hosted p95 or real production workload-cycle claim.",
+        "Hosted preflight/deployment and terminal migration-test receipts belong to Issue/PR #793; this disposition is not deployment proof."
       ],
-      "retentionConfidence": "current_release_risk_acceptance_after_bounded_review",
+      "retentionConfidence": "qualified_scoped_contraction",
       "sourceEvidence": [
         "source-34",
         "source-371",
@@ -7105,8 +7129,13 @@
         "source-530",
         "source-531"
       ],
-      "releaseDecision": "retain_current_containment_interface_for_this_release",
-      "activeBusinessUsageClaimed": false
+      "releaseDecision": "retire_exact_guarded_index_in_database_793",
+      "activeBusinessUsageClaimed": false,
+      "migration": "supabase/migrations/20261007143357_retire_qualified_search_indexes.sql",
+      "qualificationContract": [
+        "scripts/benchmark_search_index_retirement.py",
+        "supabase/tests/20261007_search_index_retirement.sql"
+      ]
     },
     {
       "cacheKey": "unused_index_public_lciamethods_lciamethods_modified_at_idx",
@@ -13409,19 +13438,20 @@
     {
       "object": "private.lcia_scope_closure_issue_roots_issue_idx",
       "table": "private.lcia_scope_closure_issue_roots",
-      "decision": "retain_issue_root_prefix_layout_for_this_release",
+      "decision": "retire_qualified_issue_root_prefix_in_database_793",
       "interface": "private.svc_lcia_scope_closure_artifact_gc_complete reverse-root joins/deletes; PK remains(closure_issue_id,root_dataset_type,root_dataset_id,root_dataset_version,impact_role).",
-      "reason": "Preserve the narrow/covering/current lifecycle layout; a wider or differently ordered alternative is not a qualified read/write equivalent.",
+      "reason": "The retained PK has an exact compatible four-key prefix; populated natural lookup/copy/GC/cascade comparisons and actual PK-only closure/retention regressions qualify the replacement.",
       "alternatives": [
         {
           "index": "lcia_scope_closure_issue_roots_pkey",
           "definition": "CREATE UNIQUE INDEX lcia_scope_closure_issue_roots_pkey ON private.lcia_scope_closure_issue_roots USING btree (closure_issue_id, root_dataset_type, root_dataset_id, root_dataset_version, impact_role)"
         }
       ],
-      "reviewTrigger": "Resolve the exact live dependency question and run owned populated natural GC/FK/read plans using the PK after surgical transaction-local removal, with multiple impact roles and protected/reused closure evidence.",
+      "reviewTrigger": "Requalify if primary key layout/opclass/collation changes, a new roots dependency appears, or issue/root cardinality and GC budgets change. Keep the canonical PK and cascade FK.",
       "sourceEvidence": [
         "source-565"
-      ]
+      ],
+      "migration": "supabase/migrations/20261007143357_retire_qualified_search_indexes.sql"
     },
     {
       "object": "public.flows_team_id_idx",
@@ -13482,11 +13512,12 @@
     "original_review_gaps": 60,
     "decisions": 60,
     "overlap_decisions": 5,
-    "current_cycle_retained_gap_indexes": 59,
-    "current_cycle_qualified_removal_indexes": 1,
-    "current_cycle_retained_overlap_indexes": 5,
+    "current_cycle_retained_gap_indexes": 55,
+    "current_cycle_qualified_removal_indexes": 5,
+    "current_cycle_retained_overlap_indexes": 4,
     "current_cycle_unresolved_todos": 0,
-    "future_contraction_conditions_preserved": true
+    "future_contraction_conditions_preserved": true,
+    "current_cycle_qualified_overlap_removal_indexes": 1
   },
   "deploymentAuthority": "Issue/PR deployment, qualification and exact integration receipts are authoritative; this source fixture does not claim production deployment or hosted validation."
 }
