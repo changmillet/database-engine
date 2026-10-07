@@ -156,6 +156,11 @@ PROCESS_KEYWORD_RANK_CONTROL_FUNCTION_IDENTITIES = (
     "private.portal_process_keyword_rank_manifest_sha256_v1()",
     "private.assert_portal_process_keyword_rank_contract_v1()",
 )
+PROCESS_KEYWORD_RANK_RETIREMENT_NAME = "20261007143357_retire_qualified_search_indexes.sql"
+RETIRED_PROCESS_KEYWORD_RANK_IDENTITIES = (
+    PROCESS_KEYWORD_RANK_FUNCTION_IDENTITIES[2:]
+    + PROCESS_KEYWORD_RANK_CONTROL_FUNCTION_IDENTITIES
+)
 SITEMAP_SHARD_FUNCTION_IDENTITIES = (
     "private.sync_portal_sitemap_row_v1()",
     "private.sync_portal_sitemap_latest_row_v1()",
@@ -186,6 +191,33 @@ def mutation_pattern(identity: str) -> re.Pattern[str]:
         rf'"?{re.escape(function_name)}"?\s*\(',
         flags=re.IGNORECASE,
     )
+
+
+def reviewed_process_rank_retirement(name: str, sql: str, identity: str) -> bool:
+    """Admit one exact DROP only; historical definitions and live shared keys stay frozen."""
+    if name != PROCESS_KEYWORD_RANK_RETIREMENT_NAME or identity not in RETIRED_PROCESS_KEYWORD_RANK_IDENTITIES:
+        return False
+    # The general historical scanner recognizes the first DROP target. Do not
+    # let a second target (or dynamic/unknown DROP) hide behind this exception.
+    drops = re.findall(r"\bdrop\s+(?:function|routine)\b[^;]*;", sql, re.IGNORECASE)
+    permitted = {
+        re.sub(r"\s+", " ", f"drop function {item} restrict").lower()
+        for item in RETIRED_PROCESS_KEYWORD_RANK_IDENTITIES
+    }
+    normalized = [re.sub(r"\s+", " ", drop[:-1].rstrip().rstrip("'").rstrip()).lower()
+                  for drop in drops]
+    if len(normalized) != len(permitted) or set(normalized) != permitted:
+        return False
+    mutations = list(mutation_pattern(identity).finditer(sql))
+    if len(mutations) != 1:
+        return False
+    # The reviewed migration uses literal EXECUTE statements. Do not turn its
+    # filename into a CREATE/ALTER/overload/CASCADE or future-migration waiver.
+    exact_drop = re.compile(
+        rf"drop\s+function\s+{re.escape(identity)}\s+restrict\s*'?\s*;",
+        flags=re.IGNORECASE,
+    )
+    return exact_drop.match(sql, mutations[0].start()) is not None
 
 
 def main() -> int:
@@ -926,7 +958,9 @@ def main() -> int:
             continue
         executable_sql = sql_without_comments(migration.read_text(encoding="utf-8"))
         for identity, pattern in process_rank_patterns.items():
-            if pattern.search(executable_sql):
+            if pattern.search(executable_sql) and not reviewed_process_rank_retirement(
+                migration.name, executable_sql, identity
+            ):
                 violations.append(f"{migration.name}: {identity}")
 
     required_guard_counts = {

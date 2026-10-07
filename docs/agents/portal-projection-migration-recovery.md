@@ -1,7 +1,7 @@
 ---
-lastReviewedAt: 2026-09-27
-lastReviewedCommit: 5935527b3564fc519549766cc65375a3eca4fd61
-lastReviewedNote: "Reviewed Database #738: closed server-only facade diagnostics preserve public failure bodies, successful queries, signatures, budgets and access; temporary owner/schema/member DDL privileges restore exact prestate. Anonymous, native-cancellation and Portal/adjacent regression proof and exact local schema/type generation remain required; Preview/Main ingestion, Main-to-Dev and Root integration stay separate gates."
+lastReviewedAt: 2026-10-08
+lastReviewedCommit: d724b9af27ce3d41dc0ac063c47dc0e0f5cecac7
+lastReviewedNote: "Reviewed Database #793 source d724b9af: 29 raw facade bounds preserve normal10x delegation; selective exact-version Flow type keys retain PGroonga scoring and broad/missing-stat fallback; five qualified indexes and four closed legacy rank routines retire under exact guards. Canonical417 local17.11 reset, 32 suites2344 assertions, 555 HTTP checks, non-superuser grant/refusal/replay proofs, independent reviews and deterministic1827-file generation pass. Hosted release/backmerge/root integration and user-authenticated production reads remain tracked delivery gates."
 title: Portal Projection Migration Recovery
 docType: runbook
 scope: repo
@@ -911,6 +911,33 @@ or commit/history-gap retry leaves it absent. The final guard requires the API
 wrapper to call only `private.portal_projection_hybrid_search_v1_impl(...)`.
 
 ## Derived-semantics changes
+
+### Qualified retirement of the obsolete Process rank reader
+
+Database #793 retires only the Process V1 document/rank indexes and its four
+closed keyword key/relevance/manifest/assertion routines after proving current
+Process readers use cn1/V2. The shared V1 name/classification expressions remain
+required by the live V2 GIN. The base V1 projection, facet/context manifests,
+Flow V1, current cn1 guards and both Process writers are unchanged.
+
+`20261007143357_retire_qualified_search_indexes.sql` pins exact definitions,
+owners, closed ACLs, current routing and unexpected function/procedure callers;
+it acquires bounded table locks and uses only `DROP ... RESTRICT`. Temporary
+owner-role admission must restore every original grantor/options row and schema
+ACL. Unknown/mixed object state refuses retirement; fully verified poststate
+replay is a no-op. This is a reviewed retirement, not a same-name replacement or
+a card/document semantic change.
+
+The static manifest scanner admits exactly one literal `DROP FUNCTION` with
+the exact signature and `RESTRICT` for each of those four identities in that
+single migration. It still rejects CREATE/ALTER, overloads, duplicate mutations,
+CASCADE, later filenames and every shared/current helper mutation. Run
+`python3 scripts/test_portal_rank_retirement_governance.py` as well as the
+manifest check. Historical migration definitions/digests and the old prefix
+recovery harness remain unchanged; terminal-head tests instead verify current
+cn1/V2 behavior and explicit absence of the retired objects.
+
+### Retained projection semantics
 
 The registry row, its digest, the eleven-function v1 closure, and every v1 row
 label are immutable. A card/document semantic change must create a new helper

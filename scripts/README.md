@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-06
-lastReviewedCommit: 10cc730b1463565279c6f2c10c3384bc972d19d9
-lastReviewedNote: "Reviewed Database #785 at 10cc730b: thirteen fixed private invokers preserve scalar inlining and closed ACLs; six same-role SELECT merges, two qualified Navigation indexes, single guarded typo-index removal and preexisting retention/helper ACL reconciliation preserve ownership and API boundaries. Canonical 414-migration local17.11.0.002 reset, ordinary-schema canaries, upgrade10/typo5 cases, full JSON/cursors, exact577 dispositions and deterministic1836-file exports pass; reported hosted17.11.0.003, deployment and integration proof remain Issue/PR-owned."
+lastReviewedAt: 2026-10-08
+lastReviewedCommit: d724b9af27ce3d41dc0ac063c47dc0e0f5cecac7
+lastReviewedNote: "Reviewed Database #793 source d724b9af: 29 raw facade bounds preserve normal10x delegation; selective exact-version Flow type keys retain PGroonga scoring and broad/missing-stat fallback; five qualified indexes and four closed legacy rank routines retire under exact guards. Canonical417 local17.11 reset, 32 suites2344 assertions, 555 HTTP checks, non-superuser grant/refusal/replay proofs, independent reviews and deterministic1827-file generation pass. Hosted release/backmerge/root integration and user-authenticated production reads remain tracked delivery gates."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -191,6 +191,32 @@ Reset that isolated stack before and after. This diagnostic is not hosted
 relevance or production-cardinality release evidence.
 
 `node scripts/benchmark_hybrid_versions.mjs --help`
+
+### Raw search and index follow-up qualification
+
+Database #793 has three task-bound local entrypoints. They refuse hosted URLs
+and shared local stacks. Read the corresponding architecture and validation
+sections before interpreting synthetic results as release proof.
+
+- `benchmark_raw_flow_hybrid.py`: create and clean a production-shaped synthetic
+  Flow fixture; compare the full raw API and lexical/vector/frozen-fusion stages,
+  keeping first-call and repeated measurements separate. Inspect `--help` for
+  exact candidate-file, sample-count and output arguments.
+- `benchmark_search_index_retirement.py --local-container
+  supabase_db_database-engine-793 --output <new-private-json>`: rollback-only
+  PK-prefix and large nested JSON GIN read/write comparison. It refuses an
+  existing fixture namespace and verifies its removal.
+- `test_raw_search_request_bounds_http.py --workdir <isolated-workdir>
+  --supabase-cli <exact-cli> --task-owned-local-stack`: real Auth and PostgREST
+  boundary proof with exact actor/session/profile cleanup. Its
+  `--upgrade-authority-only` mode rehearses the migration's temporary DDL
+  authority under the actual non-superuser local migration role.
+
+`supabase/tests/upgrade/test_issue_793_search_index_retirement.py` exercises
+retirement/replay and refusal of drift under absent/SET-false/SET-true own
+membership grants. Every case rolls back; inspect its help for the exact target
+and new evidence output. The old 299-migration Portal benchmark remains a
+historical prefix runner and is not a terminal-head V2 retirement test.
 
 ### `benchmark_flow_lexical_payloads.py`
 
@@ -866,3 +892,8 @@ It admits only the explicitly reused `workspace-1701` PostgreSQL17.11 local stac
 and empty projections. Use `--help` for bounded fixture options; the report, SQL
 and plan log must have new paths. The rollback-only synthetic fixture is reader
 evidence; real writer/RLS suites and hosted performance remain separate proof.
+
+The obsolete Process V1 rank-reader retirement has an exact DROP-only exception
+in `check_portal_projection_manifest.py`; run
+`python3 scripts/test_portal_rank_retirement_governance.py` to verify that it
+cannot waive shared/current helpers, replacement DDL or later migrations.

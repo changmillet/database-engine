@@ -1,3 +1,22 @@
+-- Database #793: compact legacy Flow lexical filter facts and use existing
+-- type-index exact-version keys only for statistically selective type requests.
+-- Preserve the original PGroonga match/score boundary, complete matched set,
+-- historical-match/latest-visible selection, rank/count/page/payload and ACLs.
+-- The 20% estimate is an execution heuristic; absent/broad statistics retain
+-- direct JSON filtering. It never truncates candidates or chooses result rows.
+begin;
+set local lock_timeout='5s';
+set local statement_timeout='30s';
+create temp table raw_flow793_before on commit drop as
+select p.* from pg_catalog.pg_proc p where p.oid='private.search_flows_latest_impl(text,jsonb,bigint,bigint,text,text,uuid,integer,text[])'::regprocedure;
+do $preflight$ begin
+ if not exists(select 1 from raw_flow793_before where
+  pg_catalog.md5(prosrc)='4a6e3b1b5ac4fe617eff68cd47fca77b'
+  and proowner='postgres'::regrole and prosecdef
+  and prolang=(select oid from pg_catalog.pg_language where lanname='plpgsql')) then
+  raise exception using errcode='55000',message='Database #793 Flow lexical prestate drift';
+ end if;
+end $preflight$;
 CREATE OR REPLACE FUNCTION "private"."search_flows_latest_impl"("query_text" "text", "filter_condition" "jsonb" DEFAULT '{}'::"jsonb", "page_size" bigint DEFAULT 10, "page_current" bigint DEFAULT 1, "data_source" "text" DEFAULT 'tg'::"text", "this_user_id" "text" DEFAULT ''::"text", "team_id_filter" "uuid" DEFAULT NULL::"uuid", "state_code_filter" integer DEFAULT NULL::integer, "query_terms" "text"[] DEFAULT NULL::"text"[]) RETURNS TABLE("rank" bigint, "id" "uuid", "json" "jsonb", "version" character, "modified_at" timestamp with time zone, "team_id" "uuid", "total_count" bigint)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'private', 'api', 'public', 'util', 'extensions', 'extensions', 'pg_temp'
@@ -308,10 +327,10 @@ begin
 end;
 $_$;
 
-ALTER FUNCTION "private"."search_flows_latest_impl"("query_text" "text", "filter_condition" "jsonb", "page_size" bigint, "page_current" bigint, "data_source" "text", "this_user_id" "text", "team_id_filter" "uuid", "state_code_filter" integer, "query_terms" "text"[]) OWNER TO "postgres";
-
-REVOKE ALL ON FUNCTION "private"."search_flows_latest_impl"("query_text" "text", "filter_condition" "jsonb", "page_size" bigint, "page_current" bigint, "data_source" "text", "this_user_id" "text", "team_id_filter" "uuid", "state_code_filter" integer, "query_terms" "text"[]) FROM PUBLIC;
-
-GRANT ALL ON FUNCTION "private"."search_flows_latest_impl"("query_text" "text", "filter_condition" "jsonb", "page_size" bigint, "page_current" bigint, "data_source" "text", "this_user_id" "text", "team_id_filter" "uuid", "state_code_filter" integer, "query_terms" "text"[]) TO "service_role";
-
-GRANT ALL ON FUNCTION "private"."search_flows_latest_impl"("query_text" "text", "filter_condition" "jsonb", "page_size" bigint, "page_current" bigint, "data_source" "text", "this_user_id" "text", "team_id_filter" "uuid", "state_code_filter" integer, "query_terms" "text"[]) TO "api_internal_executor";
+do $verify$ begin
+ if exists(select 1 from raw_flow793_before b left join pg_catalog.pg_proc p using(oid)
+   where p.oid is null or (to_jsonb(p)-'prosrc') is distinct from (to_jsonb(b)-'prosrc')) then
+  raise exception using errcode='55000',message='Database #793 Flow lexical metadata changed';
+ end if;
+end $verify$;
+commit;

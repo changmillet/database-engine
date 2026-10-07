@@ -397,8 +397,8 @@ select extensions.is(
       and routine.proname not in ('portal_navigation_v1','portal_navigation_impl_v1','portal_navigation_matched_versions_v1')
       and routine.proowner = 'portal_public_executor'::regrole
   ),
-  50::bigint,
-  'the private executor-owned Portal helper surface includes the composite-name helper and 49 frozen v1 routines'
+  49::bigint,
+  'the private executor-owned Portal helper surface retains 49 routines after retiring the closed Process v1 rank manifest helper'
 );
 
 select extensions.ok(
