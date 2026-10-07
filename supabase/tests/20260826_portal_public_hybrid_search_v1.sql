@@ -123,7 +123,8 @@ select extensions.ok(
 select extensions.is(
   (
     -- Database #636 adds authenticated ex scope to four private raw helpers.
-    -- Pin those reviewed definitions; retain every owner, security and ACL expectation.
+    -- Database #793 adds request bounds to four API facades. Pin only those
+    -- reviewed changes; retain all private definitions, owners, security and ACLs.
     with expected(
       routine_identity,
       definition_md5,
@@ -135,25 +136,25 @@ select extensions.is(
       values
         (
           'api.hybrid_search_flows_v2(text,text,text,double precision,integer,double precision,double precision,integer,text,integer,integer,text[])',
-          'a36294ce86731379f01c88ced5c37ca4', 'api_internal_executor', true,
+          'aa63aea21de592b7e46521124643a55e', 'api_internal_executor', true,
           '{"search_path=api, private, public, util, extensions, extensions, pg_temp",statement_timeout=60s}',
           '{api_internal_executor=X/api_internal_executor,anon=X/api_internal_executor,authenticated=X/api_internal_executor}'
         ),
         (
           'api.hybrid_search_flows(text,text,jsonb,double precision,integer,double precision,double precision,integer,text,integer,integer,text[])',
-          'd6a6eaa2291c53ce4c2301a98146f50b', 'api_internal_executor', true,
+          '359dcac53de5b84a153a7dddb8ff98ad', 'api_internal_executor', true,
           '{"search_path=api, private, public, util, extensions, extensions, pg_temp",statement_timeout=60s}',
           '{api_internal_executor=X/api_internal_executor,anon=X/api_internal_executor,authenticated=X/api_internal_executor}'
         ),
         (
           'api.hybrid_search_processes_v2(text,text,text,double precision,integer,double precision,double precision,integer,text,integer,integer,text[])',
-          'b4a75c92187f9a88e9db131590c1efd1', 'api_internal_executor', true,
+          '434fa8ccd0e5fa34bc8c061edb3340e5', 'api_internal_executor', true,
           '{"search_path=api, private, public, util, extensions, extensions, pg_temp",statement_timeout=60s}',
           '{api_internal_executor=X/api_internal_executor,anon=X/api_internal_executor,authenticated=X/api_internal_executor}'
         ),
         (
           'api.hybrid_search_processes(text,text,jsonb,double precision,integer,double precision,double precision,integer,text,integer,integer,text[])',
-          'a540312d04fda305d64c0c03e60ed6d3', 'api_internal_executor', true,
+          '06718268d24233ab245a056f680ffcb9', 'api_internal_executor', true,
           '{"search_path=api, private, public, util, extensions, extensions, pg_temp",statement_timeout=60s}',
           '{api_internal_executor=X/api_internal_executor,anon=X/api_internal_executor,authenticated=X/api_internal_executor}'
         ),
