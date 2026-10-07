@@ -144,7 +144,7 @@ const SQL_ARGUMENT_TYPES = Object.freeze({
   p_required_primary_roles: 'jsonb', p_items: 'jsonb', p_staging_seconds: 'integer',
 });
 
-async function rpc(environment, name, body) {
+async function rpc(environment, name, body, applicationName = 'scope-closure-sql-contract') {
   assertContract(/^svc_lcia_scope_closure_artifact_write_set_(create|register_batch|status|seal|finalize|fail)_v2$/.test(name), 'SQL_FUNCTION_ALLOWLIST');
   const args = Object.entries(body).map(([key, value]) => {
     const type = SQL_ARGUMENT_TYPES[key];
@@ -152,13 +152,13 @@ async function rpc(environment, name, body) {
     const text = type === 'jsonb' ? JSON.stringify(value) : String(value);
     return `${key} => ${value === null ? 'null' : "'" + text.replaceAll("'", "''") + "'"}::${type}`;
   }).join(', ');
-  const sql = `with service_context as (
+  const sql = `set statement_timeout = '15s'; with service_context as (
     select set_config('request.jwt.claim.role', 'service_role', true)
   ) select private.${name}(${args})::text from service_context;`;
   const startedAt = performance.now();
   // Separate asynchronous sessions preserve a genuine concurrent register/seal race.
   const output = await new Promise((resolve, reject) => {
-    const child = spawn('psql', [environment.databaseUrl, '-X', '-qAt', '-v', 'ON_ERROR_STOP=1'], { stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn('psql', [environment.databaseUrl, '-X', '-qAt', '-v', 'ON_ERROR_STOP=1'], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PGAPPNAME: applicationName } });
     let stdout = '';
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk) => { stdout += chunk; });
@@ -172,16 +172,89 @@ async function rpc(environment, name, body) {
   return { value, elapsedMs: performance.now() - startedAt };
 }
 
-async function verifyPostgrestIsolation(environment) {
+function helperPlacementSql() {
+  return `select count(*) = 6 and count(distinct p.proname) = 6
+    and bool_and(n.nspname = 'private'
+      and not has_function_privilege('anon', p.oid, 'execute')
+      and not has_function_privilege('authenticated', p.oid, 'execute'))
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where p.proname in (${['create', 'register_batch', 'status', 'seal', 'finalize', 'fail']
+      .map((name) => "'svc_lcia_scope_closure_artifact_write_set_" + name + "_v2'").join(',')})
+      and n.nspname in ('public', 'api', 'private');`;
+}
+
+async function verifyPostgrestIsolation(environment, exact) {
+  assertContract(runSql(environment.databaseUrl, helperPlacementSql()) === 't', 'PRIVATE_HELPER_PLACEMENT_ACL');
+  // Fault injection is uncommitted and confined to the loopback synthetic stack.
+  // The same real catalogue predicate must detect an exposed extra helper.
+  assertContract(runSql(environment.databaseUrl, `begin;
+    create function api.svc_lcia_scope_closure_artifact_write_set_status_v2(uuid, uuid, uuid, uuid)
+      returns jsonb language sql as 'select ''{}''::jsonb';
+    ${helperPlacementSql()}
+    rollback;`) === 'f', 'HELPER_EXPOSURE_MUTATION_DETECTED');
+  assertContract(runSql(environment.databaseUrl, helperPlacementSql()) === 't', 'HELPER_EXPOSURE_MUTATION_ROLLED_BACK');
   for (const profile of ['public', 'api', 'private']) {
     const response = await fetch(`${environment.apiUrl}/rest/v1/rpc/svc_lcia_scope_closure_artifact_write_set_status_v2`, {
       method: 'POST',
       headers: { apikey: environment.serviceRoleKey, authorization: `Bearer ${environment.serviceRoleKey}`, 'content-type': 'application/json', 'accept-profile': profile, 'content-profile': profile },
-      body: '{}',
+      body: JSON.stringify({ p_closure_check_id: exact.closureCheckId, p_worker_job_id: exact.workerJobId, p_worker_lease_token: exact.workerLeaseToken, p_request_id: exact.requestId }),
     });
     const value = await response.json();
     assertContract(response.status === (profile === 'private' ? 406 : 404)
       && value.code === (profile === 'private' ? 'PGRST106' : 'PGRST202'), 'POSTGREST_HELPER_ISOLATION');
+  }
+}
+
+async function verifiedConcurrentRace(environment, writeSetId, calls) {
+  assertContract(UUID_RE.test(writeSetId), 'BARRIER_WRITE_SET_ID');
+  const names = [`scope-register-${writeSetId}`, `scope-seal-${writeSetId}`];
+  const blocker = spawn('psql', [environment.databaseUrl, '-X', '-qAt', '-v', 'ON_ERROR_STOP=1'], {
+    stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, PGAPPNAME: `scope-barrier-${writeSetId}` },
+  });
+  blocker.stderr.resume();
+  blocker.stdin.on('error', () => {}); // Process close/error below owns failure disposition.
+  const closed = new Promise((resolve) => {
+    blocker.on('error', () => resolve(false));
+    blocker.on('close', (code) => resolve(code === 0));
+  });
+  let contenders = [];
+  let released = false;
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new ContractError('BARRIER_SETUP_TIMEOUT')), 10_000);
+      let output = '';
+      blocker.stdout.setEncoding('utf8');
+      blocker.stdout.on('data', (chunk) => {
+        output += chunk;
+        if (output.includes('barrier-held')) { clearTimeout(timer); resolve(); }
+      });
+      blocker.on('error', () => { clearTimeout(timer); reject(new ContractError('BARRIER_SETUP_FAILED')); });
+      blocker.on('close', () => { clearTimeout(timer); reject(new ContractError('BARRIER_SETUP_FAILED')); });
+      blocker.stdin.write(`begin; set local idle_in_transaction_session_timeout = '15s'; set local statement_timeout = '15s';
+        select id from private.lcia_scope_closure_artifact_write_sets where id = '${writeSetId}'::uuid for update;
+        select 'barrier-held';
+`);
+    });
+    contenders = calls.map((call, index) => call(names[index]));
+    for (const contender of contenders) contender.catch(() => {});
+    const deadline = performance.now() + 10_000;
+    let observed = false;
+    while (performance.now() < deadline) {
+      const count = runSql(environment.databaseUrl, `select count(*) from pg_stat_activity
+        where application_name in ('${names[0]}', '${names[1]}')
+          and state = 'active' and wait_event_type = 'Lock';`);
+      if (count === '2') { observed = true; break; }
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assertContract(observed, 'CONCURRENT_CONTENDERS_NOT_OBSERVED');
+    blocker.stdin.end('commit;\n');
+    released = true;
+    assertContract(await closed, 'BARRIER_RELEASE_FAILED');
+    return await Promise.all(contenders);
+  } finally {
+    if (!released && !blocker.stdin.destroyed) blocker.stdin.end('rollback;\n');
+    await closed;
+    await Promise.allSettled(contenders);
   }
 }
 
@@ -512,7 +585,7 @@ async function main() {
 
   const environment = parseSupabaseEnvironment();
   verifyAtomicSetup(environment, exact);
-  await verifyPostgrestIsolation(environment);
+  await verifyPostgrestIsolation(environment, exact);
   let setupComplete = false;
   const evidence = {
     schemaVersion: 'lcia.scope-closure-staged-write-set-sql-proof.v1',
@@ -729,8 +802,8 @@ async function main() {
     );
     assertContract(firstBatch.value.ok === true, 'CONCURRENT_FIRST_BATCH');
 
-    const [racedRegistration, racedSeal] = await Promise.all([
-      rpc(
+    const [racedRegistration, racedSeal] = await verifiedConcurrentRace(environment, concurrentWriteSet.writeSetId, [
+      (applicationName) => rpc(
         environment,
         'svc_lcia_scope_closure_artifact_write_set_register_batch_v2',
         {
@@ -741,8 +814,9 @@ async function main() {
           p_batch_id: randomUUID(),
           p_items: concurrentDescriptors.slice(2),
         },
+        applicationName,
       ),
-      rpc(
+      (applicationName) => rpc(
         environment,
         'svc_lcia_scope_closure_artifact_write_set_seal_v2',
         {
@@ -751,6 +825,7 @@ async function main() {
           p_worker_job_id: CONCURRENT.workerJobId,
           p_worker_lease_token: CONCURRENT.workerLeaseToken,
         },
+        applicationName,
       ),
     ]);
     assertContract(

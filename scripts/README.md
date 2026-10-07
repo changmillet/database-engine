@@ -22,7 +22,7 @@ checkPaths:
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-08
 lastReviewedCommit: 6e9d8d357c6baa20e8f1ee086e739af8eb5a393d
-lastReviewedNote: "Reviewed Database #794 current private SQL provider transport, independent stored-state status, asynchronous register/seal, replay/fences and PostgREST isolation; atomic setup preserves deferred Auth profile mirroring and rolls back late failure. No production migrations, RPCs, schema, grants or deployment changes."
+lastReviewedNote: "Reviewed Database #794 current private SQL provider transport, independent stored-state status, lock-observed asynchronous register/seal, replay/fences and mutation-verified PostgREST isolation; atomic setup preserves deferred Auth profile mirroring and rolls back late failure. No production migrations, RPCs, schema, grants or deployment changes."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml

@@ -34,7 +34,7 @@ checkPaths:
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-08
 lastReviewedCommit: 6e9d8d357c6baa20e8f1ee086e739af8eb5a393d
-lastReviewedNote: "Reviewed Database #794 current private SQL provider transport, independent stored-state status, asynchronous register/seal, replay/fences and PostgREST isolation; atomic setup preserves deferred Auth profile mirroring and rolls back late failure. No production migrations, RPCs, schema, grants or deployment changes."
+lastReviewedNote: "Reviewed Database #794 current private SQL provider transport, independent stored-state status, lock-observed asynchronous register/seal, replay/fences and mutation-verified PostgREST isolation; atomic setup preserves deferred Auth profile mirroring and rolls back late failure. No production migrations, RPCs, schema, grants or deployment changes."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -590,7 +590,7 @@ If you add or change SQL assertions:
 
 If you add or change an offline Node contract, run its exact file with `node --test` and record that command separately from any deferred Hosted proof.
 
-The current scope-closure transport fixture is run with `node supabase/tests/20260730_scope_closure_staged_write_set_v2_sql_contract.mjs` against the reset local stack. It invokes the current private helpers through independent asynchronous SQL sessions with the Worker service-role claim, preserving exact DTOs, replay, stale fences and concurrent final-register/seal outcomes. Status is compared with independently queried stored rows and fixture counts/hash, not another invocation of the same status helper. The suite also proves the helpers are absent from public/api PostgREST routes and private is not exposed. Setup commits Auth/profile/job/check fixtures in one transaction under the governed deferred Auth profile trigger; an invalid late lease UUID proves zero partial fixture residue. The owner adapter parses actual SQL proof assertions instead of assigning a fixed transport count. No schema, grants, façade or runtime RPC changes are part of this fixture correction.
+The current scope-closure transport fixture is run with `node supabase/tests/20260730_scope_closure_staged_write_set_v2_sql_contract.mjs` against the reset local stack. It invokes the current private helpers through independent asynchronous SQL sessions with the Worker service-role claim, preserving exact DTOs, replay, stale fences and concurrent final-register/seal outcomes. Status is compared with independently queried stored rows and fixture counts/hash, not another invocation of the same status helper. A bounded row-lock barrier observes both named contenders active and waiting before release. The suite proves all six helpers remain private with closed anon/authenticated ACLs, verifies complete-argument public/api PostgREST requests are missing and private is not exposed, and detects a transaction-rolled-back exposure mutation. Setup commits Auth/profile/job/check fixtures in one transaction under the governed deferred Auth profile trigger; an invalid late lease UUID proves zero partial fixture residue. The owner adapter parses actual SQL proof assertions instead of assigning a fixed transport count. No schema, grants, façade or runtime RPC changes are part of this fixture correction.
 
 ## Supabase Functions Hooks Compaction
 
