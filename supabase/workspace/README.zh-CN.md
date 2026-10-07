@@ -21,7 +21,7 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-08
-lastReviewedCommit: d724b9af27ce3d41dc0ac063c47dc0e0f5cecac7
+lastReviewedCommit: a949215a18122f7130f4d2235df8ddde25d23071
 lastReviewedNote: "Database #797 combines Main #793/#796 raw bounds, selective Flow retrieval and guarded retirement with Dev #789 allocation-v5 and #794/#795 private SQL fixture qualification. Owned local415-to-418 upgrade,9 SQL suites1598 assertions,161 private-SQL transport checks,14 static helper tests and exact1827-file generated schema equality pass. Both source contracts remain; exact-head CI and persistent-Dev readback are still required."
 related:
   - ../../AGENTS.md
