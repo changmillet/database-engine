@@ -38,8 +38,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-08
-lastReviewedCommit: d724b9af27ce3d41dc0ac063c47dc0e0f5cecac7
-lastReviewedNote: "Reviewed Database #793 source d724b9af: 29 raw facade bounds preserve normal10x delegation; selective exact-version Flow type keys retain PGroonga scoring and broad/missing-stat fallback; five qualified indexes and four closed legacy rank routines retire under exact guards. Canonical417 local17.11 reset, 32 suites2344 assertions, 555 HTTP checks, non-superuser grant/refusal/replay proofs, independent reviews and deterministic1827-file generation pass. Hosted release/backmerge/root integration and user-authenticated production reads remain tracked delivery gates."
+lastReviewedCommit: a949215a18122f7130f4d2235df8ddde25d23071
+lastReviewedNote: "Database #797 combines Main #793/#796 raw bounds, selective Flow retrieval and guarded retirement with Dev #789 allocation-v5 and #794/#795 private SQL fixture qualification. Owned local415-to-418 upgrade,9 SQL suites1598 assertions,161 private-SQL transport checks,14 static helper tests and exact1827-file generated schema equality pass. Both source contracts remain; exact-head CI and persistent-Dev readback are still required."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md
