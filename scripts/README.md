@@ -897,3 +897,13 @@ The obsolete Process V1 rank-reader retirement has an exact DROP-only exception
 in `check_portal_projection_manifest.py`; run
 `python3 scripts/test_portal_rank_retirement_governance.py` to verify that it
 cannot waive shared/current helpers, replacement DDL or later migrations.
+
+### Dataset display list benchmark
+
+`python3 scripts/benchmark_dataset_display_list.py --local-container supabase_db_codex-display-801 --output <new-private-json>` accepts only the exact
+task-owned local Unix Docker target and an empty seven-table source. The default
+profile has 200,000 exact-version rows with unique TOAST-backed JSON, old/current
+RPC response digests, seven request shapes and the current physical plan. All
+fixtures and temporary trigger suppression roll back. Current queries must meet
+the existing 15-second budget and hydrate only ten page names; output is private
+and an existing output path is refused. These are synthetic local measurements.

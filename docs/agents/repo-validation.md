@@ -61,7 +61,8 @@ supabase migration list
 
 Open Data catalog or publication changes must additionally run the focused
 `supabase/tests/20260923_open_data_catalog_publications.sql` and
-`supabase/tests/20261009_dataset_display_settings.sql` pgTAP suites and
+`supabase/tests/20261009_dataset_display_settings.sql` and
+`supabase/tests/20261009_dataset_display_list_page_hydration.sql` pgTAP suites and
 record any pre-existing local migration-history drift separately from failures
 in the new migration.
 
@@ -940,3 +941,18 @@ poststate replay. Hosted schema/Advisor and bounded normal-request readback,
 reviewed Main hotfix, Dev backmerge and root integration remain separate gates.
 
 For dataset-display changes, qualify a blank migration rebuild and populated legacy-selection upgrade, all seven source types, foreign draft/review/state-120 candidates, exact versions, default-hidden/no inheritance, set/cancel/no-op timestamps, atomic invalid batches, source cleanup and unchanged source immutability. Run API closure, OAuth capability and Result Process read-isolation suites alongside the two catalog/display suites. Compare generated five-schema workspace and Data API types from the same owned local database. No hosted deployment is implied by local proof.
+
+## Dataset display pagination performance proof
+
+Run the display-settings and page-hydration pgTAP suites after a clean rebuild.
+The hydration suite compares complete JSONB responses, totals and ordering against
+the predecessor over seven kinds, visibility/search filters, multiple versions and
+deep/empty pages; a rollback-only name guard must reject any off-page hydration.
+For query-shape changes, run `python3 scripts/benchmark_dataset_display_list.py --local-container supabase_db_codex-display-801 --output <new-private-json>` on the
+empty, exact task-owned local database. It uses 200,000 synthetic large-JSON rows,
+records old/current complete-response digests and natural plans, enforces the
+unchanged 15-second query budget and ten-row hydration, and verifies rollback.
+Synthetic local timings are not hosted performance evidence. A populated
+canonical-base-to-head upgrade must preserve source/settings hashes, response
+parity and function OID/owner/ACL/security/config/result identity. Do not increase
+role/RPC timeouts or add indexes/caches without separate measured justification.

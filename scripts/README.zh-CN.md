@@ -788,3 +788,13 @@ PostgreSQL17.11 本地栈和空投影表。通过 `--help` 查看有界 fixture 
 只作为读取证据；真实 writer/RLS 测试与托管性能仍需分别验证。
 
 旧 Process V1 排名读取路径的退役在 `check_portal_projection_manifest.py` 中使用精确的 DROP-only 例外。运行 `python3 scripts/test_portal_rank_retirement_governance.py`，验证该例外不会放行共享/当前 helper、替换定义或其他迁移文件。
+
+### Dataset display list benchmark
+
+`python3 scripts/benchmark_dataset_display_list.py --local-container supabase_db_codex-display-801 --output <new-private-json>` accepts only the exact
+task-owned local Unix Docker target and an empty seven-table source. The default
+profile has 200,000 exact-version rows with unique TOAST-backed JSON, old/current
+RPC response digests, seven request shapes and the current physical plan. All
+fixtures and temporary trigger suppression roll back. Current queries must meet
+the existing 15-second budget and hydrate only ten page names; output is private
+and an existing output path is refused. These are synthetic local measurements.
