@@ -1,7 +1,7 @@
 version: 1
 layout: repo
 lastReviewedAt: "2026-10-09"
-lastReviewedCommit: "7678a9251b3d5b03513b6c96a929506cbd5d1e14"
+lastReviewedCommit: "1c6b66b48eb8ca232ba7ba23c92b048028cd4c4e"
 lastReviewedNote: 'Database #803: reviewed exact same-bundle Process reference version rewriting; table/column structures, public signatures, ACL and generated-workspace ownership remain unchanged.'
 
 # Keep deterministic governance facts here.

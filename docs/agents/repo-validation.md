@@ -33,7 +33,7 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-09
-lastReviewedCommit: 7678a9251b3d5b03513b6c96a929506cbd5d1e14
+lastReviewedCommit: 1c6b66b48eb8ca232ba7ba23c92b048028cd4c4e
 lastReviewedNote: 'Database #803: reviewed exact same-bundle Process reference version rewriting; table/column structures, public signatures, ACL and generated-workspace ownership remain unchanged.'
 related:
   - ../../AGENTS.md
@@ -78,7 +78,7 @@ before-content save, result-process-state-120,
 result-process-lifecycle-protection, result-process-product-read-isolation, and
 manager-attested-result-publication suites before hosted steps.
 
-For Model bundle version allocation, run `20261009_model_bundle_process_references.sql` with `20260611_dataset_create_version_rpc.sql` and `20260902_process_model_version.sql`. Verify exact same-bundle reference rewriting, external version preservation, singleton/array shape and child ownership after a blank rebuild and a populated upgrade.
+The local contract CI job includes Model bundle version allocation. For focused validation, run `20261009_model_bundle_process_references.sql` with `20260611_dataset_create_version_rpc.sql` and `20260902_process_model_version.sql`. Verify exact same-bundle reference rewriting, external version preservation, singleton/array shape and child ownership after a blank rebuild and a populated upgrade.
 
 ## Proof Matrix
 
