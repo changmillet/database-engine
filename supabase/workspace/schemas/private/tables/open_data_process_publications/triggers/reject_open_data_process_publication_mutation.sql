@@ -1,1 +1,0 @@
-CREATE OR REPLACE TRIGGER "reject_open_data_process_publication_mutation" BEFORE DELETE OR UPDATE ON "private"."open_data_process_publications" FOR EACH ROW EXECUTE FUNCTION "private"."reject_open_data_process_publication_mutation"();

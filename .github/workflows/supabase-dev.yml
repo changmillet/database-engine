@@ -63,6 +63,9 @@ jobs:
           supabase test db supabase/tests/20260920_portal_china_administrative_navigation.sql
           supabase test db supabase/tests/20260805_full_schema_cutover.sql
           supabase test db supabase/tests/20260806_api_contract_closure.sql
+          supabase test db supabase/tests/20260611_dataset_create_version_rpc.sql
+          supabase test db supabase/tests/20260902_process_model_version.sql
+          supabase test db supabase/tests/20261009_model_bundle_process_references.sql
           supabase test db supabase/tests/20260806_identity_center_facades.sql
           supabase test db supabase/tests/20260806_lca_package_capability_facades.sql
           supabase test db supabase/tests/20260810_issue_448_package_ownership_and_attempt_diagnostics.sql
@@ -96,6 +99,8 @@ jobs:
           supabase test db supabase/tests/20260923_derivative_scheduler_budget.sql
           supabase test db supabase/tests/20260923_retired_sample_library_contract.sql
           supabase test db supabase/tests/20260923_open_data_catalog_publications.sql
+          supabase test db supabase/tests/20261009_dataset_display_settings.sql
+          supabase test db supabase/tests/20261009_dataset_display_list_page_hydration.sql
           supabase test db supabase/tests/20260924_reviewer_contact_profile_activation.sql
           supabase test db supabase/tests/20260921_foundry60_time_alias_v2_math.sql
           supabase test db supabase/tests/20260921_foundry60_time_alias_v2_vectors.sql

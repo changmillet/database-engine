@@ -1,3 +1,4 @@
+-- Keep exact same-bundle Process references aligned with the allocated Model version.
 CREATE OR REPLACE FUNCTION "private"."save_lifecycle_model_bundle"("p_plan" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'private', 'api', 'public', 'util', 'extensions', 'pg_temp'

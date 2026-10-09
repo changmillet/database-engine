@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-08
-lastReviewedCommit: a949215a18122f7130f4d2235df8ddde25d23071
-lastReviewedNote: "Database #797 combines Main #793/#796 raw bounds, selective Flow retrieval and guarded retirement with Dev #789 allocation-v5 and #794/#795 private SQL fixture qualification. Owned local415-to-418 upgrade,9 SQL suites1598 assertions,161 private-SQL transport checks,14 static helper tests and exact1827-file generated schema equality pass. Both source contracts remain; exact-head CI and persistent-Dev readback are still required."
+lastReviewedAt: 2026-10-09
+lastReviewedCommit: 172ba55a84c0b9d8e22639978247b7916f2a64df
+lastReviewedNote: 'Database #803: reviewed exact same-bundle Process reference version rewriting; table/column structures, public signatures, ACL and generated-workspace ownership remain unchanged.'
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -897,3 +897,13 @@ The obsolete Process V1 rank-reader retirement has an exact DROP-only exception
 in `check_portal_projection_manifest.py`; run
 `python3 scripts/test_portal_rank_retirement_governance.py` to verify that it
 cannot waive shared/current helpers, replacement DDL or later migrations.
+
+### Dataset display list benchmark
+
+`python3 scripts/benchmark_dataset_display_list.py --local-container supabase_db_codex-display-801 --output <new-private-json>` accepts only the exact
+task-owned local Unix Docker target and an empty seven-table source. The default
+profile has 200,000 exact-version rows with unique TOAST-backed JSON, old/current
+RPC response digests, seven request shapes and the current physical plan. All
+fixtures and temporary trigger suppression roll back. Current queries must meet
+the existing 15-second budget and hydrate only ten page names; output is private
+and an existing output path is refused. These are synthetic local measurements.

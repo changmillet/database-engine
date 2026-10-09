@@ -22,9 +22,9 @@ checkPaths:
   - .github/workflows/supabase-dev.yml
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
-lastReviewedAt: 2026-10-08
-lastReviewedCommit: d724b9af27ce3d41dc0ac063c47dc0e0f5cecac7
-lastReviewedNote: "Reviewed Database #793 source d724b9af: 29 raw facade bounds preserve normal10x delegation; selective exact-version Flow type keys retain PGroonga scoring and broad/missing-stat fallback; five qualified indexes and four closed legacy rank routines retire under exact guards. Canonical417 local17.11 reset, 32 suites2344 assertions, 555 HTTP checks, non-superuser grant/refusal/replay proofs, independent reviews and deterministic1827-file generation pass. Hosted release/backmerge/root integration and user-authenticated production reads remain tracked delivery gates."
+lastReviewedAt: 2026-10-09
+lastReviewedCommit: 1c6b66b48eb8ca232ba7ba23c92b048028cd4c4e
+lastReviewedNote: 'Database #801: narrow-key display pagination with bounded exact-page name hydration, unchanged filters/auth/ACL/15s budget. Blank420 replay, populated419 upgrade, 8 SQL suites1023 assertions, 200k-row1.76GB-TOAST digest/plan benchmark, deterministic1833-file schema/types, workflow and legacy checks pass. Lint/advisors exactly match baseline, including existing findings. No hosted writes, deployment or merge.'
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

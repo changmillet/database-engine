@@ -111,8 +111,8 @@ begin
         %2$s as model_id,
         %3$s as model_version,
         case when $5 = 'process' then exists (
-          select 1 from private.open_data_process_publications publication
-          where publication.process_id = d.id and publication.process_version = d.version
+          select 1 from private.dataset_display_settings publication
+          where publication.dataset_kind = 'process' and publication.is_visible and publication.dataset_id = d.id and publication.dataset_version = d.version
         ) else false end as is_published,
         fused.score
       from %1$s d
@@ -166,8 +166,8 @@ ALTER FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", 
 
 REVOKE ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") FROM PUBLIC;
 
+GRANT ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") TO "api_internal_executor";
+
 GRANT ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") TO "anon";
 
 GRANT ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") TO "authenticated";
-
-GRANT ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") TO "api_internal_executor";

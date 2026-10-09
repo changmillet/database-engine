@@ -32,9 +32,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-08
-lastReviewedCommit: a949215a18122f7130f4d2235df8ddde25d23071
-lastReviewedNote: "Database #797 combines Main #793/#796 raw bounds, selective Flow retrieval and guarded retirement with Dev #789 allocation-v5 and #794/#795 private SQL fixture qualification. Owned local415-to-418 upgrade,9 SQL suites1598 assertions,161 private-SQL transport checks,14 static helper tests and exact1827-file generated schema equality pass. Both source contracts remain; exact-head CI and persistent-Dev readback are still required."
+lastReviewedAt: 2026-10-09
+lastReviewedCommit: 1c6b66b48eb8ca232ba7ba23c92b048028cd4c4e
+lastReviewedNote: 'Database #803: reviewed exact same-bundle Process reference version rewriting; table/column structures, public signatures, ACL and generated-workspace ownership remain unchanged.'
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -60,7 +60,9 @@ supabase migration list
 ```
 
 Open Data catalog or publication changes must additionally run the focused
-`supabase/tests/20260923_open_data_catalog_publications.sql` pgTAP suite and
+`supabase/tests/20260923_open_data_catalog_publications.sql` and
+`supabase/tests/20261009_dataset_display_settings.sql` and
+`supabase/tests/20261009_dataset_display_list_page_hydration.sql` pgTAP suites and
 record any pre-existing local migration-history drift separately from failures
 in the new migration.
 
@@ -75,6 +77,8 @@ TIDAS partial-import, example-dataset-scope, guarded owner-draft
 before-content save, result-process-state-120,
 result-process-lifecycle-protection, result-process-product-read-isolation, and
 manager-attested-result-publication suites before hosted steps.
+
+The local contract CI job includes Model bundle version allocation. For focused validation, run `20261009_model_bundle_process_references.sql` with `20260611_dataset_create_version_rpc.sql` and `20260902_process_model_version.sql`. Verify exact same-bundle reference rewriting, external version preservation, singleton/array shape and child ownership after a blank rebuild and a populated upgrade.
 
 ## Proof Matrix
 
@@ -937,3 +941,20 @@ Before release, compare all affected function metadata, index definitions and
 external capability grants; qualify refusal of unexpected prestate plus known
 poststate replay. Hosted schema/Advisor and bounded normal-request readback,
 reviewed Main hotfix, Dev backmerge and root integration remain separate gates.
+
+For dataset-display changes, qualify a blank migration rebuild and populated legacy-selection upgrade, all seven source types, foreign draft/review/state-120 candidates, exact versions, default-hidden/no inheritance, set/cancel/no-op timestamps, atomic invalid batches, source cleanup and unchanged source immutability. Run API closure, OAuth capability and Result Process read-isolation suites alongside the two catalog/display suites. Compare generated five-schema workspace and Data API types from the same owned local database. No hosted deployment is implied by local proof.
+
+## Dataset display pagination performance proof
+
+Run the display-settings and page-hydration pgTAP suites after a clean rebuild.
+The hydration suite compares complete JSONB responses, totals and ordering against
+the predecessor over seven kinds, visibility/search filters, multiple versions and
+deep/empty pages; a rollback-only name guard must reject any off-page hydration.
+For query-shape changes, run `python3 scripts/benchmark_dataset_display_list.py --local-container supabase_db_codex-display-801 --output <new-private-json>` on the
+empty, exact task-owned local database. It uses 200,000 synthetic large-JSON rows,
+records old/current complete-response digests and natural plans, enforces the
+unchanged 15-second query budget and ten-row hydration, and verifies rollback.
+Synthetic local timings are not hosted performance evidence. A populated
+canonical-base-to-head upgrade must preserve source/settings hashes, response
+parity and function OID/owner/ACL/security/config/result identity. Do not increase
+role/RPC timeouts or add indexes/caches without separate measured justification.

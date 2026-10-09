@@ -70,17 +70,11 @@ values
    '71200000-0000-4000-8000-000000000002',
    '{"testScope":"open-data-712","label":"catalogtoken enterprise"}',array['catalogtoken enterprise']);
 
-select ok(
-  not has_table_privilege('authenticated','private.open_data_process_publications','select')
-  and not has_table_privilege('authenticated','private.open_data_process_publications','insert'),
-  'the Open Data publication relation remains inaccessible to browser DML'
-);
-select ok(
-  has_function_privilege('authenticated','api.cmd_open_data_process_publish_batch(jsonb)','execute')
-  and not has_function_privilege('anon','api.cmd_open_data_process_publish_batch(jsonb)','execute')
-  and not has_function_privilege('service_role','api.cmd_open_data_process_publish_batch(jsonb)','execute'),
-  'only authenticated actor sessions can enter the Open Data publish command'
-);
+select ok(to_regclass('private.open_data_process_publications') is null and to_regprocedure('api.cmd_dataset_display_set_batch(jsonb)') is null,
+  'the retired publication storage and command are removed');
+select ok(not has_table_privilege('authenticated','private.dataset_display_settings','select')
+  and not has_table_privilege('authenticated','private.dataset_display_settings','insert'),
+  'display settings remain inaccessible to browser DML');
 select ok(
   has_function_privilege(
     'anon',
@@ -146,8 +140,8 @@ set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','71200000-0000-4000-8000-000000000002',true);
 select throws_ok(
-  $$select api.cmd_open_data_process_publish_batch(
-    '[{"id":"71200000-0000-4000-8000-000000000010","version":"02.00.000"}]'
+  $$select api.cmd_dataset_display_set_batch(
+    '[{"datasetKind":"process","id":"71200000-0000-4000-8000-000000000010","version":"02.00.000"}]',true
   )$$,
   '42501',
   'data_product_manager role required',
@@ -159,20 +153,20 @@ set local role authenticated;
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.sub','71200000-0000-4000-8000-000000000001',true);
 create temporary table publish_result on commit drop as
-select api.cmd_open_data_process_publish_batch(
-  '[{"id":"71200000-0000-4000-8000-000000000010","version":"02.00.000"},
-    {"id":"71200000-0000-4000-8000-000000000010","version":"02.00.000"}]'
+select api.cmd_dataset_display_set_batch(
+  '[{"datasetKind":"process","id":"71200000-0000-4000-8000-000000000010","version":"02.00.000"},
+    {"datasetKind":"process","id":"71200000-0000-4000-8000-000000000010","version":"02.00.000"}]',true
 ) as response;
 select is((select response #>> '{data,inputCount}' from publish_result), '2',
   'the command reports the original input count');
 select is((select response #>> '{data,requestedCount}' from publish_result), '1',
   'the command deduplicates exact identities');
-select is((select response #>> '{data,publishedCount}' from publish_result), '1',
+select is((select response #>> '{data,changedCount}' from publish_result), '1',
   'the command inserts one exact publication');
 select is(
-  api.cmd_open_data_process_publish_batch(
-    '[{"id":"71200000-0000-4000-8000-000000000010","version":"02.00.000"}]'
-  ) #>> '{data,alreadyPublishedCount}',
+  api.cmd_dataset_display_set_batch(
+    '[{"datasetKind":"process","id":"71200000-0000-4000-8000-000000000010","version":"02.00.000"}]',true
+  ) #>> '{data,unchangedCount}',
   '1',
   'an exact retry is idempotent'
 );
@@ -183,21 +177,6 @@ select is(
    where id='71200000-0000-4000-8000-000000000010' and version='02.00.000'),
   '100',
   'publication does not change state_code'
-);
-select is(
-  (select published_by::text from private.open_data_process_publications
-   where process_id='71200000-0000-4000-8000-000000000010'
-     and process_version='02.00.000'),
-  '71200000-0000-4000-8000-000000000001',
-  'the server-derived manager identity is retained for audit'
-);
-select throws_ok(
-  $$delete from private.open_data_process_publications
-    where process_id='71200000-0000-4000-8000-000000000010'
-      and process_version='02.00.000'$$,
-  '55000',
-  'Open Data Process publications are append-only',
-  'publication rows cannot be withdrawn by mutation'
 );
 select is(
   (select total_count::text from api.search_open_data_catalog(

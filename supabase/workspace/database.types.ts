@@ -150,6 +150,10 @@ export type Database = {
         Args: { p_id: string; p_table: string; p_version: string }
         Returns: Json
       }
+      cmd_dataset_display_set_batch: {
+        Args: { p_is_visible: boolean; p_items: Json }
+        Returns: Json
+      }
       cmd_dataset_extraction_ack: {
         Args: { p_msg_ids: number[] }
         Returns: Json
@@ -425,10 +429,6 @@ export type Database = {
           p_recipient_user_id: string
           p_tab_names?: string[]
         }
-        Returns: Json
-      }
-      cmd_open_data_process_publish_batch: {
-        Args: { p_items: Json }
         Returns: Json
       }
       cmd_portal_lcia_projection_finalize_publication_v1: {
@@ -1464,6 +1464,25 @@ export type Database = {
       lifecyclemodels_embedding_ft_input: {
         Args: { proc: Database["public"]["Tables"]["lifecyclemodels"]["Row"] }
         Returns: string
+      }
+      list_dataset_display_candidates: {
+        Args: {
+          p_dataset_kind?: string
+          p_page?: number
+          p_page_size?: number
+          p_query?: string
+          p_visibility?: string
+        }
+        Returns: Json
+      }
+      list_displayed_datasets: {
+        Args: {
+          p_dataset_kind?: string
+          p_page?: number
+          p_page_size?: number
+          p_query?: string
+        }
+        Returns: Json
       }
       list_lcia_result_sets: { Args: { p_limit?: number }; Returns: Json }
       list_lcia_scope_closure_issues: {
