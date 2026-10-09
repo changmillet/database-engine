@@ -1,8 +1,8 @@
 version: 1
 layout: repo
 lastReviewedAt: "2026-10-09"
-lastReviewedCommit: "1c0600bddde26bd7c46485d6b0cd046c57a958dd"
-lastReviewedNote: "Database #799: reversible exact-version display settings for seven dataset kinds, manager-only all-owner/all-state candidates and bounded authenticated metadata. Owned blank419 rebuild, populated418-to-419 marker upgrade, seven SQL suites226 assertions, workflow contract, and deterministic1833-file generation pass. Local security advisors report no new display findings. No hosted deployment or merge is authorized."
+lastReviewedCommit: "43fad1efe148154e2e7aeca38a054dd0957746de"
+lastReviewedNote: 'Database #801: narrow-key display pagination with bounded exact-page name hydration, unchanged filters/auth/ACL/15s budget. Blank420 replay, populated419 upgrade, 8 SQL suites1023 assertions, 200k-row1.76GB-TOAST digest/plan benchmark, deterministic1833-file schema/types, workflow and legacy checks pass. Lint/advisors exactly match baseline, including existing findings. No hosted writes, deployment or merge.'
 
 # Keep deterministic governance facts here.
 # AGENTS.md remains the repo contract entrypoint.

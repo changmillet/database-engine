@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-09
-lastReviewedCommit: 1c0600bddde26bd7c46485d6b0cd046c57a958dd
-lastReviewedNote: "Database #799: reversible exact-version display settings for seven dataset kinds, manager-only all-owner/all-state candidates and bounded authenticated metadata. Owned blank419 rebuild, populated418-to-419 marker upgrade, seven SQL suites226 assertions, workflow contract, and deterministic1833-file generation pass. Local security advisors report no new display findings. No hosted deployment or merge is authorized."
+lastReviewedCommit: 43fad1efe148154e2e7aeca38a054dd0957746de
+lastReviewedNote: 'Database #801: narrow-key display pagination with bounded exact-page name hydration, unchanged filters/auth/ACL/15s budget. Blank420 replay, populated419 upgrade, 8 SQL suites1023 assertions, 200k-row1.76GB-TOAST digest/plan benchmark, deterministic1833-file schema/types, workflow and legacy checks pass. Lint/advisors exactly match baseline, including existing findings. No hosted writes, deployment or merge.'
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -1112,3 +1112,5 @@ prefix-bound recovery/benchmark contracts remain immutable history.
 `api.list_dataset_display_candidates` and `api.cmd_dataset_display_set_batch` recheck the live system `data_product_manager` role. Candidates include every exact business version regardless of state, owner or team. The command validates 1–100 identities, deduplicates, locks sources in stable kind/id/version order, and changes only configuration atomically; malformed or missing sources roll back the entire batch. Set and cancel are idempotent. Source deletion or an admitted identity replacement cleans its exact setting; business immutability guards remain authoritative.
 
 `api.list_displayed_datasets` admits existing authenticated actors only and returns bounded selected names, exact versions and types. The private union projection and configuration table grant no application-role access. OAuth readers use `NX-CORE-02`, the command uses `CLI-RPC-01`, and all three facade grants are manifest-complete with no anonymous or service-role grant. Pages are bounded to 100 rows, filters/counts precede pagination, names are capped at 16 KiB and queries at 512 bytes. Display does not confer raw dataset, export, reference, Portal or calculation eligibility. Existing source-filtered state-100 Open Data readers keep their signatures and derive their legacy Process selection flag from the new true settings.
+
+Display list pagination materializes only exact identity and visibility keys. Empty queries carry no name/JSON expression in the candidate scan; bound custom SQL plans prune unused type/filter branches. Totals and stable kind/id/version-desc ordering precede pagination, then a correlated exact lookup with an OFFSET-0 fence hydrates only the bounded page. Nonempty searches retain full name-or-UUID substring semantics before counting/paging; no search candidate cap, cache, new index or timeout increase is introduced.

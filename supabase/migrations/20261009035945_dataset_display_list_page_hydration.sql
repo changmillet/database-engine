@@ -1,8 +1,10 @@
-CREATE OR REPLACE FUNCTION "private"."dataset_display_list"("p_kind" "text", "p_visibility" "text", "p_query" "text", "p_page_size" integer, "p_page" integer, "p_candidates" boolean) RETURNS "jsonb"
-    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
-    SET "search_path" TO ''
-    SET "statement_timeout" TO '15s'
-    AS $_$
+-- Database #801: count/page narrow identities before reading TOAST-backed names.
+-- Preserve the #799 response, exact totals, sort, search and authorization contract.
+begin;
+create or replace function private.dataset_display_list(
+  p_kind text,p_visibility text,p_query text,p_page_size integer,p_page integer,p_candidates boolean
+) returns jsonb language plpgsql stable security definer
+set search_path = '' set statement_timeout = '15s' as $$
 declare v_result jsonb; v_search_filter text := '';
 begin
   if auth.uid() is null then raise exception using errcode='28000',message='authentication required'; end if;
@@ -56,8 +58,6 @@ begin
       'total',(select count(*) from eligible))
   $query$ into v_result using p_kind,p_visibility,p_query,p_page_size,p_page,p_candidates;
   return v_result;
-end; $_$;
-
-ALTER FUNCTION "private"."dataset_display_list"("p_kind" "text", "p_visibility" "text", "p_query" "text", "p_page_size" integer, "p_page" integer, "p_candidates" boolean) OWNER TO "postgres";
-
-REVOKE ALL ON FUNCTION "private"."dataset_display_list"("p_kind" "text", "p_visibility" "text", "p_query" "text", "p_page_size" integer, "p_page" integer, "p_candidates" boolean) FROM PUBLIC;
+end; $$;
+-- CREATE OR REPLACE preserves owner and the existing closed private ACL.
+commit;

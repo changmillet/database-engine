@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-09
-lastReviewedCommit: 1c0600bddde26bd7c46485d6b0cd046c57a958dd
-lastReviewedNote: "Database #799: reversible exact-version display settings for seven dataset kinds, manager-only all-owner/all-state candidates and bounded authenticated metadata. Owned blank419 rebuild, populated418-to-419 marker upgrade, seven SQL suites226 assertions, workflow contract, and deterministic1833-file generation pass. Local security advisors report no new display findings. No hosted deployment or merge is authorized."
+lastReviewedCommit: 43fad1efe148154e2e7aeca38a054dd0957746de
+lastReviewedNote: 'Database #801: narrow-key display pagination with bounded exact-page name hydration, unchanged filters/auth/ACL/15s budget. Blank420 replay, populated419 upgrade, 8 SQL suites1023 assertions, 200k-row1.76GB-TOAST digest/plan benchmark, deterministic1833-file schema/types, workflow and legacy checks pass. Lint/advisors exactly match baseline, including existing findings. No hosted writes, deployment or merge.'
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -788,3 +788,13 @@ PostgreSQL17.11 本地栈和空投影表。通过 `--help` 查看有界 fixture 
 只作为读取证据；真实 writer/RLS 测试与托管性能仍需分别验证。
 
 旧 Process V1 排名读取路径的退役在 `check_portal_projection_manifest.py` 中使用精确的 DROP-only 例外。运行 `python3 scripts/test_portal_rank_retirement_governance.py`，验证该例外不会放行共享/当前 helper、替换定义或其他迁移文件。
+
+### Dataset display list benchmark
+
+`python3 scripts/benchmark_dataset_display_list.py --local-container supabase_db_codex-display-801 --output <new-private-json>` accepts only the exact
+task-owned local Unix Docker target and an empty seven-table source. The default
+profile has 200,000 exact-version rows with unique TOAST-backed JSON, old/current
+RPC response digests, seven request shapes and the current physical plan. All
+fixtures and temporary trigger suppression roll back. Current queries must meet
+the existing 15-second budget and hydrate only ten page names; output is private
+and an existing output path is refused. These are synthetic local measurements.
