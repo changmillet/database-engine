@@ -63815,6 +63815,10 @@ declare
     v_pub jsonb;
     v_resulting_refs jsonb;
     v_submodels jsonb;
+    v_process_instances jsonb;
+    v_included_refs jsonb;
+    v_rewritten jsonb;
+    v_mutation_index integer;
 begin
     if v_mode not in ('create', 'update') then
         raise exception 'INVALID_PLAN';
@@ -63948,6 +63952,64 @@ begin
                 true
             );
         end if;
+
+        -- Only exact references to Processes created by this bundle follow its
+        -- allocated version. References to source inventories remain version-pinned.
+        v_process_instances := v_parent_json_ordered #> '{lifeCycleModelDataSet,lifeCycleModelInformation,technology,processes,processInstance}';
+        if jsonb_typeof(v_process_instances) in ('array', 'object') then
+            select coalesce(jsonb_agg(
+                case when exists (
+                    select 1 from jsonb_array_elements(v_process_mutations) m
+                    where m->>'op' = 'create'
+                      and m->>'id' = i.value #>> '{referenceToProcess,@refObjectId}'
+                      and m #>> '{jsonOrdered,processDataSet,administrativeInformation,publicationAndOwnership,common:dataSetVersion}'
+                          = i.value #>> '{referenceToProcess,@version}'
+                ) then jsonb_set(i.value, '{referenceToProcess,@version}', to_jsonb(v_allocated_version), false)
+                else i.value end order by i.ordinality
+            ), '[]'::jsonb) into v_rewritten
+            from jsonb_array_elements(
+                case when jsonb_typeof(v_process_instances) = 'array' then v_process_instances
+                     else jsonb_build_array(v_process_instances) end
+            ) with ordinality i(value, ordinality);
+            v_parent_json_ordered := jsonb_set(
+                v_parent_json_ordered,
+                '{lifeCycleModelDataSet,lifeCycleModelInformation,technology,processes,processInstance}',
+                case when jsonb_typeof(v_process_instances) = 'array' then v_rewritten
+                     else v_rewritten->0 end,
+                false
+            );
+        end if;
+
+        for v_mutation_index in 0 .. jsonb_array_length(v_process_mutations) - 1 loop
+            v_mutation := v_process_mutations->v_mutation_index;
+            if v_mutation->>'op' <> 'create' then
+                continue;
+            end if;
+            v_included_refs := v_mutation #> '{jsonOrdered,processDataSet,processInformation,technology,referenceToIncludedProcesses}';
+            if jsonb_typeof(v_included_refs) in ('array', 'object') then
+                select coalesce(jsonb_agg(
+                    case when exists (
+                        select 1 from jsonb_array_elements(v_process_mutations) m
+                        where m->>'op' = 'create'
+                          and m->>'id' = r.value->>'@refObjectId'
+                          and m #>> '{jsonOrdered,processDataSet,administrativeInformation,publicationAndOwnership,common:dataSetVersion}'
+                              = r.value->>'@version'
+                    ) then jsonb_set(r.value, '{@version}', to_jsonb(v_allocated_version), false)
+                    else r.value end order by r.ordinality
+                ), '[]'::jsonb) into v_rewritten
+                from jsonb_array_elements(
+                    case when jsonb_typeof(v_included_refs) = 'array' then v_included_refs
+                         else jsonb_build_array(v_included_refs) end
+                ) with ordinality r(value, ordinality);
+                v_process_mutations := jsonb_set(
+                    v_process_mutations,
+                    array[v_mutation_index::text, 'jsonOrdered', 'processDataSet', 'processInformation', 'technology', 'referenceToIncludedProcesses'],
+                    case when jsonb_typeof(v_included_refs) = 'array' then v_rewritten
+                         else v_rewritten->0 end,
+                    false
+                );
+            end if;
+        end loop;
 
         if jsonb_typeof(v_parent_json_tg->'submodels') = 'array' then
             select coalesce(

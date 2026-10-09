@@ -38,8 +38,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-09
-lastReviewedCommit: 43fad1efe148154e2e7aeca38a054dd0957746de
-lastReviewedNote: 'Database #801: narrow-key display pagination with bounded exact-page name hydration, unchanged filters/auth/ACL/15s budget. Blank420 replay, populated419 upgrade, 8 SQL suites1023 assertions, 200k-row1.76GB-TOAST digest/plan benchmark, deterministic1833-file schema/types, workflow and legacy checks pass. Lint/advisors exactly match baseline, including existing findings. No hosted writes, deployment or merge.'
+lastReviewedCommit: 172ba55a84c0b9d8e22639978247b7916f2a64df
+lastReviewedNote: 'Database #803: reviewed exact same-bundle Process reference version rewriting; table/column structures, public signatures, ACL and generated-workspace ownership remain unchanged.'
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md

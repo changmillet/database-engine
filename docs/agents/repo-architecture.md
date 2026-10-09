@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-09
-lastReviewedCommit: 43fad1efe148154e2e7aeca38a054dd0957746de
-lastReviewedNote: 'Database #801: narrow-key display pagination with bounded exact-page name hydration, unchanged filters/auth/ACL/15s budget. Blank420 replay, populated419 upgrade, 8 SQL suites1023 assertions, 200k-row1.76GB-TOAST digest/plan benchmark, deterministic1833-file schema/types, workflow and legacy checks pass. Lint/advisors exactly match baseline, including existing findings. No hosted writes, deployment or merge.'
+lastReviewedCommit: 172ba55a84c0b9d8e22639978247b7916f2a64df
+lastReviewedNote: 'Database #803: reviewed exact same-bundle Process reference version rewriting; table/column structures, public signatures, ACL and generated-workspace ownership remain unchanged.'
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -63,6 +63,9 @@ Open Data catalog publication is represented independently in
 `private.sample_library_process_publications` relation.
 
 For LifecycleModel review and bundle operations, authoritative composition comes from ILCD `processInstance` references and the Process ownership pair `public.processes.model_id` plus `coalesce(public.processes.model_version, public.processes.version)`. The nullable `model_version` is an additive correction to the original same-version bundle assumption: new writers persist the exact owning LifecycleModel version, while historical rows with `model_version is null` retain the legacy Process-version fallback. Readers must never substitute the latest LifecycleModel version. `lifecyclemodels.json_tg` is persisted for frontend reconstruction only and must not define review closure, approval targets, publication admission, or deletion membership.
+
+When a Model bundle creates a new version, the save transaction assigns that version to its created Processes and rewrites exact same-bundle references in Model process instances and Process `referenceToIncludedProcesses`. Matching uses both Process UUID and the submitted Process version. Source inventories and references to other versions retain their pinned versions. Singleton, array, empty and absent reference shapes retain their structure and order; Process ownership continues to use the exact parent Model version.
+
 
 The application database uses five durable schemas with deliberately different
 responsibilities:
