@@ -7158,6 +7158,53 @@ COMMENT ON FUNCTION "api"."cmd_dataset_derivative_rebuild_snapshot"("p_table" "t
 
 
 
+CREATE OR REPLACE FUNCTION "api"."cmd_dataset_display_set_batch"("p_items" "jsonb", "p_is_visible" boolean) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    SET "statement_timeout" TO '15s'
+    AS $_$
+declare v_item record; v_table text; v_exists boolean; v_current boolean; v_requested integer:=0; v_changed integer:=0;
+begin
+  perform private.dataset_display_require_manager();
+  if p_is_visible is null or jsonb_typeof(p_items) is distinct from 'array' then
+    raise exception using errcode='22023',message='items must be an array and isVisible a boolean';
+  end if;
+  if jsonb_array_length(p_items) not between 1 and 100 then
+    raise exception using errcode='22023',message='items must contain between 1 and 100 exact dataset versions';
+  end if;
+  if exists(select 1 from jsonb_array_elements(p_items) t(v) where jsonb_typeof(v) is distinct from 'object'
+    or jsonb_typeof(v->'datasetKind') is distinct from 'string' or (v->>'datasetKind') not in ('lifecyclemodel','process','flow','flowproperty','unitgroup','source','contact')
+    or jsonb_typeof(v->'id') is distinct from 'string' or not ((v->>'id')~*'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+    or jsonb_typeof(v->'version') is distinct from 'string' or not ((v->>'version')~'^\d{2}\.\d{2}\.\d{3}$')
+    or v - array['datasetKind','id','version']::text[] <> '{}'::jsonb) then
+    raise exception using errcode='22023',message='each item must contain only a supported datasetKind, valid id and version';
+  end if;
+  -- Lock each exact source in the same global order. No state/owner/team predicate.
+  -- FOR UPDATE serializes overlapping commands and source deletion/identity changes.
+  for v_item in select distinct v->>'datasetKind' as kind,(v->>'id')::uuid as id,(v->>'version')::character(9) as version
+    from jsonb_array_elements(p_items) t(v) order by 1,2,3 loop
+    v_table:=case v_item.kind when 'lifecyclemodel' then 'lifecyclemodels' when 'process' then 'processes' when 'flow' then 'flows'
+      when 'flowproperty' then 'flowproperties' when 'unitgroup' then 'unitgroups' when 'source' then 'sources' when 'contact' then 'contacts' end;
+    v_exists:=false;
+    execute format('select true from public.%I where id=$1 and version=$2 for update',v_table) into v_exists using v_item.id,v_item.version;
+    if v_exists is distinct from true then raise exception using errcode='22023',message='all requested dataset versions must exist'; end if;
+    v_requested:=v_requested+1;
+    select is_visible into v_current from private.dataset_display_settings
+      where dataset_kind=v_item.kind and dataset_id=v_item.id and dataset_version=v_item.version;
+    if coalesce(v_current,false) is distinct from p_is_visible then
+      insert into private.dataset_display_settings(dataset_kind,dataset_id,dataset_version,is_visible)
+      values(v_item.kind,v_item.id,v_item.version,p_is_visible)
+      on conflict(dataset_kind,dataset_id,dataset_version) do update set is_visible=excluded.is_visible,updated_at=now();
+      v_changed:=v_changed+1;
+    end if;
+  end loop;
+  return jsonb_build_object('ok',true,'data',jsonb_build_object('inputCount',jsonb_array_length(p_items),'requestedCount',v_requested,'changedCount',v_changed,'unchangedCount',v_requested-v_changed,'isVisible',p_is_visible));
+end; $_$;
+
+
+ALTER FUNCTION "api"."cmd_dataset_display_set_batch"("p_items" "jsonb", "p_is_visible" boolean) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "api"."cmd_dataset_extraction_ack"("p_msg_ids" bigint[]) RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -12910,141 +12957,6 @@ $$;
 
 
 ALTER FUNCTION "api"."cmd_notification_send_validation_issue"("p_recipient_user_id" "uuid", "p_dataset_type" "text", "p_dataset_id" "uuid", "p_dataset_version" "text", "p_link" "text", "p_issue_codes" "text"[], "p_tab_names" "text"[], "p_issue_count" integer, "p_audit" "jsonb") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "api"."cmd_open_data_process_publish_batch"("p_items" "jsonb") RETURNS "jsonb"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'api', 'private', 'public', 'util', 'extensions', 'pg_temp'
-    AS $_$
-declare
-  v_actor uuid := auth.uid();
-  v_input_count integer;
-  v_requested_count integer;
-  v_existing_count integer;
-  v_inserted_count integer;
-  v_valid_count integer;
-begin
-  if v_actor is null then
-    raise exception using errcode = '28000', message = 'authentication required';
-  end if;
-
-  if not exists (
-    select 1
-    from private.roles r
-    where r.user_id = v_actor
-      and r.team_id = '00000000-0000-0000-0000-000000000000'::uuid
-      and r.role::text = 'data_product_manager'
-  ) then
-    raise exception using errcode = '42501', message = 'data_product_manager role required';
-  end if;
-
-  if jsonb_typeof(p_items) is distinct from 'array' then
-    raise exception using errcode = '22023', message = 'p_items must be a JSON array';
-  end if;
-
-  v_input_count := jsonb_array_length(p_items);
-  if v_input_count < 1 or v_input_count > 100 then
-    raise exception using errcode = '22023', message = 'p_items must contain between 1 and 100 items';
-  end if;
-
-  if exists (
-    select 1
-    from jsonb_array_elements(p_items) item(value)
-    where jsonb_typeof(item.value) is distinct from 'object'
-      or jsonb_typeof(item.value -> 'id') is distinct from 'string'
-      or jsonb_typeof(item.value -> 'version') is distinct from 'string'
-      or not ((item.value ->> 'id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
-      or not ((item.value ->> 'version') ~ '^\d{2}\.\d{2}\.\d{3}$')
-  ) then
-    raise exception using errcode = '22023', message = 'each item must contain a valid id and version';
-  end if;
-
-  select count(*)
-  into v_requested_count
-  from (
-    select distinct
-      (item.value ->> 'id')::uuid as process_id,
-      (item.value ->> 'version')::character(9) as process_version
-    from jsonb_array_elements(p_items) item(value)
-  ) requested;
-
-  -- Lock in a stable order so concurrent overlapping batches cannot invert locks.
-  perform p.id
-  from public.processes p
-  join (
-    select distinct
-      (item.value ->> 'id')::uuid as process_id,
-      (item.value ->> 'version')::character(9) as process_version
-    from jsonb_array_elements(p_items) item(value)
-  ) requested
-    on requested.process_id = p.id
-   and requested.process_version = p.version
-  order by p.id, p.version
-  for update of p;
-
-  select count(*)
-  into v_valid_count
-  from public.processes p
-  join (
-    select distinct
-      (item.value ->> 'id')::uuid as process_id,
-      (item.value ->> 'version')::character(9) as process_version
-    from jsonb_array_elements(p_items) item(value)
-  ) requested
-    on requested.process_id = p.id
-   and requested.process_version = p.version
-  where p.state_code = 100;
-
-  if v_valid_count <> v_requested_count then
-    raise exception using
-      errcode = '22023',
-      message = 'all requested Process versions must exist with state_code 100';
-  end if;
-
-  select count(*)
-  into v_existing_count
-  from private.open_data_process_publications publication
-  join (
-    select distinct
-      (item.value ->> 'id')::uuid as process_id,
-      (item.value ->> 'version')::character(9) as process_version
-    from jsonb_array_elements(p_items) item(value)
-  ) requested
-    using (process_id, process_version);
-
-  insert into private.open_data_process_publications (
-    process_id,
-    process_version,
-    published_by
-  )
-  select distinct
-    (item.value ->> 'id')::uuid,
-    (item.value ->> 'version')::character(9),
-    v_actor
-  from jsonb_array_elements(p_items) item(value)
-  order by 1, 2
-  on conflict (process_id, process_version) do nothing;
-
-  get diagnostics v_inserted_count = row_count;
-
-  return jsonb_build_object(
-    'ok', true,
-    'data', jsonb_build_object(
-      'inputCount', v_input_count,
-      'requestedCount', v_requested_count,
-      'publishedCount', v_inserted_count,
-      'alreadyPublishedCount', v_existing_count
-    )
-  );
-end;
-$_$;
-
-
-ALTER FUNCTION "api"."cmd_open_data_process_publish_batch"("p_items" "jsonb") OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "api"."cmd_open_data_process_publish_batch"("p_items" "jsonb") IS 'Idempotently publishes 1-100 exact state-100 Process versions for Open Data. Does not change Process lifecycle state.';
-
 
 
 CREATE OR REPLACE FUNCTION "api"."cmd_portal_lcia_projection_finalize_publication_v1"("p_projection_id" "uuid", "p_lcia_result_publication_id" "uuid", "p_package_version" "text", "p_package_result_hash" "text", "p_projection_content_hash" "text", "p_idempotency_key" "text", "p_audit" "jsonb" DEFAULT '{}'::"jsonb") RETURNS "jsonb"
@@ -21269,8 +21181,8 @@ begin
         %2$s as model_id,
         %3$s as model_version,
         case when $5 = 'process' then exists (
-          select 1 from private.open_data_process_publications publication
-          where publication.process_id = d.id and publication.process_version = d.version
+          select 1 from private.dataset_display_settings publication
+          where publication.dataset_kind = 'process' and publication.is_visible and publication.dataset_id = d.id and publication.dataset_version = d.version
         ) else false end as is_published,
         fused.score
       from %1$s d
@@ -22049,6 +21961,30 @@ $$;
 
 
 ALTER FUNCTION "api"."lifecyclemodels_embedding_ft_input"("proc" "public"."lifecyclemodels") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "api"."list_dataset_display_candidates"("p_dataset_kind" "text" DEFAULT 'all'::"text", "p_visibility" "text" DEFAULT 'all'::"text", "p_query" "text" DEFAULT ''::"text", "p_page_size" integer DEFAULT 20, "p_page" integer DEFAULT 1) RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    SET "statement_timeout" TO '15s'
+    AS $$
+  select private.dataset_display_list(p_dataset_kind,p_visibility,p_query,p_page_size,p_page,true);
+$$;
+
+
+ALTER FUNCTION "api"."list_dataset_display_candidates"("p_dataset_kind" "text", "p_visibility" "text", "p_query" "text", "p_page_size" integer, "p_page" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "api"."list_displayed_datasets"("p_dataset_kind" "text" DEFAULT 'all'::"text", "p_query" "text" DEFAULT ''::"text", "p_page_size" integer DEFAULT 20, "p_page" integer DEFAULT 1) RETURNS "jsonb"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    SET "statement_timeout" TO '15s'
+    AS $$
+  select private.dataset_display_list(p_dataset_kind,'visible',p_query,p_page_size,p_page,false);
+$$;
+
+
+ALTER FUNCTION "api"."list_displayed_datasets"("p_dataset_kind" "text", "p_query" "text", "p_page_size" integer, "p_page" integer) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "api"."list_lcia_result_sets"("p_limit" integer DEFAULT 100) RETURNS "jsonb"
@@ -29799,9 +29735,9 @@ begin
         %3$s as model_version,
         case when $6 = 'process' then exists (
           select 1
-          from private.open_data_process_publications publication
-          where publication.process_id = d.id
-            and publication.process_version = d.version
+          from private.dataset_display_settings publication
+          where publication.dataset_kind = 'process' and publication.is_visible and publication.dataset_id = d.id
+            and publication.dataset_version = d.version
         ) else false end as is_published,
         %4$s as candidate_score
       from %1$s d
@@ -45903,6 +45839,78 @@ ALTER FUNCTION "private"."dataset_derivative_rebuild_queue_cache"("p_targets" "j
 
 COMMENT ON FUNCTION "private"."dataset_derivative_rebuild_queue_cache"("p_targets" "jsonb") IS 'One-pass candidate cache over the derivative dispatch queue for a bounded batch: every queue row''s id and ctid version, plus the per-target-ordinal row-id sets derived from decoded body ids. A candidate superset for the quarantine predicate; the matcher still decides every candidate row.';
 
+
+
+CREATE OR REPLACE FUNCTION "private"."dataset_display_list"("p_kind" "text", "p_visibility" "text", "p_query" "text", "p_page_size" integer, "p_page" integer, "p_candidates" boolean) RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    SET "statement_timeout" TO '15s'
+    AS $$
+declare v_result jsonb;
+begin
+  if auth.uid() is null then raise exception using errcode='28000',message='authentication required'; end if;
+  if p_candidates then perform private.dataset_display_require_manager(); end if;
+  if p_kind is null or p_kind not in ('all','lifecyclemodel','process','flow','flowproperty','unitgroup','source','contact')
+    or p_visibility is null or p_visibility not in ('all','visible','hidden')
+    or p_query is null or octet_length(p_query)>512
+    or p_page_size is null or p_page_size not between 1 and 100
+    or p_page is null or p_page not between 1 and 1000000 then
+    raise exception using errcode='22023',message='invalid display list filters or pagination';
+  end if;
+  with eligible as materialized (
+    select c.dataset_kind,c.dataset_id,c.dataset_version,
+      case when octet_length(c.name::text)<=16384 then c.name else null end as name,
+      coalesce(s.is_visible,false) as is_visible
+    from private.dataset_display_catalog c
+    left join private.dataset_display_settings s using(dataset_kind,dataset_id,dataset_version)
+    where (p_kind='all' or c.dataset_kind=p_kind)
+      and (p_candidates or s.is_visible)
+      and (p_visibility='all' or (p_visibility='visible' and s.is_visible) or (p_visibility='hidden' and not coalesce(s.is_visible,false)))
+      and (p_query='' or strpos(lower(coalesce(c.name::text,'')),lower(p_query))>0 or strpos(c.dataset_id::text,lower(p_query))>0)
+  ), page as (
+    select * from eligible order by dataset_kind,dataset_id,dataset_version desc
+    limit p_page_size offset (p_page::bigint-1)*p_page_size
+  )
+  select jsonb_build_object('data',coalesce((select jsonb_agg(
+    case when p_candidates then to_jsonb(page) else to_jsonb(page)-'is_visible' end
+    order by dataset_kind,dataset_id,dataset_version desc) from page),'[]'::jsonb),
+    'total',(select count(*) from eligible)) into v_result;
+  return v_result;
+end; $$;
+
+
+ALTER FUNCTION "private"."dataset_display_list"("p_kind" "text", "p_visibility" "text", "p_query" "text", "p_page_size" integer, "p_page" integer, "p_candidates" boolean) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "private"."dataset_display_require_manager"() RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if auth.uid() is null then raise exception using errcode='28000',message='authentication required'; end if;
+  if not exists (select 1 from private.roles where user_id=auth.uid()
+    and team_id='00000000-0000-0000-0000-000000000000'::uuid and role::text='data_product_manager') then
+    raise exception using errcode='42501',message='data_product_manager role required';
+  end if;
+end; $$;
+
+
+ALTER FUNCTION "private"."dataset_display_require_manager"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "private"."dataset_display_source_cleanup"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+begin
+  if TG_OP='DELETE' or new.id is distinct from old.id or new.version is distinct from old.version then
+    delete from private.dataset_display_settings where dataset_kind=TG_ARGV[0] and dataset_id=old.id and dataset_version=old.version;
+  end if;
+  return null;
+end; $$;
+
+
+ALTER FUNCTION "private"."dataset_display_source_cleanup"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "private"."dataset_flow_identity_active_fence"() RETURNS "trigger"
@@ -62106,21 +62114,6 @@ $$;
 
 
 ALTER FUNCTION "private"."protect_example_dataset_write"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "private"."reject_open_data_process_publication_mutation"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
-    SET "search_path" TO 'pg_catalog', 'pg_temp'
-    AS $$
-begin
-  raise exception using
-    errcode = '55000',
-    message = 'Open Data Process publications are append-only';
-end;
-$$;
-
-
-ALTER FUNCTION "private"."reject_open_data_process_publication_mutation"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "private"."result_process_content_sha256_v1"("p_text" "text") RETURNS "text"
@@ -83616,6 +83609,78 @@ COMMENT ON COLUMN "private"."comments"."submitted_decision_at" IS 'The timestamp
 
 
 
+CREATE OR REPLACE VIEW "private"."dataset_display_catalog" AS
+ SELECT 'lifecyclemodel'::"text" AS "dataset_kind",
+    "lifecyclemodels"."id" AS "dataset_id",
+    ("lifecyclemodels"."version")::"text" AS "dataset_version",
+    ("lifecyclemodels"."json" #> '{lifeCycleModelDataSet,lifeCycleModelInformation,dataSetInformation,name}'::"text"[]) AS "name",
+    "lifecyclemodels"."state_code"
+   FROM "public"."lifecyclemodels"
+UNION ALL
+ SELECT 'process'::"text" AS "dataset_kind",
+    "processes"."id" AS "dataset_id",
+    ("processes"."version")::"text" AS "dataset_version",
+    ("processes"."json" #> '{processDataSet,processInformation,dataSetInformation,name}'::"text"[]) AS "name",
+    "processes"."state_code"
+   FROM "public"."processes"
+UNION ALL
+ SELECT 'flow'::"text" AS "dataset_kind",
+    "flows"."id" AS "dataset_id",
+    ("flows"."version")::"text" AS "dataset_version",
+    ("flows"."json" #> '{flowDataSet,flowInformation,dataSetInformation,name}'::"text"[]) AS "name",
+    "flows"."state_code"
+   FROM "public"."flows"
+UNION ALL
+ SELECT 'flowproperty'::"text" AS "dataset_kind",
+    "flowproperties"."id" AS "dataset_id",
+    ("flowproperties"."version")::"text" AS "dataset_version",
+    ("flowproperties"."json" #> '{flowPropertyDataSet,flowPropertiesInformation,dataSetInformation,common:name}'::"text"[]) AS "name",
+    "flowproperties"."state_code"
+   FROM "public"."flowproperties"
+UNION ALL
+ SELECT 'unitgroup'::"text" AS "dataset_kind",
+    "unitgroups"."id" AS "dataset_id",
+    ("unitgroups"."version")::"text" AS "dataset_version",
+    ("unitgroups"."json" #> '{unitGroupDataSet,unitGroupInformation,dataSetInformation,common:name}'::"text"[]) AS "name",
+    "unitgroups"."state_code"
+   FROM "public"."unitgroups"
+UNION ALL
+ SELECT 'source'::"text" AS "dataset_kind",
+    "sources"."id" AS "dataset_id",
+    ("sources"."version")::"text" AS "dataset_version",
+    COALESCE(("sources"."json" #> '{sourceDataSet,sourceInformation,dataSetInformation,common:shortName}'::"text"[]), ("sources"."json" #> '{sourceDataSet,sourceInformation,dataSetInformation,sourceCitation}'::"text"[])) AS "name",
+    "sources"."state_code"
+   FROM "public"."sources"
+UNION ALL
+ SELECT 'contact'::"text" AS "dataset_kind",
+    "contacts"."id" AS "dataset_id",
+    ("contacts"."version")::"text" AS "dataset_version",
+    COALESCE(("contacts"."json" #> '{contactDataSet,contactInformation,dataSetInformation,common:name}'::"text"[]), ("contacts"."json" #> '{contactDataSet,contactInformation,dataSetInformation,common:shortName}'::"text"[])) AS "name",
+    "contacts"."state_code"
+   FROM "public"."contacts";
+
+
+ALTER VIEW "private"."dataset_display_catalog" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "private"."dataset_display_settings" (
+    "dataset_kind" "text" NOT NULL,
+    "dataset_id" "uuid" NOT NULL,
+    "dataset_version" character(9) NOT NULL,
+    "is_visible" boolean DEFAULT false NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "dataset_display_settings_dataset_kind_check" CHECK (("dataset_kind" = ANY (ARRAY['lifecyclemodel'::"text", 'process'::"text", 'flow'::"text", 'flowproperty'::"text", 'unitgroup'::"text", 'source'::"text", 'contact'::"text"]))),
+    CONSTRAINT "dataset_display_settings_dataset_version_check" CHECK (("dataset_version" ~ '^\d{2}\.\d{2}\.\d{3}$'::"text"))
+);
+
+
+ALTER TABLE "private"."dataset_display_settings" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "private"."dataset_display_settings" IS 'Exact-version list visibility only. Missing configuration is hidden; no actor or history is stored. Does not confer raw, export, Portal, calculation or numerical publication access.';
+
+
+
 CREATE TABLE IF NOT EXISTS "private"."identity_center_processed_events" (
     "event_id" "text" NOT NULL,
     "event_type" "text" NOT NULL,
@@ -84479,25 +84544,6 @@ ALTER TABLE ONLY "private"."oauth_relation_capability_grants" FORCE ROW LEVEL SE
 
 
 ALTER TABLE "private"."oauth_relation_capability_grants" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "private"."open_data_process_publications" (
-    "process_id" "uuid" NOT NULL,
-    "process_version" character(9) NOT NULL,
-    "published_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "published_by" "uuid" NOT NULL
-);
-
-
-ALTER TABLE "private"."open_data_process_publications" OWNER TO "postgres";
-
-
-COMMENT ON TABLE "private"."open_data_process_publications" IS 'Exact Process versions explicitly published in the Open Data catalog. Row existence is the publication state.';
-
-
-
-COMMENT ON COLUMN "private"."open_data_process_publications"."published_by" IS 'Authenticated actor that first published the exact Process version.';
-
 
 
 CREATE TABLE IF NOT EXISTS "private"."portal_catalog_character_rows_v1" (
@@ -86348,6 +86394,11 @@ ALTER TABLE ONLY "private"."comments"
 
 
 
+ALTER TABLE ONLY "private"."dataset_display_settings"
+    ADD CONSTRAINT "dataset_display_settings_pkey" PRIMARY KEY ("dataset_kind", "dataset_id", "dataset_version");
+
+
+
 ALTER TABLE ONLY "private"."dataset_review_submit_gate_runs"
     ADD CONSTRAINT "dataset_review_submit_gate_runs_pkey" PRIMARY KEY ("id");
 
@@ -86700,11 +86751,6 @@ ALTER TABLE ONLY "private"."oauth_client_registry"
 
 ALTER TABLE ONLY "private"."oauth_relation_capability_grants"
     ADD CONSTRAINT "oauth_relation_capability_grants_pkey" PRIMARY KEY ("relation_schema", "relation_name", "command");
-
-
-
-ALTER TABLE ONLY "private"."open_data_process_publications"
-    ADD CONSTRAINT "open_data_process_publications_pkey" PRIMARY KEY ("process_id", "process_version");
 
 
 
@@ -87194,6 +87240,10 @@ CREATE UNIQUE INDEX "command_audit_log_guarded_alias_plan_summary_replay_idx" ON
 
 
 CREATE INDEX "comments_reviewer_queue_state_review_idx" ON "private"."comments" USING "btree" ("reviewer_id", "state_code", "review_id");
+
+
+
+CREATE INDEX "dataset_display_settings_visible_idx" ON "private"."dataset_display_settings" USING "btree" ("dataset_kind", "dataset_id", "dataset_version") WHERE "is_visible";
 
 
 
@@ -88641,10 +88691,6 @@ COMMENT ON TRIGGER "portal_sitemap_rows_sync_v1" ON "private"."portal_catalog_fa
 
 
 
-CREATE OR REPLACE TRIGGER "reject_open_data_process_publication_mutation" BEFORE DELETE OR UPDATE ON "private"."open_data_process_publications" FOR EACH ROW EXECUTE FUNCTION "private"."reject_open_data_process_publication_mutation"();
-
-
-
 CREATE OR REPLACE TRIGGER "result_process_publications_immutable" BEFORE DELETE OR UPDATE ON "private"."result_process_publications" FOR EACH ROW EXECUTE FUNCTION "private"."result_process_publications_immutable_v1"();
 
 
@@ -88690,6 +88736,34 @@ CREATE OR REPLACE TRIGGER "contacts_json_sync_trigger" BEFORE INSERT OR UPDATE O
 
 
 CREATE OR REPLACE TRIGGER "contacts_set_modified_at_trigger" BEFORE UPDATE OF "json", "json_ordered", "user_id", "state_code", "version", "team_id", "review_id", "rule_verification", "reviews" ON "public"."contacts" FOR EACH ROW EXECUTE FUNCTION "private"."update_modified_at"();
+
+
+
+CREATE OR REPLACE TRIGGER "dataset_display_source_cleanup" AFTER DELETE OR UPDATE OF "id", "version" ON "public"."contacts" FOR EACH ROW EXECUTE FUNCTION "private"."dataset_display_source_cleanup"('contact');
+
+
+
+CREATE OR REPLACE TRIGGER "dataset_display_source_cleanup" AFTER DELETE OR UPDATE OF "id", "version" ON "public"."flowproperties" FOR EACH ROW EXECUTE FUNCTION "private"."dataset_display_source_cleanup"('flowproperty');
+
+
+
+CREATE OR REPLACE TRIGGER "dataset_display_source_cleanup" AFTER DELETE OR UPDATE OF "id", "version" ON "public"."flows" FOR EACH ROW EXECUTE FUNCTION "private"."dataset_display_source_cleanup"('flow');
+
+
+
+CREATE OR REPLACE TRIGGER "dataset_display_source_cleanup" AFTER DELETE OR UPDATE OF "id", "version" ON "public"."lifecyclemodels" FOR EACH ROW EXECUTE FUNCTION "private"."dataset_display_source_cleanup"('lifecyclemodel');
+
+
+
+CREATE OR REPLACE TRIGGER "dataset_display_source_cleanup" AFTER DELETE OR UPDATE OF "id", "version" ON "public"."processes" FOR EACH ROW EXECUTE FUNCTION "private"."dataset_display_source_cleanup"('process');
+
+
+
+CREATE OR REPLACE TRIGGER "dataset_display_source_cleanup" AFTER DELETE OR UPDATE OF "id", "version" ON "public"."sources" FOR EACH ROW EXECUTE FUNCTION "private"."dataset_display_source_cleanup"('source');
+
+
+
+CREATE OR REPLACE TRIGGER "dataset_display_source_cleanup" AFTER DELETE OR UPDATE OF "id", "version" ON "public"."unitgroups" FOR EACH ROW EXECUTE FUNCTION "private"."dataset_display_source_cleanup"('unitgroup');
 
 
 
@@ -89354,11 +89428,6 @@ ALTER TABLE ONLY "private"."oauth_client_capability_grants"
 
 
 
-ALTER TABLE ONLY "private"."open_data_process_publications"
-    ADD CONSTRAINT "open_data_process_publications_process_fkey" FOREIGN KEY ("process_id", "process_version") REFERENCES "public"."processes"("id", "version") ON UPDATE RESTRICT ON DELETE RESTRICT;
-
-
-
 ALTER TABLE ONLY "private"."portal_catalog_character_rows_v1"
     ADD CONSTRAINT "portal_catalog_character_parent_v1_fk" FOREIGN KEY ("dataset_kind", "id", "version") REFERENCES "private"."portal_catalog_search_rows_v1"("dataset_kind", "id", "version") ON UPDATE RESTRICT ON DELETE CASCADE;
 
@@ -89640,6 +89709,9 @@ CREATE POLICY "comments update by reviewer or review-admin" ON "private"."commen
 
 
 
+ALTER TABLE "private"."dataset_display_settings" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "private"."dataset_review_submit_gate_runs" ENABLE ROW LEVEL SECURITY;
 
 
@@ -89846,9 +89918,6 @@ ALTER TABLE "private"."oauth_client_registry_audit" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "private"."oauth_relation_capability_grants" ENABLE ROW LEVEL SECURITY;
-
-
-ALTER TABLE "private"."open_data_process_publications" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "portal_catalog_character_rows_internal_all_v1" ON "private"."portal_catalog_character_rows_v1" TO "api_internal_executor" USING (true) WITH CHECK (true);
@@ -90541,6 +90610,12 @@ GRANT ALL ON FUNCTION "api"."cmd_dataset_derivative_rebuild_snapshot"("p_table" 
 
 
 
+REVOKE ALL ON FUNCTION "api"."cmd_dataset_display_set_batch"("p_items" "jsonb", "p_is_visible" boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."cmd_dataset_display_set_batch"("p_items" "jsonb", "p_is_visible" boolean) TO "authenticated";
+GRANT ALL ON FUNCTION "api"."cmd_dataset_display_set_batch"("p_items" "jsonb", "p_is_visible" boolean) TO "api_internal_executor";
+
+
+
 REVOKE ALL ON FUNCTION "api"."cmd_dataset_extraction_ack"("p_msg_ids" bigint[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "api"."cmd_dataset_extraction_ack"("p_msg_ids" bigint[]) TO "api_internal_executor";
 GRANT ALL ON FUNCTION "api"."cmd_dataset_extraction_ack"("p_msg_ids" bigint[]) TO "service_role";
@@ -90759,12 +90834,6 @@ GRANT ALL ON FUNCTION "api"."cmd_notification_normalize_text_array"("p_values" "
 REVOKE ALL ON FUNCTION "api"."cmd_notification_send_validation_issue"("p_recipient_user_id" "uuid", "p_dataset_type" "text", "p_dataset_id" "uuid", "p_dataset_version" "text", "p_link" "text", "p_issue_codes" "text"[], "p_tab_names" "text"[], "p_issue_count" integer, "p_audit" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "api"."cmd_notification_send_validation_issue"("p_recipient_user_id" "uuid", "p_dataset_type" "text", "p_dataset_id" "uuid", "p_dataset_version" "text", "p_link" "text", "p_issue_codes" "text"[], "p_tab_names" "text"[], "p_issue_count" integer, "p_audit" "jsonb") TO "api_internal_executor";
 GRANT ALL ON FUNCTION "api"."cmd_notification_send_validation_issue"("p_recipient_user_id" "uuid", "p_dataset_type" "text", "p_dataset_id" "uuid", "p_dataset_version" "text", "p_link" "text", "p_issue_codes" "text"[], "p_tab_names" "text"[], "p_issue_count" integer, "p_audit" "jsonb") TO "authenticated";
-
-
-
-REVOKE ALL ON FUNCTION "api"."cmd_open_data_process_publish_batch"("p_items" "jsonb") FROM PUBLIC;
-GRANT ALL ON FUNCTION "api"."cmd_open_data_process_publish_batch"("p_items" "jsonb") TO "api_internal_executor";
-GRANT ALL ON FUNCTION "api"."cmd_open_data_process_publish_batch"("p_items" "jsonb") TO "authenticated";
 
 
 
@@ -91321,9 +91390,9 @@ GRANT ALL ON FUNCTION "api"."hybrid_search_lifecyclemodels_v2"("query_text" "tex
 
 
 REVOKE ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") TO "api_internal_executor";
 GRANT ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") TO "anon";
 GRANT ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "api"."hybrid_search_open_data_catalog"("p_dataset_kind" "text", "query_text" "text", "query_embedding" "text", "filter_condition" "jsonb", "match_threshold" double precision, "match_count" integer, "lexical_weight" double precision, "semantic_weight" double precision, "rrf_k" integer, "page_size" integer, "page_current" integer, "query_terms" "text"[], "source_filter" "text", "publication_filter" "text") TO "api_internal_executor";
 
 
 
@@ -91428,6 +91497,18 @@ GRANT SELECT ON TABLE "public"."lifecyclemodels" TO "api_internal_executor";
 
 REVOKE ALL ON FUNCTION "api"."lifecyclemodels_embedding_ft_input"("proc" "public"."lifecyclemodels") FROM PUBLIC;
 GRANT ALL ON FUNCTION "api"."lifecyclemodels_embedding_ft_input"("proc" "public"."lifecyclemodels") TO "api_internal_executor";
+
+
+
+REVOKE ALL ON FUNCTION "api"."list_dataset_display_candidates"("p_dataset_kind" "text", "p_visibility" "text", "p_query" "text", "p_page_size" integer, "p_page" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."list_dataset_display_candidates"("p_dataset_kind" "text", "p_visibility" "text", "p_query" "text", "p_page_size" integer, "p_page" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "api"."list_dataset_display_candidates"("p_dataset_kind" "text", "p_visibility" "text", "p_query" "text", "p_page_size" integer, "p_page" integer) TO "api_internal_executor";
+
+
+
+REVOKE ALL ON FUNCTION "api"."list_displayed_datasets"("p_dataset_kind" "text", "p_query" "text", "p_page_size" integer, "p_page" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."list_displayed_datasets"("p_dataset_kind" "text", "p_query" "text", "p_page_size" integer, "p_page" integer) TO "authenticated";
+GRANT ALL ON FUNCTION "api"."list_displayed_datasets"("p_dataset_kind" "text", "p_query" "text", "p_page_size" integer, "p_page" integer) TO "api_internal_executor";
 
 
 
@@ -92083,9 +92164,9 @@ GRANT ALL ON FUNCTION "api"."search_lifecyclemodels_latest"("query_text" "text",
 
 
 REVOKE ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") TO "api_internal_executor";
 GRANT ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") TO "anon";
 GRANT ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") TO "api_internal_executor";
 
 
 
@@ -92756,6 +92837,18 @@ REVOKE ALL ON FUNCTION "private"."dataset_derivative_http_body_candidate_ids"("p
 
 
 REVOKE ALL ON FUNCTION "private"."dataset_derivative_rebuild_queue_cache"("p_targets" "jsonb") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "private"."dataset_display_list"("p_kind" "text", "p_visibility" "text", "p_query" "text", "p_page_size" integer, "p_page" integer, "p_candidates" boolean) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "private"."dataset_display_require_manager"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "private"."dataset_display_source_cleanup"() FROM PUBLIC;
 
 
 
@@ -93772,10 +93865,6 @@ GRANT ALL ON FUNCTION "private"."processes_sync_jsonb_version"() TO "api_interna
 
 
 REVOKE ALL ON FUNCTION "private"."protect_example_dataset_write"() FROM PUBLIC;
-
-
-
-REVOKE ALL ON FUNCTION "private"."reject_open_data_process_publication_mutation"() FROM PUBLIC;
 
 
 
@@ -94921,10 +95010,6 @@ GRANT SELECT("source_modified_at") ON TABLE "private"."next_hybrid_public_candid
 
 GRANT ALL ON TABLE "private"."notifications" TO "service_role";
 GRANT SELECT ON TABLE "private"."notifications" TO "api_internal_executor";
-
-
-
-GRANT SELECT ON TABLE "private"."open_data_process_publications" TO "api_internal_executor";
 
 
 

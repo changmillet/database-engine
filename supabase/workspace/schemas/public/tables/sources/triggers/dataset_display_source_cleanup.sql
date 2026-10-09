@@ -1,0 +1,1 @@
+CREATE OR REPLACE TRIGGER "dataset_display_source_cleanup" AFTER DELETE OR UPDATE OF "id", "version" ON "public"."sources" FOR EACH ROW EXECUTE FUNCTION "private"."dataset_display_source_cleanup"('source');

@@ -60,7 +60,8 @@ supabase migration list
 ```
 
 Open Data catalog or publication changes must additionally run the focused
-`supabase/tests/20260923_open_data_catalog_publications.sql` pgTAP suite and
+`supabase/tests/20260923_open_data_catalog_publications.sql` and
+`supabase/tests/20261009_dataset_display_settings.sql` pgTAP suites and
 record any pre-existing local migration-history drift separately from failures
 in the new migration.
 
@@ -937,3 +938,5 @@ Before release, compare all affected function metadata, index definitions and
 external capability grants; qualify refusal of unexpected prestate plus known
 poststate replay. Hosted schema/Advisor and bounded normal-request readback,
 reviewed Main hotfix, Dev backmerge and root integration remain separate gates.
+
+For dataset-display changes, qualify a blank migration rebuild and populated legacy-selection upgrade, all seven source types, foreign draft/review/state-120 candidates, exact versions, default-hidden/no inheritance, set/cancel/no-op timestamps, atomic invalid batches, source cleanup and unchanged source immutability. Run API closure, OAuth capability and Result Process read-isolation suites alongside the two catalog/display suites. Compare generated five-schema workspace and Data API types from the same owned local database. No hosted deployment is implied by local proof.
