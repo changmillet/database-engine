@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-09
-lastReviewedCommit: 43fad1efe148154e2e7aeca38a054dd0957746de
-lastReviewedNote: 'Database #801: narrow-key display pagination with bounded exact-page name hydration, unchanged filters/auth/ACL/15s budget. Blank420 replay, populated419 upgrade, 8 SQL suites1023 assertions, 200k-row1.76GB-TOAST digest/plan benchmark, deterministic1833-file schema/types, workflow and legacy checks pass. Lint/advisors exactly match baseline, including existing findings. No hosted writes, deployment or merge.'
+lastReviewedCommit: 1c6b66b48eb8ca232ba7ba23c92b048028cd4c4e
+lastReviewedNote: 'Database #803: reviewed exact same-bundle Process reference version rewriting; table/column structures, public signatures, ACL and generated-workspace ownership remain unchanged.'
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -77,6 +77,8 @@ TIDAS partial-import, example-dataset-scope, guarded owner-draft
 before-content save, result-process-state-120,
 result-process-lifecycle-protection, result-process-product-read-isolation, and
 manager-attested-result-publication suites before hosted steps.
+
+The local contract CI job includes Model bundle version allocation. For focused validation, run `20261009_model_bundle_process_references.sql` with `20260611_dataset_create_version_rpc.sql` and `20260902_process_model_version.sql`. Verify exact same-bundle reference rewriting, external version preservation, singleton/array shape and child ownership after a blank rebuild and a populated upgrade.
 
 ## Proof Matrix
 
