@@ -96,9 +96,9 @@ begin
         %3$s as model_version,
         case when $6 = 'process' then exists (
           select 1
-          from private.open_data_process_publications publication
-          where publication.process_id = d.id
-            and publication.process_version = d.version
+          from private.dataset_display_settings publication
+          where publication.dataset_kind = 'process' and publication.is_visible and publication.dataset_id = d.id
+            and publication.dataset_version = d.version
         ) else false end as is_published,
         %4$s as candidate_score
       from %1$s d
@@ -151,8 +151,8 @@ ALTER FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_sear
 
 REVOKE ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") FROM PUBLIC;
 
+GRANT ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") TO "api_internal_executor";
+
 GRANT ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") TO "anon";
 
 GRANT ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") TO "authenticated";
-
-GRANT ALL ON FUNCTION "api"."search_open_data_catalog"("p_dataset_kind" "text", "p_search_mode" "text", "p_query_text" "text", "p_query_terms" "text"[], "p_filter_condition" "jsonb", "p_source_filter" "text", "p_publication_filter" "text", "p_page_size" integer, "p_page_current" integer, "p_sort_by" "text", "p_sort_direction" "text") TO "api_internal_executor";

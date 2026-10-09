@@ -22,9 +22,9 @@ checkPaths:
   - .github/workflows/supabase-dev.yml
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
-lastReviewedAt: 2026-10-08
-lastReviewedCommit: d724b9af27ce3d41dc0ac063c47dc0e0f5cecac7
-lastReviewedNote: "Reviewed Database #793 source d724b9af: 29 raw facade bounds preserve normal10x delegation; selective exact-version Flow type keys retain PGroonga scoring and broad/missing-stat fallback; five qualified indexes and four closed legacy rank routines retire under exact guards. Canonical417 local17.11 reset, 32 suites2344 assertions, 555 HTTP checks, non-superuser grant/refusal/replay proofs, independent reviews and deterministic1827-file generation pass. Hosted release/backmerge/root integration and user-authenticated production reads remain tracked delivery gates."
+lastReviewedAt: 2026-10-09
+lastReviewedCommit: 1c0600bddde26bd7c46485d6b0cd046c57a958dd
+lastReviewedNote: "Database #799: reversible exact-version display settings for seven dataset kinds, manager-only all-owner/all-state candidates and bounded authenticated metadata. Owned blank419 rebuild, populated418-to-419 marker upgrade, seven SQL suites226 assertions, workflow contract, and deterministic1833-file generation pass. Local security advisors report no new display findings. No hosted deployment or merge is authorized."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
