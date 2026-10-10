@@ -41,26 +41,38 @@ GRANT SELECT("id") ON TABLE "public"."flows" TO "portal_public_executor";
 
 GRANT SELECT("id") ON TABLE "public"."flows" TO "next_public_search_executor";
 
+GRANT SELECT("id") ON TABLE "public"."flows" TO "portal_display_executor";
+
 GRANT SELECT("json") ON TABLE "public"."flows" TO "portal_public_executor";
 
 GRANT SELECT("json") ON TABLE "public"."flows" TO "next_public_search_executor";
+
+GRANT SELECT("json") ON TABLE "public"."flows" TO "portal_display_executor";
 
 GRANT SELECT("state_code") ON TABLE "public"."flows" TO "portal_public_executor";
 
 GRANT SELECT("state_code") ON TABLE "public"."flows" TO "next_public_search_executor";
 
+GRANT SELECT("state_code") ON TABLE "public"."flows" TO "portal_display_executor";
+
 GRANT SELECT("version") ON TABLE "public"."flows" TO "portal_public_executor";
 
 GRANT SELECT("version") ON TABLE "public"."flows" TO "next_public_search_executor";
 
+GRANT SELECT("version") ON TABLE "public"."flows" TO "portal_display_executor";
+
 GRANT SELECT("modified_at") ON TABLE "public"."flows" TO "portal_public_executor";
 
 GRANT SELECT("modified_at") ON TABLE "public"."flows" TO "next_public_search_executor";
+
+GRANT SELECT("modified_at") ON TABLE "public"."flows" TO "portal_display_executor";
 
 GRANT SELECT("team_id") ON TABLE "public"."flows" TO "next_public_search_executor";
 
 GRANT SELECT("embedding_ft") ON TABLE "public"."flows" TO "portal_public_executor";
 
 GRANT SELECT("embedding_ft") ON TABLE "public"."flows" TO "next_public_search_executor";
+
+GRANT SELECT("embedding_ft") ON TABLE "public"."flows" TO "portal_display_executor";
 
 GRANT SELECT("search_text") ON TABLE "public"."flows" TO "next_public_search_executor";

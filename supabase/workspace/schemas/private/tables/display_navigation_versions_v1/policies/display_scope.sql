@@ -1,0 +1,1 @@
+CREATE POLICY "display_scope" ON "private"."display_navigation_versions_v1" FOR SELECT TO "portal_display_executor" USING ("private"."portal_display_request_visible_v1"("dataset_kind", "id", "version"));

@@ -1801,6 +1801,10 @@ export type Database = {
       }
       policy_user_has_team: { Args: { _user_id: string }; Returns: boolean }
       portal_catalog_summary_v1: { Args: never; Returns: Json }
+      portal_catalog_summary_v2: {
+        Args: { p_allowed_brands: string[] }
+        Returns: Json
+      }
       portal_facets_v1: {
         Args: { p_filters?: Json; p_kind: string; p_query: string }
         Returns: Json
@@ -1813,12 +1817,45 @@ export type Database = {
         Args: { p_filters?: Json; p_kind: string; p_query: string }
         Returns: Json
       }
+      portal_facets_v4: {
+        Args: {
+          p_allowed_brands: string[]
+          p_filters?: Json
+          p_kind: string
+          p_query: string
+        }
+        Returns: Json
+      }
+      portal_flow_link_eligibility_v1: {
+        Args: { p_allowed_brands: string[]; p_flow_refs: Json }
+        Returns: Json
+      }
       portal_get_dataset_v1: {
         Args: { p_id: string; p_kind: string; p_version: string }
         Returns: Json
       }
+      portal_get_dataset_v2: {
+        Args: {
+          p_allowed_brands: string[]
+          p_id: string
+          p_kind: string
+          p_version: string
+        }
+        Returns: Json
+      }
       portal_get_published_lcia_values_v1: {
         Args: {
+          p_cursor: string
+          p_impact_ref: string
+          p_limit: number
+          p_mode: string
+          p_process_refs: Json
+        }
+        Returns: Json
+      }
+      portal_get_published_lcia_values_v2: {
+        Args: {
+          p_allowed_brands: string[]
           p_cursor: string
           p_impact_ref: string
           p_limit: number
@@ -1848,8 +1885,31 @@ export type Database = {
         }
         Returns: Json
       }
+      portal_hybrid_search_v3: {
+        Args: {
+          p_allowed_brands: string[]
+          p_cursor?: string
+          p_filters: Json
+          p_kind: string
+          p_limit: number
+          p_query_embedding: string
+          p_query_terms: string[]
+        }
+        Returns: Json
+      }
       portal_list_process_exchanges_v1: {
         Args: {
+          p_cursor?: string
+          p_exchange_kind?: string
+          p_limit?: number
+          p_process_id: string
+          p_process_version: string
+        }
+        Returns: Json
+      }
+      portal_list_process_exchanges_v2: {
+        Args: {
+          p_allowed_brands: string[]
           p_cursor?: string
           p_exchange_kind?: string
           p_limit?: number
@@ -1867,8 +1927,31 @@ export type Database = {
         }
         Returns: Json
       }
+      portal_list_versions_v2: {
+        Args: {
+          p_allowed_brands: string[]
+          p_cursor?: string
+          p_id: string
+          p_kind: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
       portal_navigation_v1: {
         Args: {
+          p_cursor?: string
+          p_dimension?: string
+          p_filters?: Json
+          p_kind: string
+          p_limit?: number
+          p_parent_node_id?: string
+          p_query?: string
+        }
+        Returns: Json
+      }
+      portal_navigation_v2: {
+        Args: {
+          p_allowed_brands: string[]
           p_cursor?: string
           p_dimension?: string
           p_filters?: Json
@@ -1909,6 +1992,17 @@ export type Database = {
         }
         Returns: Json
       }
+      portal_search_flows_v4: {
+        Args: {
+          p_allowed_brands: string[]
+          p_cursor?: string
+          p_filters?: Json
+          p_limit?: number
+          p_query: string
+          p_sort?: string
+        }
+        Returns: Json
+      }
       portal_search_processes_v1: {
         Args: {
           p_cursor?: string
@@ -1939,13 +2033,41 @@ export type Database = {
         }
         Returns: Json
       }
+      portal_search_processes_v4: {
+        Args: {
+          p_allowed_brands: string[]
+          p_cursor?: string
+          p_filters?: Json
+          p_limit?: number
+          p_query: string
+          p_sort?: string
+        }
+        Returns: Json
+      }
       portal_sitemap_entries_v1: {
         Args: { p_cursor?: string; p_kind: string; p_limit?: number }
         Returns: Json
       }
+      portal_sitemap_entries_v2: {
+        Args: {
+          p_allowed_brands: string[]
+          p_cursor?: string
+          p_kind: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
       portal_sitemap_manifest_v1: { Args: never; Returns: Json }
+      portal_sitemap_manifest_v2: {
+        Args: { p_allowed_brands: string[] }
+        Returns: Json
+      }
       portal_sitemap_shard_v1: {
         Args: { p_shard_cursor: string }
+        Returns: Json
+      }
+      portal_sitemap_shard_v2: {
+        Args: { p_allowed_brands: string[]; p_shard_cursor: string }
         Returns: Json
       }
       processes_embedding_ft_input: {

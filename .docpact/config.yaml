@@ -1,8 +1,8 @@
 version: 1
 layout: repo
-lastReviewedAt: "2026-10-09"
-lastReviewedCommit: "1c6b66b48eb8ca232ba7ba23c92b048028cd4c4e"
-lastReviewedNote: 'Database #803: reviewed exact same-bundle Process reference version rewriting; table/column structures, public signatures, ACL and generated-workspace ownership remain unchanged.'
+lastReviewedAt: "2026-10-10"
+lastReviewedCommit: "60407472b9ad5ec91a351f3d3b9c4c34531612a7"
+lastReviewedNote: "Database #807: reviewed isolated display projection and executor, guarded legacy/display/unavailable rollout, scoped readers, exact dependency licensing, immutable legacy preservation and local upgrade proof; hosted qualification and account backfill remain separate."
 
 # Keep deterministic governance facts here.
 # AGENTS.md remains the repo contract entrypoint.

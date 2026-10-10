@@ -35,10 +35,20 @@ GRANT SELECT ON TABLE "public"."unitgroups" TO "api_internal_executor";
 
 GRANT SELECT("id") ON TABLE "public"."unitgroups" TO "portal_public_executor";
 
+GRANT SELECT("id") ON TABLE "public"."unitgroups" TO "portal_display_executor";
+
 GRANT SELECT("json") ON TABLE "public"."unitgroups" TO "portal_public_executor";
+
+GRANT SELECT("json") ON TABLE "public"."unitgroups" TO "portal_display_executor";
 
 GRANT SELECT("state_code") ON TABLE "public"."unitgroups" TO "portal_public_executor";
 
+GRANT SELECT("state_code") ON TABLE "public"."unitgroups" TO "portal_display_executor";
+
 GRANT SELECT("version") ON TABLE "public"."unitgroups" TO "portal_public_executor";
 
+GRANT SELECT("version") ON TABLE "public"."unitgroups" TO "portal_display_executor";
+
 GRANT SELECT("modified_at") ON TABLE "public"."unitgroups" TO "portal_public_executor";
+
+GRANT SELECT("modified_at") ON TABLE "public"."unitgroups" TO "portal_display_executor";

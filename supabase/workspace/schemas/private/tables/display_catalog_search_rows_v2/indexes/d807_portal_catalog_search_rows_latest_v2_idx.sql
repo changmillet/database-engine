@@ -1,0 +1,1 @@
+CREATE INDEX "d807_portal_catalog_search_rows_latest_v2_idx" ON "private"."display_catalog_search_rows_v2" USING "btree" ("dataset_kind", "id", "version" DESC, "modified_at" DESC, "state_code" DESC);

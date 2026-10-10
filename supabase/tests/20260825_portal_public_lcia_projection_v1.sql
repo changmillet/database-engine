@@ -4114,6 +4114,33 @@ select extensions.throws_ok(
   'unknown actor/team widening fields are rejected rather than ignored'
 );
 
+-- Display readers use current exact visibility and scope, preserving publication checks.
+reset role;
+insert into private.dataset_display_settings(dataset_kind,dataset_id,dataset_version,is_visible,brand)
+values ('process','52710000-0000-4000-8000-000000000102','01.00.000',true,'bafu');
+update private.portal_display_rollout set mode='display';
+set local role anon;
+select extensions.is(jsonb_array_length(api.portal_get_published_lcia_values_v2(array['bafu'],'process_all_impacts',
+ '[{"id":"52710000-0000-4000-8000-000000000102","version":"01.00.000"}]',null,null,50)->'rows'),2,'display LCIA retains exact finalized publication values');
+select extensions.is(coalesce(jsonb_array_length(api.portal_get_published_lcia_values_v2(array['tiangong_lca'],'process_all_impacts',
+ '[{"id":"52710000-0000-4000-8000-000000000102","version":"01.00.000"}]',null,null,50)->'rows'),0),0,'other deployment cannot read published numeric rows');
+reset role;
+alter table public.processes disable trigger user;
+update public.processes set state_code=20 where id='52710000-0000-4000-8000-000000000102' and version='01.00.000';
+alter table public.processes enable trigger user;
+select private.portal_display_refresh_exact_v1('process','52710000-0000-4000-8000-000000000102','01.00.000');
+set local role anon;
+select extensions.is(jsonb_array_length(api.portal_get_published_lcia_values_v2(array['bafu'],'process_all_impacts',
+ '[{"id":"52710000-0000-4000-8000-000000000102","version":"01.00.000"}]',null,null,50)->'rows'),2,'display LCIA eligibility is independent of current review state');
+reset role;
+update private.dataset_display_settings set is_visible=false where dataset_id='52710000-0000-4000-8000-000000000102';
+set local role anon;
+select extensions.is(coalesce(jsonb_array_length(api.portal_get_published_lcia_values_v2(array['bafu'],'process_all_impacts',
+ '[{"id":"52710000-0000-4000-8000-000000000102","version":"01.00.000"}]',null,null,50)->'rows'),0),0,'hidden display setting immediately revokes LCIA values');
+reset role;
+update private.portal_display_rollout set mode='legacy';
+delete from private.dataset_display_settings where dataset_id='52710000-0000-4000-8000-000000000102';
+
 -- Exact publication identity never bypasses the public Process capability
 -- check.  Reclassify one projected Process temporarily and prove both 200 and
 -- draft rows disappear without touching immutable projection evidence.
@@ -4400,6 +4427,15 @@ select extensions.is(
   4::bigint,
   'revocation hides values while retaining all four immutable evidence rows'
 );
+
+reset role;
+insert into private.dataset_display_settings(dataset_kind,dataset_id,dataset_version,is_visible,brand)
+values ('process','52710000-0000-4000-8000-000000000101','01.00.000',true,'tiangong_lca');
+update private.portal_display_rollout set mode='display';
+set local role anon;
+select extensions.is(api.portal_get_published_lcia_values_v2(array['tiangong_lca'],'process_all_impacts',
+ '[{"id":"52710000-0000-4000-8000-000000000101","version":"01.00.000"}]',null,null,50),null::jsonb,'display visibility cannot bypass publication revocation');
+reset role;
 
 select * from extensions.finish();
 rollback;

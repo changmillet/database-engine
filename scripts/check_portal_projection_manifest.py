@@ -1337,8 +1337,24 @@ def main() -> int:
             continue
         executable_sql = sql_without_comments(migration.read_text(encoding="utf-8"))
         for identity, pattern in sitemap_patterns.items():
-            if pattern.search(executable_sql):
-                violations.append(f"{migration.name}: {identity}")
+            if not pattern.search(executable_sql):
+                continue
+            # #807 replaces only the public dispatchers. Their legacy bodies and
+            # metadata are proved unchanged by the populated-upgrade rehearsal;
+            # private shard derivation and every later mutation stay frozen.
+            display_dispatch = migration.name == "20261010110000_portal_display_projection.sql" and identity in {
+                "api.portal_sitemap_manifest_v1()", "api.portal_sitemap_shard_v1(text)"
+            }
+            if display_dispatch and all(token in executable_sql for token in (
+                "private.portal_display_mode_v1() is distinct from 'legacy'",
+                "perform private.portal_display_assert_contract_v1()",
+                "private.display_api_sitemap_manifest_v1()",
+                "private.display_api_sitemap_shard_v1(p_shard_cursor)",
+                '"private"."display_legacy_sitemap_manifest_v1"',
+                '"private"."display_legacy_sitemap_shard_v1"',
+            )):
+                continue
+            violations.append(f"{migration.name}: {identity}")
 
     # Composite-name generation has its own frozen closure. Shared V1 helpers
     # remain covered by the existing guards above; never exempt those identities.

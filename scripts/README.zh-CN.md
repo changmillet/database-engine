@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-09
-lastReviewedCommit: 172ba55a84c0b9d8e22639978247b7916f2a64df
-lastReviewedNote: 'Database #803: reviewed exact same-bundle Process reference version rewriting; table/column structures, public signatures, ACL and generated-workspace ownership remain unchanged.'
+lastReviewedAt: 2026-10-10
+lastReviewedCommit: 60407472b9ad5ec91a351f3d3b9c4c34531612a7
+lastReviewedNote: "Database #807: reviewed additive nullable brand, strict scope primitives, versioned public schemas and deterministic local snapshots; legacy Portal readers remain unchanged and cutover is pending."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -798,3 +798,5 @@ RPC response digests, seven request shapes and the current physical plan. All
 fixtures and temporary trigger suppression roll back. Current queries must meet
 the existing 15-second budget and hydrate only ten page names; output is private
 and an existing output path is refused. These are synthetic local measurements.
+
+展示迁移 #807 仅在 `check_portal_projection_manifest.py` 中放行该迁移的两个公共 sitemap 分发入口，旧 private 派生函数和后续迁移仍受冻结检查。`supabase/tests/upgrade/test_portal_display_upgrade.py` 在显式归属本任务的可丢弃数据库中验证旧函数体、owner、ACL 和配置保持不变。
