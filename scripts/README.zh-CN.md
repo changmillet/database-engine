@@ -809,8 +809,9 @@ and an existing output path is refused. These are synthetic local measurements.
 
 ### `benchmark_portal_display_sitemap.py`
 
-Rollback-only Database #807 local sitemap comparison, with 140,000 matching
-synthetic source/projection rows, six scope settings and three kind filters.
-Requires the fixed owned local container and a new report path; checks exact
-response digests and the unchanged eight-second candidate budget. See the
-Portal display qualification section in `docs/agents/repo-validation.md`.
+Database #807 的本地 sitemap 对比工具，仅使用可回滚的合成测试事务。
+在 140,000 条一一对应的源数据和投影记录上，比较六种范围与三种类型过滤的
+完整响应及游标。要求使用明确归属本任务的固定本地容器和新的报告路径；
+候选查询保留原有 8 秒预算。该结果仅证明本地读取规模，不代表生产 p95。
+执行方式及上线验证边界见 `docs/agents/repo-validation.md` 的 Portal display
+qualification 小节。
