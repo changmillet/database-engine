@@ -38,7 +38,7 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-10
-lastReviewedCommit: 9199f8c0c5b1803c28c591c5304c84751c10f487
+lastReviewedCommit: 60407472b9ad5ec91a351f3d3b9c4c34531612a7
 lastReviewedNote: "Database #807: reviewed isolated display projection and executor, guarded legacy/display/unavailable rollout, scoped readers, exact dependency licensing, immutable legacy preservation and local upgrade proof; hosted qualification and account backfill remain separate."
 related:
   - .docpact/config.yaml
