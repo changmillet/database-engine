@@ -1,0 +1,1 @@
+CREATE OR REPLACE TRIGGER "dataset_display_settings_touch" BEFORE UPDATE OF "is_visible", "brand" ON "private"."dataset_display_settings" FOR EACH ROW EXECUTE FUNCTION "private"."dataset_display_settings_touch"();

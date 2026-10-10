@@ -101,6 +101,8 @@ jobs:
           supabase test db supabase/tests/20260923_open_data_catalog_publications.sql
           supabase test db supabase/tests/20261009_dataset_display_settings.sql
           supabase test db supabase/tests/20261009_dataset_display_list_page_hydration.sql
+          supabase test db supabase/tests/20261010_portal_display_brand_foundation.sql
+          supabase test db supabase/tests/20261010_portal_display_readers.sql
           supabase test db supabase/tests/20260924_reviewer_contact_profile_activation.sql
           supabase test db supabase/tests/20260921_foundry60_time_alias_v2_math.sql
           supabase test db supabase/tests/20260921_foundry60_time_alias_v2_vectors.sql

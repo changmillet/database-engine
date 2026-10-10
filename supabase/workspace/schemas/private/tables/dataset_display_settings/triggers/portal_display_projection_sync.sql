@@ -1,0 +1,1 @@
+CREATE OR REPLACE TRIGGER "portal_display_projection_sync" AFTER INSERT OR DELETE OR UPDATE ON "private"."dataset_display_settings" FOR EACH ROW EXECUTE FUNCTION "private"."portal_display_settings_sync_v1"();

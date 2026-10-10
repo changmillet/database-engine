@@ -17,3 +17,5 @@ GRANT USAGE ON SCHEMA "public" TO "api_internal_executor";
 GRANT USAGE ON SCHEMA "public" TO "portal_public_executor";
 
 GRANT USAGE ON SCHEMA "public" TO "next_public_search_executor";
+
+GRANT USAGE ON SCHEMA "public" TO "portal_display_executor";

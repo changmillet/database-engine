@@ -1,6 +1,6 @@
 ---
-lastReviewedAt: 2026-10-08
-lastReviewedCommit: d724b9af27ce3d41dc0ac063c47dc0e0f5cecac7
+lastReviewedAt: 2026-10-10
+lastReviewedCommit: 489402c6d118be4202cef22f9b89266c9229ed76
 lastReviewedNote: "Reviewed Database #793 source d724b9af: 29 raw facade bounds preserve normal10x delegation; selective exact-version Flow type keys retain PGroonga scoring and broad/missing-stat fallback; five qualified indexes and four closed legacy rank routines retire under exact guards. Canonical417 local17.11 reset, 32 suites2344 assertions, 555 HTTP checks, non-superuser grant/refusal/replay proofs, independent reviews and deterministic1827-file generation pass. Hosted release/backmerge/root integration and user-authenticated production reads remain tracked delivery gates."
 title: Portal Projection Migration Recovery
 docType: runbook
@@ -1073,3 +1073,9 @@ from that exact local migration state, with deterministic regeneration and an
 unchanged Data API type contract. Before incident completion, bind Preview/Main
 deployment identities and classify a bounded live log window; these diagnostics
 cannot reconstruct previously erased parameters or replace traffic/plan proof.
+
+## Display projection rollout (#807)
+
+`20261010110000_portal_display_projection.sql` adds an independent display projection, executor and manifest in one transaction. It leaves the rollout in `legacy`; pre-existing settings need the bounded `private.portal_display_repair_batch_v1` operator path before a guarded `private.portal_display_transition_v1` switch. These helpers do not backfill business visibility or brand values. Account changes remain the separately reviewed #808 operation.
+
+The display manifest covers new readers, writers, projection indexes/RLS, views and compatibility dispatchers. Legacy private derivation helpers remain frozen. The manifest checker permits only this migration's two guarded public sitemap dispatchers; the populated-upgrade rehearsal verifies retained legacy routine bodies, owners, ACLs and configuration. See `repo-validation.md` for the exact local rehearsal. On drift, remain or enter `unavailable` and repair forward; never switch back to legacy state-code selection after activation. Preview, volume/concurrency and hosted cache-switch evidence are release gates, not implied by local fixtures.

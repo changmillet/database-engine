@@ -1,0 +1,1 @@
+CREATE INDEX "d807_portal_catalog_search_flow_document_v1_pgroonga" ON "private"."display_catalog_search_rows_v1" USING "pgroonga" ("document") WITH ("tokenizer"='TokenBigram', "normalizer"='NormalizerAuto') WHERE ("dataset_kind" = 'flow'::"text");

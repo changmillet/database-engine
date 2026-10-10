@@ -4,6 +4,25 @@ CREATE OR REPLACE FUNCTION "api"."portal_search_processes_v3"("p_query" "text", 
     SET "statement_timeout" TO '8s'
     AS $$
 begin
+
+ if private.portal_display_mode_v1() is distinct from 'legacy' then
+  declare m text:=private.portal_display_mode_v1(); result jsonb;
+ old_brands text:=current_setting('portal.display_brands',true);
+ old_global text:=current_setting('portal.display_global',true);
+ old_filter text:=current_setting('portal.display_filter_brand',true);
+begin
+ if m is distinct from 'display' then raise exception using errcode='P0001',message='portal catalog unavailable'; end if;
+ perform private.portal_display_assert_contract_v1();
+ perform set_config('portal.display_brands','',true);
+ perform set_config('portal.display_global','true',true);
+ perform set_config('portal.display_filter_brand','',true);
+ result:=private.display_api_search_processes_v3(p_query, p_filters, p_sort, p_cursor, p_limit);
+ perform set_config('portal.display_brands',coalesce(old_brands,''),true);
+ perform set_config('portal.display_global',coalesce(old_global,''),true);
+ perform set_config('portal.display_filter_brand',coalesce(old_filter,''),true);
+ return result;
+end;
+ end if;
   return pg_catalog.jsonb_set(private.portal_decorate_card_context_v1(
     private.portal_lcia_decorate_item_page_v1(
       private.portal_search_v3(

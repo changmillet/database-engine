@@ -79,5 +79,36 @@ for original in changed:
     count+=1
 assert count==34, count
 # The shadow generation must not retain duplicate mutable query readers.
-assert len([n for n in functions if re.search(r'_cn[12](?:_|$)',n)])==11
-print(f'PASS: {count} readers/helpers match the immutable composite baseline or the two exact reviewed V2 readers; only 11 required generation functions remain')
+# Database #807 owns a separate display graph. Pin both exact identity sets so
+# display copies do not count as duplicate legacy readers, and unexpected helpers
+# in either graph still fail. Display bodies/roles are guarded by its own manifest.
+legacy_generation = {
+    'assert_portal_catalog_character_contract_cn1',
+    'assert_portal_catalog_projection_contract_cn1',
+    'assert_portal_process_keyword_rank_contract_cn1',
+    'catalog_portal_process_keyword_keys_cn1',
+    'catalog_portal_process_keyword_relevance_cn1_impl',
+    'catalog_portal_projection_payload_cn1',
+    'portal_catalog_card_cn1',
+    'portal_catalog_projection_manifest_sha256_cn1',
+    'portal_process_keyword_rank_manifest_sha256_cn1',
+    'portal_projection_semantic_process_exact_cn1',
+    'sync_portal_catalog_character_row_cn1',
+}
+display_generation = {
+    'display_assert_catalog_character_contract_cn1',
+    'display_assert_catalog_projection_contract_cn1',
+    'display_assert_process_keyword_rank_contract_cn1',
+    'display_catalog_card_cn1',
+    'display_catalog_process_keyword_keys_cn1',
+    'display_catalog_process_keyword_relevance_cn1_impl',
+    'display_catalog_projection_payload_cn1',
+    'display_projection_semantic_process_exact_cn1',
+    'display_sync_catalog_character_row_cn1',
+}
+actual_generation = {n for n in functions if re.search(r'_cn[12](?:_|$)', n)}
+assert actual_generation == legacy_generation | display_generation, (
+    actual_generation - (legacy_generation | display_generation),
+    (legacy_generation | display_generation) - actual_generation,
+)
+print(f'PASS: {count} readers/helpers match the immutable composite baseline or the two exact reviewed V2 readers; exactly 11 legacy and 9 isolated display generation functions remain')
