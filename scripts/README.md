@@ -21,7 +21,7 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-10
-lastReviewedCommit: 494c6c9ead8449ae2f2b8d116c6424680de5fc36
+lastReviewedCommit: 489402c6d118be4202cef22f9b89266c9229ed76
 lastReviewedNote: "Database #807: reviewed additive nullable brand, strict scope primitives, versioned public schemas and deterministic local snapshots; legacy Portal readers remain unchanged and cutover is pending."
 related:
   - ../AGENTS.md
@@ -907,3 +907,5 @@ RPC response digests, seven request shapes and the current physical plan. All
 fixtures and temporary trigger suppression roll back. Current queries must meet
 the existing 15-second budget and hydrate only ten page names; output is private
 and an existing output path is refused. These are synthetic local measurements.
+
+The #807 display migration adds a narrow, named exception for the two public sitemap dispatchers in `check_portal_projection_manifest.py`. It does not exempt legacy private derivation helpers or future migrations. The populated upgrade rehearsal in `supabase/tests/upgrade/test_portal_display_upgrade.py` proves legacy body/owner/ACL/config preservation on an explicitly task-owned disposable stack.

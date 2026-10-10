@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-10
-lastReviewedCommit: 494c6c9ead8449ae2f2b8d116c6424680de5fc36
-lastReviewedNote: "Database #807: reviewed additive nullable brand, strict scope primitives, versioned public schemas and deterministic local snapshots; legacy Portal readers remain unchanged and cutover is pending."
+lastReviewedCommit: 489402c6d118be4202cef22f9b89266c9229ed76
+lastReviewedNote: "Database #807: reviewed isolated display projection and executor, guarded legacy/display/unavailable rollout, scoped readers, exact dependency licensing, immutable legacy preservation and local upgrade proof; hosted qualification and account backfill remain separate."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -1145,7 +1145,7 @@ Facet v3 includes a brand group using stable codes and fixed display labels.
 All retained schemas keep their original bytes; new schemas reference retained
 base-value types rather than redefining scientific values.
 
-Frozen consumer routing for the next read implementation (all scope arrays are
+Implemented scoped consumer routing (all scope arrays are
 required, canonical, nonempty and independent of the optional user filter):
 
 | Function family | New API name | Scope and retained arguments | Response |
@@ -1159,6 +1159,7 @@ required, canonical, nonempty and independent of the optional user filter):
 | Summary | `portal_catalog_summary_v2` | `p_allowed_brands` | Summary v1 |
 | Hybrid | `portal_hybrid_search_v3` | `p_allowed_brands`, existing v2 arguments | Candidate page v3 |
 | Sitemap | `portal_sitemap_entries_v2`, `portal_sitemap_manifest_v2`, `portal_sitemap_shard_v2` | `p_allowed_brands`, respective existing v1 arguments | Existing sitemap payloads |
+| Flow links | `portal_flow_link_eligibility_v1` | `p_allowed_brands`, bounded exact `p_flow_refs` (maximum 50) | Exact id/version/linkable array |
 | LCIA | `portal_get_published_lcia_values_v2` | `p_allowed_brands`, existing v1 arguments | Published LCIA page v1 |
 
 Here “existing arguments” retains their exact names and types from the prior
@@ -1182,5 +1183,25 @@ HMAC-signed bytes. LCIA retains browser mode/refs/impact/cursor/limit inputs and
 numeric response shapes. Edge validates and passes scope to these new DB APIs;
 no scoped consumer may fall back to an unscoped API. Query identities, all
 result/eligibility caches, cursors and sitemap shards include normalized scope.
-The remaining implementation and rollout evidence is tracked in Database #807
-and workspace #1794; this foundation is not production activation evidence.
+Migration `20261010110000` installs the complete isolated `display_*` projection and
+reader closure atomically. Its narrow `portal_display_executor` has no inherited
+legacy source policy. Source and setting triggers synchronize exact keys, preserve
+actual state values, and serialize each key with a transaction advisory lock.
+Reads recheck authoritative settings; source deletion clears exact settings.
+Projection/version/facet/navigation/sitemap rows have an independent derivation
+contract and a read-time identity guard over readers, relation definitions,
+indexes, RLS and writer triggers. Original frozen extraction/rank contracts remain
+unchanged; only the two new foundation predicates gain the new reader's EXECUTE.
+Narrow definer row adapters retain publication RLS and original helper ACLs.
+
+`private.portal_display_rollout` starts in `legacy`. New scoped APIs refuse reads
+until `display`; legacy APIs preserve their original bodies, metadata and grants
+in legacy mode, use globally visible display rows in display mode, and fail closed
+in `unavailable`. This is deliberate global compatibility, not a deployment scope
+for old anonymous clients. Operator-only `portal_display_repair_batch_v1` repairs
+bounded derivatives without changing settings. `portal_display_transition_v1`
+uses expected-mode comparison, locks the singleton, checks manifest and exact
+projection readiness, and admits only display/unavailable destinations. It never
+restores legacy after cutover. The migration neither repairs business rows nor
+activates display. Account backfill belongs to separate Database #808 operations;
+release, promote and workspace integration remain tracked in #807 / workspace #1794.

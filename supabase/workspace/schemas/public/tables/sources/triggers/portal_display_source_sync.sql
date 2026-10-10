@@ -1,0 +1,1 @@
+CREATE OR REPLACE TRIGGER "portal_display_source_sync" AFTER INSERT OR DELETE OR UPDATE OF "id", "version", "json", "state_code", "modified_at" ON "public"."sources" FOR EACH ROW EXECUTE FUNCTION "private"."portal_display_source_sync_v1"('source');

@@ -1,0 +1,1 @@
+CREATE INDEX "d807_portal_catalog_facet_flow_geography_v1_idx" ON "private"."display_catalog_facet_rows_v1" USING "btree" ("facet_geography") INCLUDE ("id", "version") WHERE (("dataset_kind" = 'flow'::"text") AND ("facet_contract_version" = 1));

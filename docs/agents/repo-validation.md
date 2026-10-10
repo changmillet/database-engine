@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-10
-lastReviewedCommit: 494c6c9ead8449ae2f2b8d116c6424680de5fc36
-lastReviewedNote: "Database #807: reviewed additive nullable brand, strict scope primitives, versioned public schemas and deterministic local snapshots; legacy Portal readers remain unchanged and cutover is pending."
+lastReviewedCommit: 489402c6d118be4202cef22f9b89266c9229ed76
+lastReviewedNote: "Database #807: reviewed isolated display projection and executor, guarded legacy/display/unavailable rollout, scoped readers, exact dependency licensing, immutable legacy preservation and local upgrade proof; hosted qualification and account backfill remain separate."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -960,21 +960,33 @@ parity and function OID/owner/ACL/security/config/result identity. Do not increa
 role/RPC timeouts or add indexes/caches without separate measured justification.
 
 
-## Portal display brand foundation
+## Portal display qualification (Database #807)
 
-Database #807 adds versioned brand/scope schemas and internal predicates before
-public reader cutover. Run `20261010_portal_display_brand_foundation.sql`, the two
-existing display suites, all Portal suites and the shared API/publication
-regressions after blank replay. The API closure test must bind the new exact
-migration head. Re-run strict schema compilation, deterministic type generation
-and the immutable projection-manifest checker. A populated upgrade must preserve
-existing display settings, old Portal function definitions/owners/ACLs, and the
-existing manager command's nullable-insert / brand-preserving update behavior.
+Run `20261010_portal_display_brand_foundation.sql` and
+`20261010_portal_display_readers.sql` after blank replay, alongside all existing
+Portal, display-manager, API/OAuth and Result Process suites. The publication suite
+also verifies scoped LCIA for visible review-state rows, immediate hiding and
+publication revocation. Existing historical lexical planner instability must be
+reported with predecessor evidence, not hidden by weakening expectations.
 
-Prove exact kind/id/version identity, hidden/missing denial, single/multiple
-brand intersection, null/unknown/wildcard/oversized/multidimensional input
-rejection, canonical scope ordering, globally visible cross-brand support and
-private table/helper ACLs under the actual Portal executor. This foundation does
-not change existing Portal state rules; reader cutover requires the full display
-matrix, consumer compatibility, near-production performance, hosted proof and
-independent operations receipt from the approved workspace Plan.
+The display suite covers scope-before-latest/rank/count, version brand, facets,
+summary/navigation, cross-brand/null exact support, support license and hiding,
+scoped Flow links, sitemap scope cursors, legacy-shape adapters and unavailable
+cutover. Run strict schema compilation, generated-type checks and the immutable
+legacy projection-manifest checker. Add every new external API to the capability
+manifest and bind API closure to the exact migration head.
+
+`supabase/tests/upgrade/test_portal_display_upgrade.py` refuses any stack without
+Database #807 ownership at its fixed disposable workdir. It resets only that stack
+to the foundation predecessor, inserts synthetic source/settings, applies the
+atomic display migration, and verifies unchanged source/settings, old function
+OID/metadata/ACLs and retained legacy bodies, original owner memberships, default
+legacy mode and empty display projection. Only the two new foundation helpers
+admit the new constrained reader. It then exercises explicit bounded derivative
+repair and operator transition. Restore a blank final head before generating the
+five-schema workspace and Data API types twice for deterministic comparison.
+
+Local correctness does not qualify hosted latency, near-production capacity,
+actual account backfill, traffic draining, cache purge or deployment activation.
+Those receipts, Dev/Main promotion and root integration remain explicit release
+gates in the approved workspace Plan and Database #808.

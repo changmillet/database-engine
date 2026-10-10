@@ -13,6 +13,25 @@ declare
   v_exact_id uuid;
   v_like_pattern text;
 begin
+
+ if private.portal_display_mode_v1() is distinct from 'legacy' then
+  declare m text:=private.portal_display_mode_v1(); result jsonb;
+ old_brands text:=current_setting('portal.display_brands',true);
+ old_global text:=current_setting('portal.display_global',true);
+ old_filter text:=current_setting('portal.display_filter_brand',true);
+begin
+ if m is distinct from 'display' then raise exception using errcode='P0001',message='portal catalog unavailable'; end if;
+ perform private.portal_display_assert_contract_v1();
+ perform set_config('portal.display_brands','',true);
+ perform set_config('portal.display_global','true',true);
+ perform set_config('portal.display_filter_brand','',true);
+ result:=private.display_api_facets_v3(p_kind, p_query, p_filters);
+ perform set_config('portal.display_brands',coalesce(old_brands,''),true);
+ perform set_config('portal.display_global',coalesce(old_global,''),true);
+ perform set_config('portal.display_filter_brand',coalesce(old_filter,''),true);
+ return result;
+end;
+ end if;
   perform private.assert_portal_catalog_projection_contract_cn1();
 
   if pg_catalog.octet_length(coalesce(p_kind, '')) > 32 then

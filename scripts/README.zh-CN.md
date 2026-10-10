@@ -21,7 +21,7 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-10
-lastReviewedCommit: 494c6c9ead8449ae2f2b8d116c6424680de5fc36
+lastReviewedCommit: 489402c6d118be4202cef22f9b89266c9229ed76
 lastReviewedNote: "Database #807: reviewed additive nullable brand, strict scope primitives, versioned public schemas and deterministic local snapshots; legacy Portal readers remain unchanged and cutover is pending."
 related:
   - ../AGENTS.md
@@ -798,3 +798,5 @@ RPC response digests, seven request shapes and the current physical plan. All
 fixtures and temporary trigger suppression roll back. Current queries must meet
 the existing 15-second budget and hydrate only ten page names; output is private
 and an existing output path is refused. These are synthetic local measurements.
+
+展示迁移 #807 仅在 `check_portal_projection_manifest.py` 中放行该迁移的两个公共 sitemap 分发入口，旧 private 派生函数和后续迁移仍受冻结检查。`supabase/tests/upgrade/test_portal_display_upgrade.py` 在显式归属本任务的可丢弃数据库中验证旧函数体、owner、ACL 和配置保持不变。

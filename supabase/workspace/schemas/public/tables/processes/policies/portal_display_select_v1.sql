@@ -1,0 +1,1 @@
+CREATE POLICY "portal_display_select_v1" ON "public"."processes" FOR SELECT TO "portal_display_executor" USING ("private"."portal_dataset_is_visible_v1"('process'::"text", "id", ("version")::"text"));

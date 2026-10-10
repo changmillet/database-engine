@@ -15,3 +15,5 @@ ALTER FUNCTION "private"."portal_dataset_is_visible_v1"("p_kind" "text", "p_id" 
 REVOKE ALL ON FUNCTION "private"."portal_dataset_is_visible_v1"("p_kind" "text", "p_id" "uuid", "p_version" "text") FROM PUBLIC;
 
 GRANT ALL ON FUNCTION "private"."portal_dataset_is_visible_v1"("p_kind" "text", "p_id" "uuid", "p_version" "text") TO "portal_public_executor";
+
+GRANT ALL ON FUNCTION "private"."portal_dataset_is_visible_v1"("p_kind" "text", "p_id" "uuid", "p_version" "text") TO "portal_display_executor";

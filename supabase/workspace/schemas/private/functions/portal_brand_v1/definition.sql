@@ -16,3 +16,5 @@ ALTER FUNCTION "private"."portal_brand_v1"("p_brand" "text") OWNER TO "postgres"
 REVOKE ALL ON FUNCTION "private"."portal_brand_v1"("p_brand" "text") FROM PUBLIC;
 
 GRANT ALL ON FUNCTION "private"."portal_brand_v1"("p_brand" "text") TO "portal_public_executor";
+
+GRANT ALL ON FUNCTION "private"."portal_brand_v1"("p_brand" "text") TO "portal_display_executor";

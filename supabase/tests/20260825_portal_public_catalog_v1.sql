@@ -285,8 +285,8 @@ select extensions.is(
     from private.api_capability_grants as manifest
     where manifest.capability_id = 'PORTAL-CATALOG-01'
   ),
-  17::bigint,
-  'PORTAL-CATALOG-01 contains ten frozen v1, three v2, and four navigation/V3 routines'
+  29::bigint,
+  'PORTAL-CATALOG-01 contains seventeen legacy and twelve display catalogue routines'
 );
 
 select extensions.is(
@@ -490,7 +490,7 @@ select extensions.is(
     select pg_catalog.md5(routine.prosrc)
     from pg_catalog.pg_proc as routine
     where routine.oid =
-      'api.portal_sitemap_entries_v1(text,text,integer)'::regprocedure
+      'private.display_legacy_sitemap_entries_v1(text,text,integer)'::regprocedure
   ),
   '03dd37bd0871c220fcd94cb2dec203ed',
   'the retained legacy sitemap façade remains byte-identical'
