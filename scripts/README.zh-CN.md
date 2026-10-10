@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-09
-lastReviewedCommit: 172ba55a84c0b9d8e22639978247b7916f2a64df
-lastReviewedNote: 'Database #803: reviewed exact same-bundle Process reference version rewriting; table/column structures, public signatures, ACL and generated-workspace ownership remain unchanged.'
+lastReviewedAt: 2026-10-10
+lastReviewedCommit: 494c6c9ead8449ae2f2b8d116c6424680de5fc36
+lastReviewedNote: "Database #807: reviewed additive nullable brand, strict scope primitives, versioned public schemas and deterministic local snapshots; legacy Portal readers remain unchanged and cutover is pending."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml

@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "portal.common-types.v2.schema.json",
+  "title": "Portal data brands and deployment scope",
+  "type": "object",
+  "$defs": {
+    "BrandCode": {
+      "enum": [
+        "tiangong_lca",
+        "bafu",
+        "uslci",
+        "worldsteel"
+      ]
+    },
+    "AllowedBrandCodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/BrandCode"
+      },
+      "description": "Server-owned canonical nonempty deployment set. Sort and deduplicate before signing, caching or calling RPCs. Never accept this authority from a browser."
+    },
+    "PublicBrand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "code",
+            "name"
+          ],
+          "properties": {
+            "code": {
+              "const": "tiangong_lca"
+            },
+            "name": {
+              "const": "Tiangong LCA"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "code",
+            "name"
+          ],
+          "properties": {
+            "code": {
+              "const": "bafu"
+            },
+            "name": {
+              "const": "BAFU"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "code",
+            "name"
+          ],
+          "properties": {
+            "code": {
+              "const": "uslci"
+            },
+            "name": {
+              "const": "USLCI"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "code",
+            "name"
+          ],
+          "properties": {
+            "code": {
+              "const": "worldsteel"
+            },
+            "name": {
+              "const": "World steel"
+            }
+          }
+        }
+      ]
+    },
+    "NullablePublicBrand": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PublicBrand"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

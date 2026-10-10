@@ -32,9 +32,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-09
-lastReviewedCommit: 1c6b66b48eb8ca232ba7ba23c92b048028cd4c4e
-lastReviewedNote: 'Database #803: reviewed exact same-bundle Process reference version rewriting; table/column structures, public signatures, ACL and generated-workspace ownership remain unchanged.'
+lastReviewedAt: 2026-10-10
+lastReviewedCommit: 494c6c9ead8449ae2f2b8d116c6424680de5fc36
+lastReviewedNote: "Database #807: reviewed additive nullable brand, strict scope primitives, versioned public schemas and deterministic local snapshots; legacy Portal readers remain unchanged and cutover is pending."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -958,3 +958,23 @@ Synthetic local timings are not hosted performance evidence. A populated
 canonical-base-to-head upgrade must preserve source/settings hashes, response
 parity and function OID/owner/ACL/security/config/result identity. Do not increase
 role/RPC timeouts or add indexes/caches without separate measured justification.
+
+
+## Portal display brand foundation
+
+Database #807 adds versioned brand/scope schemas and internal predicates before
+public reader cutover. Run `20261010_portal_display_brand_foundation.sql`, the two
+existing display suites, all Portal suites and the shared API/publication
+regressions after blank replay. The API closure test must bind the new exact
+migration head. Re-run strict schema compilation, deterministic type generation
+and the immutable projection-manifest checker. A populated upgrade must preserve
+existing display settings, old Portal function definitions/owners/ACLs, and the
+existing manager command's nullable-insert / brand-preserving update behavior.
+
+Prove exact kind/id/version identity, hidden/missing denial, single/multiple
+brand intersection, null/unknown/wildcard/oversized/multidimensional input
+rejection, canonical scope ordering, globally visible cross-brand support and
+private table/helper ACLs under the actual Portal executor. This foundation does
+not change existing Portal state rules; reader cutover requires the full display
+matrix, consumer compatibility, near-production performance, hosted proof and
+independent operations receipt from the approved workspace Plan.

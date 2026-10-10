@@ -30,9 +30,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-09
-lastReviewedCommit: 172ba55a84c0b9d8e22639978247b7916f2a64df
-lastReviewedNote: 'Database #803: reviewed exact same-bundle Process reference version rewriting; table/column structures, public signatures, ACL and generated-workspace ownership remain unchanged.'
+lastReviewedAt: 2026-10-10
+lastReviewedCommit: 494c6c9ead8449ae2f2b8d116c6424680de5fc36
+lastReviewedNote: "Database #807: reviewed additive nullable brand, strict scope primitives, versioned public schemas and deterministic local snapshots; legacy Portal readers remain unchanged and cutover is pending."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -1110,10 +1110,77 @@ prefix-bound recovery/benchmark contracts remain immutable history.
 
 ## Dataset display configuration
 
-`private.dataset_display_settings` stores only exact `dataset_kind/dataset_id/dataset_version`, `is_visible` and `updated_at`. Its seven-type allowlist excludes LCIA methods and ILCD. Missing settings are hidden; a new version does not inherit visibility. No operator identity or operation history is stored. Existing Open Data Process selections migrate as visible and the old append-only storage and command are removed.
+`private.dataset_display_settings` stores only exact `dataset_kind/dataset_id/dataset_version`, `is_visible`, nullable `brand` and `updated_at`. Its seven-type allowlist excludes LCIA methods and ILCD. Missing settings are hidden; a new version does not inherit visibility. No operator identity or operation history is stored. Existing Open Data Process selections migrate as visible and the old append-only storage and command are removed.
 
 `api.list_dataset_display_candidates` and `api.cmd_dataset_display_set_batch` recheck the live system `data_product_manager` role. Candidates include every exact business version regardless of state, owner or team. The command validates 1–100 identities, deduplicates, locks sources in stable kind/id/version order, and changes only configuration atomically; malformed or missing sources roll back the entire batch. Set and cancel are idempotent. Source deletion or an admitted identity replacement cleans its exact setting; business immutability guards remain authoritative.
 
 `api.list_displayed_datasets` admits existing authenticated actors only and returns bounded selected names, exact versions and types. The private union projection and configuration table grant no application-role access. OAuth readers use `NX-CORE-02`, the command uses `CLI-RPC-01`, and all three facade grants are manifest-complete with no anonymous or service-role grant. Pages are bounded to 100 rows, filters/counts precede pagination, names are capped at 16 KiB and queries at 512 bytes. Display does not confer raw dataset, export, reference, Portal or calculation eligibility. Existing source-filtered state-100 Open Data readers keep their signatures and derive their legacy Process selection flag from the new true settings.
 
 Display list pagination materializes only exact identity and visibility keys. Empty queries carry no name/JSON expression in the candidate scan; bound custom SQL plans prune unused type/filter branches. Totals and stable kind/id/version-desc ordering precede pagination, then a correlated exact lookup with an OFFSET-0 fence hydrates only the bounded page. Nonempty searches retain full name-or-UUID substring semantics before counting/paging; no search candidate cap, cache, new index or timeout increase is introduced.
+
+
+## Portal display rollout contracts (Database #807)
+
+The additive brand foundation does not activate anonymous display settings.
+Existing Portal readers retain their legacy semantics until the separately
+validated display projection/read cutover is installed and enabled. The new
+schemas are opt-in consumer contracts; schema presence is not API readiness.
+
+`brand` is null or one of `tiangong_lca`, `bafu`, `uslci`, `worldsteel`, with exact
+public labels Tiangong LCA, BAFU, USLCI, World steel. Brand changes update
+`updated_at`. Existing display commands keep their signatures and preserve the
+brand; inserts remain unassigned. No account/state backfill is in migration.
+The private global-visibility helper checks only the exact setting. The private
+scope helper additionally intersects a required nonempty brand set, with no
+state condition. Callers must still validate source existence, public shape,
+rollout readiness, license, reference integrity and publication evidence.
+
+The common v2 schema owns BrandCode, AllowedBrandCodes and correlated code/name
+pairs. Browser Search v4 and Facet v4 add only `filters.brand`; Navigation input
+v2 reuses the same filter definition. Browser requests never own deployment
+scope. Hybrid database input v3 additionally requires `p_allowed_brands`.
+Search page v3, Dataset/Version page v2 and Hybrid candidate page v3 carry an
+independent nullable brand; every Hybrid exact version match carries its brand.
+Facet v3 includes a brand group using stable codes and fixed display labels.
+All retained schemas keep their original bytes; new schemas reference retained
+base-value types rather than redefining scientific values.
+
+Frozen consumer routing for the next read implementation (all scope arrays are
+required, canonical, nonempty and independent of the optional user filter):
+
+| Function family | New API name | Scope and retained arguments | Response |
+| --- | --- | --- | --- |
+| Search | `portal_search_processes_v4`, `portal_search_flows_v4` | `p_allowed_brands` followed by existing query/filters/sort/cursor/limit | Search page v3 |
+| Facets | `portal_facets_v4` | `p_allowed_brands`, kind/query/filters | Facets v3 |
+| Navigation | `portal_navigation_v2` | `p_allowed_brands`, existing v1 arguments | Navigation v2 |
+| Dataset | `portal_get_dataset_v2` | `p_allowed_brands`, kind/id/version | Dataset v2 |
+| Versions | `portal_list_versions_v2` | `p_allowed_brands`, kind/id/cursor/limit | Version page v2 |
+| Exchanges | `portal_list_process_exchanges_v2` | `p_allowed_brands`, existing v1 arguments | Exchange page v1 |
+| Summary | `portal_catalog_summary_v2` | `p_allowed_brands` | Summary v1 |
+| Hybrid | `portal_hybrid_search_v3` | `p_allowed_brands`, existing v2 arguments | Candidate page v3 |
+| Sitemap | `portal_sitemap_entries_v2`, `portal_sitemap_manifest_v2`, `portal_sitemap_shard_v2` | `p_allowed_brands`, respective existing v1 arguments | Existing sitemap payloads |
+| LCIA | `portal_get_published_lcia_values_v2` | `p_allowed_brands`, existing v1 arguments | Published LCIA page v1 |
+
+Here “existing arguments” retains their exact names and types from the prior
+API; scope is the first SQL argument, and JSON callers use its explicit name.
+All supplied scope members must be valid codes. The database accepts at most
+four entries and canonicalizes their order/duplicates; BFFs deduplicate before
+calling it. The wire schema requires unique canonical members. An omitted user
+brand means all deployment brands; a known out-of-scope user brand matches zero
+roots. Null brands never match a deployment but may support a visible root.
+
+The scope must precede candidate selection, version selection, ranking, counting
+and pagination. Cross-brand technical dependencies use global visibility along
+real exact references from a scoped root. They do not become catalog members or
+independent details, and require no same-brand test. Existing raw-table and
+non-Portal roles retain their policies. This is deployment presentation, not
+site-bound authorization for the shared publishable database identity.
+
+Server-to-Edge Hybrid request/page v3 and the new
+`portal.published-lcia-request.v2` envelope bind `allowedBrandCodes` inside the
+HMAC-signed bytes. LCIA retains browser mode/refs/impact/cursor/limit inputs and
+numeric response shapes. Edge validates and passes scope to these new DB APIs;
+no scoped consumer may fall back to an unscoped API. Query identities, all
+result/eligibility caches, cursors and sitemap shards include normalized scope.
+The remaining implementation and rollout evidence is tracked in Database #807
+and workspace #1794; this foundation is not production activation evidence.

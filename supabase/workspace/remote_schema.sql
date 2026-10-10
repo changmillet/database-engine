@@ -45921,6 +45921,22 @@ end; $$;
 ALTER FUNCTION "private"."dataset_display_require_manager"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "private"."dataset_display_settings_touch"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+begin
+  if (new.is_visible, new.brand) is distinct from (old.is_visible, old.brand) then
+    new.updated_at := pg_catalog.clock_timestamp();
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "private"."dataset_display_settings_touch"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "private"."dataset_display_source_cleanup"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -55065,6 +55081,23 @@ $$;
 ALTER FUNCTION "private"."portal_administration_v1"("p_kind" "text", "p_json" "jsonb") OWNER TO "portal_public_executor";
 
 
+CREATE OR REPLACE FUNCTION "private"."portal_brand_v1"("p_brand" "text") RETURNS "jsonb"
+    LANGUAGE "sql" IMMUTABLE PARALLEL SAFE
+    SET "search_path" TO ''
+    AS $$
+  select case p_brand
+    when 'tiangong_lca' then pg_catalog.jsonb_build_object('code', p_brand, 'name', 'Tiangong LCA')
+    when 'bafu' then pg_catalog.jsonb_build_object('code', p_brand, 'name', 'BAFU')
+    when 'uslci' then pg_catalog.jsonb_build_object('code', p_brand, 'name', 'USLCI')
+    when 'worldsteel' then pg_catalog.jsonb_build_object('code', p_brand, 'name', 'World steel')
+    else null
+  end;
+$$;
+
+
+ALTER FUNCTION "private"."portal_brand_v1"("p_brand" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "private"."portal_canonical_decimal_v1"("p_value" "text") RETURNS "text"
     LANGUAGE "plpgsql" IMMUTABLE PARALLEL SAFE
     SET "search_path" TO ''
@@ -56256,6 +56289,42 @@ $$;
 
 
 ALTER FUNCTION "private"."portal_cursor_encode_v1"("p_payload" "jsonb") OWNER TO "portal_public_executor";
+
+
+CREATE OR REPLACE FUNCTION "private"."portal_dataset_in_brand_scope_v1"("p_kind" "text", "p_id" "uuid", "p_version" "text", "p_allowed_brands" "text"[]) RETURNS boolean
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+declare v_scope text[] := private.portal_normalize_brand_scope_v1(p_allowed_brands);
+begin
+  return exists (
+    select 1 from private.dataset_display_settings s
+    where s.dataset_kind = p_kind and s.dataset_id = p_id
+      and s.dataset_version = p_version::character(9)
+      and s.is_visible and s.brand = any(v_scope)
+      and p_version ~ '^\d{2}\.\d{2}\.\d{3}$'
+  );
+end;
+$_$;
+
+
+ALTER FUNCTION "private"."portal_dataset_in_brand_scope_v1"("p_kind" "text", "p_id" "uuid", "p_version" "text", "p_allowed_brands" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "private"."portal_dataset_is_visible_v1"("p_kind" "text", "p_id" "uuid", "p_version" "text") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $_$
+  select exists (
+    select 1 from private.dataset_display_settings s
+    where s.dataset_kind = p_kind and s.dataset_id = p_id
+      and s.dataset_version = p_version::character(9)
+      and s.is_visible and p_version ~ '^\d{2}\.\d{2}\.\d{3}$'
+  );
+$_$;
+
+
+ALTER FUNCTION "private"."portal_dataset_is_visible_v1"("p_kind" "text", "p_id" "uuid", "p_version" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "private"."portal_dataset_metadata_v1"("p_kind" "text", "p_state_code" integer, "p_json" "jsonb") RETURNS "jsonb"
@@ -59563,6 +59632,31 @@ $$;
 
 
 ALTER FUNCTION "private"."portal_navigation_virtual_labels_v1"("p_key" "text") OWNER TO "api_internal_executor";
+
+
+CREATE OR REPLACE FUNCTION "private"."portal_normalize_brand_scope_v1"("p_allowed_brands" "text"[]) RETURNS "text"[]
+    LANGUAGE "plpgsql" IMMUTABLE PARALLEL SAFE
+    SET "search_path" TO ''
+    AS $$
+declare v_result text[];
+begin
+  if p_allowed_brands is null
+    or coalesce(pg_catalog.array_ndims(p_allowed_brands), 0) <> 1
+    or pg_catalog.cardinality(p_allowed_brands) not between 1 and 4
+    or exists (
+      select 1 from pg_catalog.unnest(p_allowed_brands) b(code)
+      where code is null or code not in ('tiangong_lca', 'bafu', 'uslci', 'worldsteel')
+    ) then
+    raise exception using errcode = '22023', message = 'invalid portal brand scope';
+  end if;
+  select pg_catalog.array_agg(code order by code collate "C") into v_result
+    from (select distinct code from pg_catalog.unnest(p_allowed_brands) b(code)) normalized;
+  return v_result;
+end;
+$$;
+
+
+ALTER FUNCTION "private"."portal_normalize_brand_scope_v1"("p_allowed_brands" "text"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "private"."portal_normalize_filters_v1"("p_filters" "jsonb") RETURNS "jsonb"
@@ -83754,6 +83848,8 @@ CREATE TABLE IF NOT EXISTS "private"."dataset_display_settings" (
     "dataset_version" character(9) NOT NULL,
     "is_visible" boolean DEFAULT false NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "brand" "text",
+    CONSTRAINT "dataset_display_settings_brand_check" CHECK (("brand" = ANY (ARRAY['tiangong_lca'::"text", 'bafu'::"text", 'uslci'::"text", 'worldsteel'::"text"]))),
     CONSTRAINT "dataset_display_settings_dataset_kind_check" CHECK (("dataset_kind" = ANY (ARRAY['lifecyclemodel'::"text", 'process'::"text", 'flow'::"text", 'flowproperty'::"text", 'unitgroup'::"text", 'source'::"text", 'contact'::"text"]))),
     CONSTRAINT "dataset_display_settings_dataset_version_check" CHECK (("dataset_version" ~ '^\d{2}\.\d{2}\.\d{3}$'::"text"))
 );
@@ -83763,6 +83859,10 @@ ALTER TABLE "private"."dataset_display_settings" OWNER TO "postgres";
 
 
 COMMENT ON TABLE "private"."dataset_display_settings" IS 'Exact-version list visibility only. Missing configuration is hidden; no actor or history is stored. Does not confer raw, export, Portal, calculation or numerical publication access.';
+
+
+
+COMMENT ON COLUMN "private"."dataset_display_settings"."brand" IS 'Exact-version data brand. NULL is unassigned, not Tiangong. Deployment selection does not mutate this value or is_visible.';
 
 
 
@@ -88660,6 +88760,10 @@ CREATE OR REPLACE TRIGGER "comments_v2_kind_guard" BEFORE INSERT OR UPDATE ON "p
 
 
 
+CREATE OR REPLACE TRIGGER "dataset_display_settings_touch" BEFORE UPDATE OF "is_visible", "brand" ON "private"."dataset_display_settings" FOR EACH ROW EXECUTE FUNCTION "private"."dataset_display_settings_touch"();
+
+
+
 CREATE OR REPLACE TRIGGER "lca_network_snapshots_closure_delete_guard" BEFORE DELETE ON "private"."lca_network_snapshots" FOR EACH ROW EXECUTE FUNCTION "private"."lcia_scope_closure_guard_snapshot_delete"();
 
 
@@ -92933,6 +93037,10 @@ REVOKE ALL ON FUNCTION "private"."dataset_display_require_manager"() FROM PUBLIC
 
 
 
+REVOKE ALL ON FUNCTION "private"."dataset_display_settings_touch"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "private"."dataset_display_source_cleanup"() FROM PUBLIC;
 
 
@@ -93502,6 +93610,11 @@ REVOKE ALL ON FUNCTION "private"."portal_administration_v1"("p_kind" "text", "p_
 
 
 
+REVOKE ALL ON FUNCTION "private"."portal_brand_v1"("p_brand" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "private"."portal_brand_v1"("p_brand" "text") TO "portal_public_executor";
+
+
+
 REVOKE ALL ON FUNCTION "private"."portal_canonical_decimal_v1"("p_value" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."portal_canonical_decimal_v1"("p_value" "text") TO "postgres";
 
@@ -93588,6 +93701,16 @@ REVOKE ALL ON FUNCTION "private"."portal_cursor_decode_v1"("p_cursor" "text") FR
 
 
 REVOKE ALL ON FUNCTION "private"."portal_cursor_encode_v1"("p_payload" "jsonb") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "private"."portal_dataset_in_brand_scope_v1"("p_kind" "text", "p_id" "uuid", "p_version" "text", "p_allowed_brands" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "private"."portal_dataset_in_brand_scope_v1"("p_kind" "text", "p_id" "uuid", "p_version" "text", "p_allowed_brands" "text"[]) TO "portal_public_executor";
+
+
+
+REVOKE ALL ON FUNCTION "private"."portal_dataset_is_visible_v1"("p_kind" "text", "p_id" "uuid", "p_version" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "private"."portal_dataset_is_visible_v1"("p_kind" "text", "p_id" "uuid", "p_version" "text") TO "portal_public_executor";
 
 
 
@@ -93780,6 +93903,11 @@ REVOKE ALL ON FUNCTION "private"."portal_navigation_version_matches_v3"("p_kind"
 
 
 REVOKE ALL ON FUNCTION "private"."portal_navigation_virtual_labels_v1"("p_key" "text") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "private"."portal_normalize_brand_scope_v1"("p_allowed_brands" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "private"."portal_normalize_brand_scope_v1"("p_allowed_brands" "text"[]) TO "portal_public_executor";
 
 
 

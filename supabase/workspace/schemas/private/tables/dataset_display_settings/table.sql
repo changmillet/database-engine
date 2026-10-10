@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS "private"."dataset_display_settings" (
     "dataset_version" character(9) NOT NULL,
     "is_visible" boolean DEFAULT false NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "brand" "text",
+    CONSTRAINT "dataset_display_settings_brand_check" CHECK (("brand" = ANY (ARRAY['tiangong_lca'::"text", 'bafu'::"text", 'uslci'::"text", 'worldsteel'::"text"]))),
     CONSTRAINT "dataset_display_settings_dataset_kind_check" CHECK (("dataset_kind" = ANY (ARRAY['lifecyclemodel'::"text", 'process'::"text", 'flow'::"text", 'flowproperty'::"text", 'unitgroup'::"text", 'source'::"text", 'contact'::"text"]))),
     CONSTRAINT "dataset_display_settings_dataset_version_check" CHECK (("dataset_version" ~ '^\d{2}\.\d{2}\.\d{3}$'::"text"))
 );
