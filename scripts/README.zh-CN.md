@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-10
-lastReviewedCommit: 1fa9efca660b9361f06e378f889b0d788f6cb74f
-lastReviewedNote: "Database #807 production qualification follow-up: reviewed set-based exact-setting RLS bridge, bounded summary examples, unchanged 2s budget, view-option contract guard and rollback-only synthetic benchmark. Hosted activation remains separately gated by #808."
+lastReviewedCommit: 31cd8e4ffc2899df9cf0e526667a97f33ce9656e
+lastReviewedNote: 'Database #807 sitemap follow-up: narrow synchronized projection pages preserve scope-before-latest, kind/id ordering, cursor identity and the original 8s budget; production activation remains independently gated.'
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -806,3 +806,11 @@ the existing 15-second budget and hydrate only ten page names; output is private
 and an existing output path is refused. These are synthetic local measurements.
 
 展示迁移 #807 仅在 `check_portal_projection_manifest.py` 中放行该迁移的两个公共 sitemap 分发入口，旧 private 派生函数和后续迁移仍受冻结检查。`supabase/tests/upgrade/test_portal_display_upgrade.py` 在显式归属本任务的可丢弃数据库中验证旧函数体、owner、ACL 和配置保持不变。
+
+### `benchmark_portal_display_sitemap.py`
+
+Rollback-only Database #807 local sitemap comparison, with 140,000 matching
+synthetic source/projection rows, six scope settings and three kind filters.
+Requires the fixed owned local container and a new report path; checks exact
+response digests and the unchanged eight-second candidate budget. See the
+Portal display qualification section in `docs/agents/repo-validation.md`.
