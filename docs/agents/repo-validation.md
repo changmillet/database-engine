@@ -33,7 +33,7 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-10
-lastReviewedCommit: 52da798b64a4762d81e0cd452525a9b271397203
+lastReviewedCommit: 9199f8c0c5b1803c28c591c5304c84751c10f487
 lastReviewedNote: "Database #807: reviewed isolated display projection and executor, guarded legacy/display/unavailable rollout, scoped readers, exact dependency licensing, immutable legacy preservation and local upgrade proof; hosted qualification and account backfill remain separate."
 related:
   - ../../AGENTS.md
@@ -65,6 +65,8 @@ Open Data catalog or publication changes must additionally run the focused
 `supabase/tests/20261009_dataset_display_list_page_hydration.sql` pgTAP suites and
 record any pre-existing local migration-history drift separately from failures
 in the new migration.
+
+The full-schema cutover inventory includes Database #807 additions: 14 API functions, 186 private helpers, 15 application triggers, 12 RLS policies, 56 constraints and eight RLS-enabled private relations. Keep the exact aggregate assertions and the display-specific role/manifest tests together; never relax the aggregate to a lower bound when adding a projection.
 
 There is no checked-in monolithic database-contract runner. Run the relevant
 pgTAP files explicitly after a clean reset, and run the change-specific shell
