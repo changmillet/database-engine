@@ -23,8 +23,8 @@ checkPaths:
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
 lastReviewedAt: 2026-10-11
-lastReviewedCommit: 00a086e6184e30fb46aea621f11e567836153cf5
-lastReviewedNote: "Database #824: reviewed sparse-kind exact Flow prefilter, full support and cursor parity, local upgrade proof, CI registration and exact-local exports. Existing ownership, branch, API, ACL, LCIA and hosted qualification boundaries remain unchanged."
+lastReviewedCommit: c55ae785b5700e0b2ebc1e27a2400d6333f2452f
+lastReviewedNote: "Database #829: reviewed statement-local scope evaluation, scope-isolation tests, synthetic performance and exact-local snapshots; retained #828 enqueue-relative suggestion lifetimes and claim caps. Existing ownership, API, ACL/security barrier, budgets, branches and hosted qualification remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

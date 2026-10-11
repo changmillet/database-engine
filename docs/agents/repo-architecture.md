@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-11
-lastReviewedCommit: 6e7d4741710636a850e8ba304c777ad8bb876fe9
-lastReviewedNote: "Database #824 / PR #826: reviewed bounded synthetic fixture writes and restoration of the eight-second public read budget. Migration, reader, support/cursor semantics, generated schema and hosted boundaries remain unchanged."
+lastReviewedCommit: c55ae785b5700e0b2ebc1e27a2400d6333f2452f
+lastReviewedNote: "Database #829: reviewed statement-local scope evaluation, scope-isolation tests, synthetic performance and exact-local snapshots; retained #828 enqueue-relative suggestion lifetimes and claim caps. Existing ownership, API, ACL/security barrier, budgets, branches and hosted qualification remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -886,6 +886,8 @@ aliases are owned by Edge, not by a source/vector backfill here.
 
 The reusable AI runtime uses `worker_queue=ai`; `ai.tidas_suggestion` is only its first versioned job kind. `api.svc_ai_tidas_suggestion_enqueue` validates the exact Process/Flow v1 envelope, computes the canonical request hash, and reuses only identical active requests. `api.svc_ai_tidas_suggestion_read` requires the original requester and exposes the non-internal Worker projection. Both facades are service-only: Edge owns user authentication, while authenticated clients never enqueue or read `private.worker_jobs` directly. AI results remain advisory and create no Process/Flow domain mutation.
 
+AI suggestion `timeout_at` is an admission and lease-recovery deadline. The internal `private.worker_expire_ai_suggestions` helper cancels elapsed queued/stale suggestions and elapsed running suggestions only after their lease expires, in batches of at most 50 locked rows with `SKIP LOCKED`. It preserves canonical rows, payloads, request attribution and prior events, appends one compact `cancelled` event with `worker_job_timeout`, and releases the active request identity so a new explicit request receives a fresh 30-minute deadline. The owner-only `worker-ai-deadline-expiry` minute cron settles pending work without an AI consumer; AI claim also performs a bounded expiry visit and independently excludes every elapsed suggestion from claim/reclaim, even beyond that visit's batch. Null deadlines retain prior behavior. Current unexpired leases keep the existing heartbeat/result and exact terminal replay contract after the admission deadline; this is not a hard execution deadline or a generic solver/package timeout policy. Explicit retry of an elapsed terminal AI suggestion returns `WORKER_JOB_DEADLINE_EXPIRED`; users submit fresh work rather than resurrect an old deadline. AI deadline checks use actual time rather than transaction-start time: expiry captures a fresh visit cutoff and timestamps each locked cancellation and its event together, claim captures admission time after candidate locks and binds eligibility, lease creation and claim audit to it, and retry captures time after its row lock. Long caller transactions and lock waits therefore cannot admit or resurrect elapsed AI work. Non-AI transaction clocks and current-lease heartbeat/result/replay are unchanged. The helper has no external grants or new API surface.
+
 Claim must remain non-blocking under concurrent recovery: expired max-attempt rows are selected in bounded `FOR UPDATE SKIP LOCKED` batches before they are marked failed, while claimable queued/stale or expired-retry rows use their own skip-locked candidate set. Terminal result recording is lease-fenced; an exact repeat with the same lease token, status, and normalized result content is an idempotent acknowledgement, while any conflicting replay remains rejected. This permits a Worker to retry an ambiguous database/transport failure without leaving completed compute stranded in `running`.
 
 Scope-closure package-build certificate admission runs on job insert or payload mutation, not on status-only claim or terminal transitions. If a certificate is revoked after enqueue, Worker must still claim the job, reject the stale binding, and record a terminal failure with no package publication; the queue must not retain an unclaimable head.
@@ -1286,3 +1288,21 @@ rows. No new index, projection, grant or source rewrite is introduced. PostgreSQ
 [materialization](https://www.postgresql.org/docs/17/queries-with.html) and
 [conditional expressions](https://www.postgresql.org/docs/17/functions-conditional.html)
 define the relevant evaluation boundaries.
+
+
+### Request-scope settings evaluation (Database #829)
+
+Migration `20261011151720` changes only the private security-barrier scope view
+and refreshes its existing manifest identity. Each SQL statement reads the three
+request GUCs and parses the allowed-brand array through uncorrelated scalar
+subqueries, instead of repeating those operations for each settings row. The
+exact visible kind/id/version keys, global support mode and narrowing brand
+filter retain their existing predicates. The view's columns, owner, grants,
+security barrier and every reader/function configuration remain unchanged.
+
+InitPlan values belong to the current statement execution; they are not a
+session or prepared-statement authorization cache. The focused SQL and local
+upgrade/concurrency harness verify successive scopes on one prepared statement,
+multiple differently scoped RPCs in one statement, outer-GUC restoration after
+success and failure, and simultaneous sessions. The ordinary contract assertion
+still rejects a changed view definition or security barrier before serving.
