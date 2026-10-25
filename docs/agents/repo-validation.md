@@ -32,9 +32,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-21
-lastReviewedCommit: 96d042679810e8df0427d4d4ecd34e2c1b6a5d61
-lastReviewedNote: "Database #857: reviewed one-current-assigned-approval finalization and batch eligibility. Exact-local schema is generated from clean migration history; authority, revision, target-only publication, metadata, helper ACLs and independent rejection remain unchanged. Focused and populated-upgrade proof is tracked on the Issue."
+lastReviewedAt: 2026-10-25
+lastReviewedCommit: 3711a8e8e671decc5e77cd37341b9f5d83b622b6
+lastReviewedNote: "Reviewed Worker #339 / PR #340 local companion against base 3711a8e8: registered category receipts, private partial readiness/export, complete-only Portal/publication/release guards and r6 admission. Supplemental PostgreSQL17 WASM proof is recorded separately; full native history, generated workspace and hosted qualification remain pending."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -88,6 +88,12 @@ no local or hosted database operation is needed for that scoped proof. The
 unchanged required hosted PR jobs still rebuild and validate the full database
 contract. Record those hosted results separately before merge; offline fixtures
 do not replace them.
+
+## LCIA partial-result compatibility proof
+
+For Worker #339 / PR #340 companions, run `supabase/tests/20261025_lcia_category_availability.sql` after the normal isolated rebuild, plus the existing Portal LCIA projection, formal release, Calculation Bundle/export and Scope Closure suites. Validate a populated upgrade as well as a blank rebuild and regenerate the schema workspace through its normal tooling. Preserve the r5 history/lease regression while checking that new requests select r6. Private partial readiness and LCI export must remain reachable; full Portal/publication/release transitions must reject partial, missing, forged or stale receipts. Exercise the V3 partial wrapper through the real lease/certificate chain: reject stale attempt A after claimant B owns the row, reject tokenless V3, recover an identical ready call after response loss, restart without a projection, and recover under reclaimed lease C while rejecting the old token. Reject original-body/query-reference/reserved-hash drift and arbitrary extra retry fields. Prove exact payload/schema restoration and rollback after a late postcondition failure. The private request digest is a binding, not an approval stage.
+
+An in-memory PostgreSQL 17 PGlite execution of the new migration and bounded fixtures is supplemental syntax/behavior proof. It does not qualify Supabase Auth, PGroonga, the complete migration history, generated workspace, the original real-source workflow or a hosted deployment. Report missing native/Preview gates explicitly.
 
 ## Proof Matrix
 

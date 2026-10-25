@@ -37,9 +37,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-23
-lastReviewedCommit: 51a0b3e81287c691b18b885af8767d4a8f8fd47d
-lastReviewedNote: "Database #860: reviewed additive dashboard v6 migration, latest-current state-0 attribution, draft ranking, capability ACLs and generated schema; original v5, ownership and deployment workflow remain unchanged."
+lastReviewedAt: 2026-10-25
+lastReviewedCommit: 3711a8e8e671decc5e77cd37341b9f5d83b622b6
+lastReviewedNote: "Reviewed Worker #339 / PR #340 local companion against base 3711a8e8: registered category receipts, private partial readiness/export, complete-only Portal/publication/release guards and r6 admission. Supplemental PostgreSQL17 WASM proof is recorded separately; full native history, generated workspace and hosted qualification remain pending."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md
