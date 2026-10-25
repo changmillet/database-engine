@@ -50,7 +50,26 @@ prefix = {str(path) for path in Path("supabase/migrations").glob("*.sql") if pat
 changed = subprocess.check_output(["git", "diff", "--name-only", base, "--", "supabase/migrations"], text=True).splitlines()
 if prefix != paths or any(path in paths for path in changed):
     raise SystemExit("Checkout migrations no longer reproduce the exact canonical base")
-body = source.read_text()
+# This historical proof must not inherit current-only package receipts or
+# relative includes. CI's full-history checkout supplies this exact canonical
+# object; missing history fails before reset and never falls back to HEAD.
+fixture_revision = "3711a8e8e671decc5e77cd37341b9f5d83b622b6"
+fixture_blob = "3028724ba603a9d4b60e6c6abc64f7354a9faf59"
+fixture_sha256 = "bb2d1bbb7840647f07fe1fcd01cbf26f2e06b26ad570d918de916cf6223510f8"
+try:
+    source_bytes = subprocess.check_output(
+        ["git", "show", f"{fixture_revision}:{source}"], stderr=subprocess.PIPE
+    )
+except subprocess.CalledProcessError as error:
+    raise SystemExit(
+        f"Missing pinned scanner fixture {fixture_revision}:{source}; "
+        "the CI checkout must include canonical history (fetch-depth: 0)"
+    ) from error
+blob_header = f"blob {len(source_bytes)}\0".encode()
+if (hashlib.sha1(blob_header + source_bytes).hexdigest() != fixture_blob
+        or hashlib.sha256(source_bytes).hexdigest() != fixture_sha256):
+    raise SystemExit("Pinned scanner fixture blob/hash mismatch")
+body = source_bytes.decode("utf-8")
 start = "-- SCANNER_R5_MIGRATION_BEGIN"
 end = "-- SCANNER_R5_MIGRATION_END"
 if body.count(start) != 1 or body.count(end) != 1:
@@ -73,7 +92,7 @@ rendered = (
     + sql + checks + sql + checks + after
 )
 Path(sys.argv[1]).write_text(rendered)
-print(f"Canonical base: {base}; migration SHA256: {hashlib.sha256(sql.encode()).hexdigest()}; two actual SQL applications in rollback fixture")
+print(f"Canonical base: {base}; fixture: {fixture_revision}:{source} blob {fixture_blob}; migration SHA256: {hashlib.sha256(sql.encode()).hexdigest()}; two actual SQL applications in rollback fixture")
 PY
 
 supabase db reset --local --version 20261011151720 --no-seed

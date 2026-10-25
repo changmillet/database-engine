@@ -1,0 +1,1 @@
+CREATE OR REPLACE TRIGGER "lcia_result_publications_category_completeness_v1" BEFORE INSERT OR UPDATE ON "private"."lcia_result_publications" FOR EACH ROW EXECUTE FUNCTION "private"."lcia_public_category_completeness_guard_v1"();

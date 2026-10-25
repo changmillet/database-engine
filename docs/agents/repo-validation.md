@@ -123,7 +123,8 @@ listed below and `scripts/test_scope_closure_scanner_upgrade.sh`. The helper
 requires the matching GitHub-hosted workspace and local Unix Docker context, then
 resets its explicitly admitted isolated local project to canonical commit
 `03939b8880f983d494406f0e10b213081b9f900a` / migration `20261011151720`,
-uses the shared populated R4 fixture, and executes the actual R5 migration SQL
+uses the frozen populated fixture from canonical `3711a8e8e671decc5e77cd37341b9f5d83b622b6`
+(blob `3028724ba603a9d4b60e6c6abc64f7354a9faf59`, SHA-256 verified), and executes the actual R5 migration SQL
 twice inside its rollback transaction. It verifies R5 admission, preservation of
 other config fields and the existing history/lease/reuse assertions before
 restoring current HEAD with local migrations. Future migrations do not enter

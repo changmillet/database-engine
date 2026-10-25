@@ -271,9 +271,14 @@ The existing CI local-contract job invokes this helper with
 `SCOPE_CLOSURE_UPGRADE_ALLOW_RESET=isolated`. It also requires a matching GitHub-hosted
 workspace and a local Unix Docker context; normal local checkouts, self-hosted runners
 and overridden Docker targets are rejected before reset. It resets to the frozen
-canonical R4 schema, reuses the Scope Closure pgTAP history fixture, applies the
+canonical R4 schema, reads the frozen Scope Closure fixture at canonical
+`3711a8e8e671decc5e77cd37341b9f5d83b622b6` (blob
+`3028724ba603a9d4b60e6c6abc64f7354a9faf59`, verified with SHA-256), applies the
 actual R5 singleton migration twice inside a rollback transaction, and restores
-current migrations after the assertions. CI runs it in the existing local-contract
+current migrations after the 113 assertions. The full-history CI checkout
+(`fetch-depth: 0`) must contain that object; missing or corrupt history fails
+before reset, without a current-fixture fallback. The offline workflow contract
+executes the read-only renderer and covers both refusals. CI runs it in the existing local-contract
 job without hosted credentials. It does not validate original R1 browser inputs.
 See `docs/agents/repo-validation.md` for the required evidence and related suites.
 

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import os
 import re
 import shlex
@@ -11,6 +13,7 @@ import subprocess
 import tempfile
 import textwrap
 from pathlib import Path
+from unittest.mock import patch
 
 from resolve_migration_head import resolve_migration_head
 
@@ -21,6 +24,61 @@ MIGRATIONS = REPO_ROOT / "supabase" / "migrations"
 API_CONTRACT_TEST = (
     REPO_ROOT / "supabase" / "tests" / "20260806_api_contract_closure.sql"
 )
+
+
+def exercise_scanner_renderer() -> None:
+    """Execute the actual read-only renderer, never its guarded reset wrapper."""
+    script = (REPO_ROOT / "scripts/test_scope_closure_scanner_upgrade.sh").read_text()
+    body = script.split("<<'PY'\n", 1)[1].split("\nPY\n", 1)[0]
+    pinned = "3711a8e8e671decc5e77cd37341b9f5d83b622b6:supabase/tests/20260722_scope_closure_release_binding_e2e.sql"
+    fixture = REPO_ROOT / "supabase/tests/20260722_scope_closure_release_binding_e2e.sql"
+    original_read = Path.read_text
+    original_check = subprocess.check_output
+
+    def no_current_fixture(path: Path, *args, **kwargs):
+        if path.resolve() == fixture:
+            raise AssertionError("historical renderer read the current fixture")
+        return original_read(path, *args, **kwargs)
+
+    def invoke(output: Path, mode: str) -> str:
+        def read_git(command, *args, **kwargs):
+            if command == ["git", "show", pinned]:
+                if mode == "missing":
+                    raise subprocess.CalledProcessError(128, command)
+                value = original_check(command, *args, **kwargs)
+                return value + b"\ncorrupt" if mode == "corrupt" else value
+            return original_check(command, *args, **kwargs)
+
+        captured = io.StringIO()
+        with patch.object(Path, "read_text", no_current_fixture), patch.object(
+            subprocess, "check_output", read_git
+        ), patch("sys.argv", ["scanner-renderer", str(output)]), contextlib.redirect_stdout(captured):
+            exec(compile(body, "scanner-upgrade-renderer", "exec"), {"__name__": "__main__"})
+        return captured.getvalue()
+
+    old_cwd = Path.cwd()
+    try:
+        os.chdir(REPO_ROOT)
+        with tempfile.TemporaryDirectory(prefix="scanner-renderer-") as temporary:
+            output = Path(temporary) / "rendered.sql"
+            evidence = invoke(output, "valid")
+            rendered = output.read_text()
+            assert pinned in evidence
+            assert "\\ir fixtures/" not in rendered
+            assert rendered.count("actual migration activates R5") == 2
+            assert "retention preserves the scan execution numerical snapshot UUID" in rendered
+            output.unlink()
+            for mode, expected in [("missing", "Missing pinned scanner fixture"), ("corrupt", "blob/hash mismatch")]:
+                try:
+                    invoke(output, mode)
+                except SystemExit as error:
+                    assert expected in str(error), str(error)
+                else:
+                    raise AssertionError(f"renderer accepted {mode} pinned source")
+                assert not output.exists(), "refusal wrote a fallback fixture"
+    finally:
+        os.chdir(old_cwd)
+    print("PASS: historical scanner renderer uses the exact pinned blob, ignores HEAD fixture, and rejects missing/corrupt history")
 
 
 def job_sections(text: str) -> dict[str, str]:
@@ -843,6 +901,7 @@ def main() -> int:
             print(f"FAIL: {failure}")
         return 1
 
+    exercise_scanner_renderer()
     checks = exercise_scope_classifiers(text)
     print(f"PASS: {checks} offline push/Preview scope and missing-authority controls")
     print(

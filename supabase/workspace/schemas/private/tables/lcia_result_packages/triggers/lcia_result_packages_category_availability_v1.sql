@@ -1,0 +1,1 @@
+CREATE OR REPLACE TRIGGER "lcia_result_packages_category_availability_v1" BEFORE INSERT ON "private"."lcia_result_packages" FOR EACH ROW EXECUTE FUNCTION "private"."lcia_package_category_availability_guard_v1"();

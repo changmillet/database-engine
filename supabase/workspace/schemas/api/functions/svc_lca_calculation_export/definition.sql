@@ -34,8 +34,13 @@ begin
     into v_bundle from private.lca_results where id = v_package.result_id;
   if v_bundle is null or coalesce(v_bundle->>'bundleContentHash', '') !~ '^[0-9a-f]{64}$'
     or coalesce(v_bundle->>'manifestSha256', '') !~ '^[0-9a-f]{64}$'
-    or coalesce(v_bundle->>'schemaVersion', '') <> 'tiangong.calculation-bundle.v2' then
+    or coalesce(v_bundle->>'schemaVersion', '') not in ('tiangong.calculation-bundle.v2','tiangong.calculation-bundle.v3') then
     return api.lcia_result_error('calculation_bundle_not_available', 409, 'calculation bundle not available');
+  end if;
+  if (v_bundle->>'schemaVersion' = 'tiangong.calculation-bundle.v3'
+      or v_package.artifact_manifest ? 'lciaAvailability')
+     and not private.lcia_package_availability_valid_v1(v_package.id,false) then
+    return api.lcia_result_error('lcia_package_availability_binding_invalid',409,'Private export requires exact category availability');
   end if;
   v_hash := encode(extensions.digest(convert_to(jsonb_build_array(
     'lca.calculation_export.request.v1', p_package_id, v_bundle->>'bundleContentHash',

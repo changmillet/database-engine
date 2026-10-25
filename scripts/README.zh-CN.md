@@ -229,8 +229,12 @@ python3 scripts/test_check_auth_email_templates.py
 现有 CI local-contract job 以 `SCOPE_CLOSURE_UPGRADE_ALLOW_RESET=isolated` 调用；
 脚本还要求匹配的 GitHub 托管工作目录及本地 Unix Docker context，普通本地 checkout、
 self-hosted runner 和被覆盖的 Docker 目标均在 reset 前拒绝。
-脚本重置到固定 canonical R4 schema，复用 Scope Closure pgTAP 历史 fixture，在回滚事务内
-执行两次真实 R5 singleton 迁移并验证记录保持，断言后才恢复当前迁移。CI 复用现有
+脚本重置到固定 canonical R4 schema，从 canonical 提交
+`3711a8e8e671decc5e77cd37341b9f5d83b622b6` 读取固定历史 fixture
+（blob `3028724ba603a9d4b60e6c6abc64f7354a9faf59`，同时核对 SHA-256），在回滚事务内
+执行两次真实 R5 singleton 迁移，通过原有 113 条断言后才恢复当前迁移。CI 的
+`fetch-depth: 0` checkout 必须提供该对象；历史缺失或损坏会在 reset 前明确拒绝，
+不回退到当前 fixture。离线 workflow 契约直接执行只读 renderer 并验证两种拒绝。CI 复用现有
 local-contract job，不使用 hosted 凭据；这不验证原 R1 浏览器输入。
 所需证据和关联套件见 `docs/agents/repo-validation.md`。
 
