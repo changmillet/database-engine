@@ -836,6 +836,42 @@ Database #807 的本地 sitemap 对比工具，仅使用可回滚的合成测试
 执行方式及上线验证边界见 `docs/agents/repo-validation.md` 的 Portal display
 qualification 小节。
 
+### Facets 与 Navigation 验证（Database #864）
+
+这组 collector 只接受明确归属本任务的本地 `portal-facets-864`、PostgreSQL
+17.11、指定 ownership receipt 和新的私有输出路径，不接受托管 DSN 或凭据。
+`--smoke` 使用小型正确性 fixture；容量验证必须不带该参数。可重复传入 `--case`
+选择查询形状。
+
+```bash
+python3 scripts/benchmark_portal_facets_navigation.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --candidate supabase/migrations/20261025052607_optimize_portal_facets_navigation.sql \
+  --process-datasets 10000 --flow-datasets 69000 --card-padding 3072 \
+  --samples 10 --report <new-private-serial-json>
+python3 supabase/tests/upgrade/test_portal_facets_navigation_upgrade.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --report <new-private-upgrade-json>
+python3 supabase/tests/upgrade/test_portal_facets_navigation_upgrade.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --committed-visibility --report <new-private-visibility-json>
+```
+
+committed-visibility 模式会保留真实 fixture，必须对本任务独占环境执行 reset。
+随后并发 profile 使用准确且成功的串行报告与候选文件：
+
+```bash
+python3 scripts/benchmark_portal_facets_navigation_concurrent.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --reference-report <successful-serial-json> \
+  --candidate supabase/migrations/20261025052607_optimize_portal_facets_navigation.sql \
+  --rounds 3 --report <new-private-concurrent-json>
+```
+
+串行测试回滚；并发测试恢复候选 readers，但保留已提交的合成 fixture，由主代理
+仅对本任务环境执行 reset。两者保留 4 MB session work_mem、既有函数覆盖值和
+8 秒请求预算。完整正确性、性能与清理要求见 repo validation guide。
+
 ### 计算导出升级验证
 
 `render_calculation_export_upgrade.py <output.sql>` 只生成绑定准确基线和迁移文件的 populated fixture，不连接数据库。`test_calculation_export_upgrade.sh` 只在匹配的临时 GitHub-hosted workspace 中、显式允许隔离重置后执行，验证既有任务/结果/包/快照不变、导出租约和不可变输入绑定。基线与恢复顺序见 validation guide。

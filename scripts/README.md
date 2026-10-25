@@ -982,6 +982,44 @@ sessions with independent scopes, and removes the clone before recording success
 Release the task-owned Docker group through the workspace resource controller
 once qualification evidence is preserved.
 
+### Facets and Navigation qualification (Database #864)
+
+These collectors admit only the owned local `portal-facets-864` project,
+PostgreSQL 17.11, its explicit ownership receipt and new private output paths.
+They accept no hosted DSN or credentials. `--smoke` uses a small correctness
+fixture; omit it for read-scale evidence. `--case` selects repeatable shapes.
+
+```bash
+python3 scripts/benchmark_portal_facets_navigation.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --candidate supabase/migrations/20261025052607_optimize_portal_facets_navigation.sql \
+  --process-datasets 10000 --flow-datasets 69000 --card-padding 3072 \
+  --samples 10 --report <new-private-serial-json>
+python3 supabase/tests/upgrade/test_portal_facets_navigation_upgrade.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --report <new-private-upgrade-json>
+python3 supabase/tests/upgrade/test_portal_facets_navigation_upgrade.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --committed-visibility --report <new-private-visibility-json>
+```
+
+The committed-visibility mode retains real fixtures for an owned reset. After
+that reset, the concurrent profile consumes the exact successful
+serial report and candidate file:
+
+```bash
+python3 scripts/benchmark_portal_facets_navigation_concurrent.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --reference-report <successful-serial-json> \
+  --candidate supabase/migrations/20261025052607_optimize_portal_facets_navigation.sql \
+  --rounds 3 --report <new-private-concurrent-json>
+```
+
+The serial profile rolls back; concurrency restores candidate readers but keeps
+its committed synthetic fixture for the main agent's owned reset. Both preserve
+4 MB session work memory, existing routine overrides and eight-second requests.
+See the validation guide for complete correctness, performance and cleanup gates.
+
 ### Calculation export upgrade qualification
 
 `render_calculation_export_upgrade.py <output.sql>` renders the exact canonical-base populated fixture without connecting to a database. `test_calculation_export_upgrade.sh` runs that fixture only in the matching ephemeral GitHub-hosted workspace, with explicit isolated-reset admission. It verifies historical jobs/results/packages/snapshots, native export leases and immutable admission; see the validation guide for the pinned base and restore sequence.

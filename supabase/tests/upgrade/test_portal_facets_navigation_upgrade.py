@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Database #864: guarded, rollback-only full-migration upgrade qualification.
+"""Database #864: guarded local upgrade and committed visibility qualification.
 
 The exact task-owned local PG17.11 container is the only accepted target. Real
 source INSERTs and unchanged source/settings/projection hashes qualify upgrade
-correctness. Optional direct-projection volume timing is separately classified
-and never substitutes for the real writer fixture. No hosted DSN is accepted.
+correctness. Default upgrade proof rolls back. Optional committed visibility
+retains real fixtures for an owned reset; optional direct-projection volume
+timing is separate and never substitutes for real writers. No hosted DSN.
 """
 from __future__ import annotations
 
@@ -12,9 +13,13 @@ import argparse
 import importlib.util
 import json
 from pathlib import Path
+import queue
 import re
 import subprocess
 import sys
+import threading
+import time
+import uuid
 
 # This harness owns only its explicit evidence paths, including during imports.
 sys.dont_write_bytecode = True
@@ -32,6 +37,10 @@ TARGETS = ('display_navigation_matched_versions_v1', 'display_catalog_facets_v3_
            'display_navigation_impl_v1', 'portal_display_brand_facets_v1')
 GUARD_STATE = '55000'
 GUARD_MESSAGE = 'Display facets cutover projection coverage or facts drifted'
+ROLE_GUARD_MESSAGE = 'Display facets cutover requires an RLS-bypassing migration role'
+CHECK_LABELS = frozenset(('reject-missing-navigation', 'reject-missing-facet',
+    'reject-navigation-facts', 'reject-facet-text-facts', 'reject-facet-state',
+    'reject-original-v1-orphan', 'reject-non-bypass-role', 'injected-mid-upgrade'))
 
 
 def split_statements(source: str) -> list[str]:
@@ -275,7 +284,8 @@ def probes(phase: str) -> tuple[str, int]:
     return sql + 'reset role;\n', count
 
 
-def rejection(label: str, setup: str, statements: list[str], state: str, message: str) -> str:
+def rejection(label: str, setup: str, statements: list[str], state: str, message: str,
+              evidence_sql: str = "'{}'::jsonb") -> str:
     """Nested transactions independently roll back migration and corruption."""
     return f"""
 do $rejection$
@@ -299,9 +309,26 @@ begin
   if sqlerrm<>'rollback #864 rejection fixture' then raise;end if;
  end;
  if pg_temp.upgrade_snapshot() is distinct from original then raise exception 'Rejection fixture rollback leaked state: {label}';end if;
- insert into upgrade_checks values({bench.literal(label)},jsonb_build_object('sqlstate',caught_state,'message',caught_message,'migrationRolledBack',true,'fixtureRolledBack',true));
+ insert into upgrade_checks values({bench.literal(label)},jsonb_build_object('sqlstate',caught_state,'message',caught_message,'migrationRolledBack',true,'fixtureRolledBack',true)||{evidence_sql});
 end$rejection$;
 """
+
+
+def cutover_guard(statements: list[str]) -> str:
+    guards = [s for s in statements if '$display_facets_cutover_guard$' in s]
+    if len(guards) != 1:
+        raise ValueError('Exactly one named cutover guard required')
+    return guards[0]
+
+
+def old_three_way_guard(guard: str) -> str:
+    """Only remove the fourth coverage leg to prove the P1 counterexample."""
+    old, joins = re.subn(r'\s+full\s+join\s+private\.display_catalog_search_rows_v1\s+as\s+original\s+'
+        r'using\s*\(dataset_kind,\s*id,\s*version\)', '', guard, flags=re.I)
+    old, predicates = re.subn(r'\s+or\s+original\.id\s+is\s+null', '', old, flags=re.I)
+    if joins != 1 or predicates != 1:
+        raise ValueError('Exact original-V1 fourth guard leg required for P1 counterexample')
+    return old
 
 
 def build_real_sql(predecessor: dict, statements: list[str]) -> tuple[str, int]:
@@ -323,6 +350,30 @@ def build_real_sql(predecessor: dict, statements: list[str]) -> tuple[str, int]:
     }
     for label, setup in corruptions.items():
         sql += rejection(label, setup, statements, GUARD_STATE, GUARD_MESSAGE)
+    orphan_setup = f"""
+delete from private.display_catalog_search_rows_v2 where {key};
+delete from private.display_catalog_facet_rows_v1 where {key};
+do $$begin
+ if not exists(select 1 from private.display_catalog_search_rows_v1 where {key})
+  or exists(select 1 from private.display_catalog_search_current_v2 where {key})
+  or exists(select 1 from private.display_navigation_versions_v1 where {key})
+  or exists(select 1 from private.display_catalog_facet_rows_v1 where {key}) then
+  raise exception 'Original-V1 orphan counterexample was not constructed';
+ end if;
+end$$;
+""" + old_three_way_guard(cutover_guard(statements))
+    sql += rejection('reject-original-v1-orphan', orphan_setup, statements, GUARD_STATE, GUARD_MESSAGE,
+        "jsonb_build_object('oldThreeWayGuardAccepted',true,'originalV1Present',true,'currentNavigationFacetAbsent',true)")
+    # Role switching belongs INSIDE the failing migration subtransaction so the
+    # exception restores the administrator before either snapshot is read.
+    role_setup = """do $$begin
+ if not exists(select 1 from pg_roles where rolname='portal_display_executor' and not rolsuper and not rolbypassrls) then
+  raise exception 'An existing exact non-BYPASSRLS executor role is required';
+ end if;
+end$$;"""
+    sql += rejection('reject-non-bypass-role', role_setup,
+        ['set local role portal_display_executor;'] + statements, GUARD_STATE, ROLE_GUARD_MESSAGE,
+        "jsonb_build_object('role','portal_display_executor','roleOrAclMutation',false)")
     replaced = 0
     partial = []
     for statement in statements:
@@ -360,12 +411,10 @@ rollback;
 
 
 def build_synthetic_sql(predecessor: dict, statements: list[str], processes: int, flows: int) -> str:
-    guard = [s for s in statements if '$display_facets_cutover_guard$' in s]
-    if len(guard) != 1:
-        raise ValueError('Exactly one named cutover guard required for separate volume timing')
-    sql = bench.fixture(processes, flows, 1024) + bench.definitions_sql(predecessor) + snapshot_helpers()
+    guard = cutover_guard(statements)
+    sql = bench.fixture(processes, flows, 3072) + bench.definitions_sql(predecessor) + snapshot_helpers()
     sql += "insert into upgrade_snapshots values('baseline',pg_temp.upgrade_snapshot());set local statement_timeout='60s';create temp table guard_timing(started timestamptz);insert into guard_timing values(clock_timestamp());\n"
-    sql += guard[0] + "\nselect jsonb_build_object('guardElapsedMs',extract(epoch from clock_timestamp()-started)*1000) from guard_timing;\n"
+    sql += guard + "\nselect jsonb_build_object('guardElapsedMs',extract(epoch from clock_timestamp()-started)*1000) from guard_timing;\n"
     sql += '\n'.join(statements) + '\nselect pg_temp.verify_upgrade();\n'
     sql += "select jsonb_build_object('snapshot',pg_temp.upgrade_snapshot(),'classification','synthetic direct projections: guard volume only; not source-writer proof');rollback;\n"
     return sql
@@ -381,6 +430,293 @@ def execute_case(sql: str, stem: Path) -> tuple[list[dict], str]:
     return records, bench.sha(sql)
 
 
+def visibility_run(application: str, sql: str, timeout: int = 120) -> subprocess.CompletedProcess[str]:
+    """Name at startup and normalize metadata deparsing across sessions."""
+    return subprocess.run(['docker', 'exec', '-i', '-e', 'PGAPPNAME=' + application,
+        bench.CONTAINER, 'psql', '-X', '-h', '/var/run/postgresql', '-U', 'supabase_admin',
+        '-d', 'postgres', '-Atq', '-v', 'ON_ERROR_STOP=1'], input="set search_path='';\n" + sql, text=True,
+        capture_output=True, timeout=timeout)
+
+
+class VisibilitySession:
+    """One named local socket client; stdout markers synchronize actual SQL."""
+
+    def __init__(self, application: str):
+        self.application = application
+        self.lines: list[str] = []
+        self.errors: list[str] = []
+        self.events: queue.Queue[str | None] = queue.Queue()
+        self.process = subprocess.Popen(['docker', 'exec', '-i', '-e', 'PGAPPNAME=' + application, bench.CONTAINER,
+            'psql', '-X', '-h', '/var/run/postgresql', '-U', 'supabase_admin',
+            '-d', 'postgres', '-Atq', '-v', 'ON_ERROR_STOP=1'], text=True,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=1)
+
+        def collect(stream, output, events=None):
+            for line in stream:
+                output.append(line)
+                if events is not None:
+                    events.put(line.rstrip('\n'))
+            if events is not None:
+                events.put(None)
+
+        self.readers = [threading.Thread(target=collect,
+            args=(self.process.stdout, self.lines, self.events), daemon=True),
+            threading.Thread(target=collect, args=(self.process.stderr, self.errors), daemon=True)]
+        for reader in self.readers:
+            reader.start()
+        self.send('set application_name=' + bench.literal(application) + ';')
+
+    def send(self, sql: str) -> None:
+        assert self.process.stdin
+        self.process.stdin.write(sql + '\n')
+        self.process.stdin.flush()
+
+    def marker(self, prefix: str, timeout: int = 60) -> str:
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                line = self.events.get(timeout=max(0.001, deadline - time.monotonic()))
+            except queue.Empty as exc:
+                raise RuntimeError('SQL marker timeout: ' + prefix) from exc
+            if line is None:
+                raise RuntimeError('Local client exited before marker: ' + prefix)
+            if line.startswith(prefix):
+                return line
+            if time.monotonic() >= deadline:
+                raise RuntimeError('SQL marker timeout: ' + prefix)
+
+    def close(self) -> None:
+        if self.process.poll() is None:
+            try:
+                self.send('\\q')
+            except (BrokenPipeError, OSError):
+                pass
+        if self.process.stdin and not self.process.stdin.closed:
+            self.process.stdin.close()
+        self.process.wait(timeout=60)
+        for reader in self.readers:
+            reader.join(timeout=5)
+
+
+def visibility_queries() -> dict[str, str]:
+    """Complete DTOs plus unaffected-brand controls, all through public RPCs."""
+    scopes = {'tiangong': "array['tiangong_lca']",
+              'combined': "array['bafu','tiangong_lca','uslci','worldsteel']"}
+    result = {}
+    for label, brands in scopes.items():
+        result['facets_' + label] = f"api.portal_facets_v4({brands},'all','','{{}}')"
+        result['facets_process_' + label] = f"api.portal_facets_v4({brands},'process','visible','{{}}')"
+        result['navigation_geography_' + label] = f"api.portal_navigation_v2({brands},'all','','{{}}','geography',null,null,100)"
+        result['navigation_classification_' + label] = f"api.portal_navigation_v2({brands},'process','','{{}}','classification','class:isic',null,20)"
+    result['facets_bafu_control'] = "api.portal_facets_v4(array['bafu'],'flow','50-00-0','{}')"
+    return result
+
+
+def visibility_read_sql() -> str:
+    fields = ','.join(bench.literal(label) + ',' + query for label, query in visibility_queries().items())
+    return ("set local statement_timeout='8s';set local role anon;select jsonb_build_object("
+            "'readerRole',current_user,'readerPid',pg_backend_pid(),"
+            "'readerApplication',current_setting('application_name'),'responses',jsonb_build_object("
+            + fields + '));reset role;')
+
+
+def committed_visibility(args, context: dict, inspected: dict, owner: str, base: str,
+                         migration: str, statements: list[str], predecessor: dict,
+                         initial_catalog: dict) -> int:
+    """Committed local fixtures are deliberately retained for an owned reset.
+
+    A controller holds both the existing #864 exclusive fixture lock and a
+    nonce-specific gate. The settings writer changes real display state, then
+    blocks at that gate before COMMIT. An observer proves the writer's actual
+    advisory wait and blocker PID before/after a separate anonymous read. No
+    sleep interval substitutes for transaction ordering.
+    """
+    nonce = args.visibility_nonce
+    prefix = 'portal864-cv-' + nonce + '-'
+    gate = int(bench.sha(nonce)[:8], 16) % 2147483645 + 2
+    stem = args.report.with_name(args.report.stem + '-visibility')
+    transcript: list[str] = []
+    logs: list[str] = []
+    ordinal = 0
+    controller = writer = None
+    owned_pids: dict[str, int] = {}
+    installed_catalog = None
+    setup_committed = False
+    report = {'schemaVersion': 'portal.facets-navigation-committed-visibility.v1',
+        'passed': False, 'classification': 'local real settings writer, independent committed visibility; not load or hosted latency',
+        'nonce': nonce, 'applicationNamePrefix': prefix, 'containerId': inspected['Id'],
+        'dockerContext': context['Name'], 'ownerSha256': bench.sha(owner), 'baseCommit': base,
+        'candidateSha256': bench.sha(migration), 'harnessSha256': bench.sha(Path(__file__).read_bytes()),
+        'exclusiveFixtureLock': [864, 1], 'writerCommitGateLock': [864, gate],
+        'requestBudget': '8s', 'writerPath': 'dataset_display_settings UPDATE with unchanged display writers enabled',
+        'sourceUpdateBeforeHide': False, 'fixtureRetained': False, 'resetRequired': False,
+        'baselineReplay': 'same committed data, transaction-only predecessor definitions and rollback',
+        'cleanup': None}
+
+    def call(label: str, sql: str, timeout: int = 120) -> list[dict]:
+        nonlocal ordinal
+        ordinal += 1
+        application = prefix + label + '-' + str(ordinal)
+        full = 'set application_name=' + bench.literal(application) + ";set search_path='';\n" + sql
+        transcript.append('-- ' + label + '\n' + full + '\n')
+        result = visibility_run(application, full, timeout)
+        logs.append('-- ' + application + '\n' + result.stdout + '\n' + result.stderr)
+        if result.returncode:
+            raise RuntimeError('Local visibility client failed: ' + label)
+        return [json.loads(line) for line in result.stdout.splitlines() if line.startswith('{')]
+
+    def capture(label: str, replay: bool = False) -> dict:
+        sql = 'begin;set local work_mem=\'4MB\';\n'
+        if replay:
+            sql += bench.definitions_sql(predecessor)
+        sql += visibility_read_sql() + '\nrollback;'
+        rows = call(label, sql)
+        if len(rows) != 1 or set(rows[0]) != {'readerRole', 'readerPid', 'readerApplication', 'responses'}:
+            raise ValueError('Complete anonymous reader connection/response envelope required')
+        row = rows[0]
+        if row['readerRole'] != 'anon' or row['readerPid'] in owned_pids.values() or not row['readerApplication'].startswith(prefix):
+            raise ValueError('An independent exact-nonce anonymous reader connection is required')
+        if set(row['responses']) != set(visibility_queries()):
+            raise ValueError('Complete unique anonymous visibility response required')
+        report.setdefault('readerConnections', {})[label] = {key: row[key] for key in ('readerRole', 'readerPid', 'readerApplication')}
+        return row['responses']
+
+    def observe(label: str) -> dict:
+        writer_app = bench.literal(prefix + 'writer')
+        controller_pid = owned_pids[prefix + 'controller']
+        writer_pid = owned_pids[prefix + 'writer']
+        predicate = f"pid={writer_pid} and application_name={writer_app} and state='active' and wait_event_type='Lock' and lower(wait_event)='advisory' and {controller_pid}=any(pg_blocking_pids(pid))"
+        sql = f"""do $wait$declare deadline timestamptz:=clock_timestamp()+interval '10 seconds';begin
+ loop
+  perform pg_stat_clear_snapshot();
+  exit when exists(select 1 from pg_stat_activity where {predicate});
+  if clock_timestamp()>deadline then raise exception 'Exact writer advisory wait was not observed';end if;
+ end loop;
+end$wait$;
+select jsonb_build_object('pid',pid,'application',application_name,'state',state,
+ 'waitEventType',wait_event_type,'waitEvent',wait_event,'blockers',pg_blocking_pids(pid))
+from pg_stat_activity where {predicate};"""
+        rows = call(label, sql, 30)
+        if len(rows) != 1:
+            raise ValueError('One exact blocked writer required')
+        return rows[0]
+
+    args.report.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        controller = VisibilitySession(prefix + 'controller')
+        control_sql = f"""do $$begin if not pg_try_advisory_lock(864,1) then raise exception 'Another #864 fixture owns this database';end if;end$$;
+select pg_advisory_lock(864,{gate});
+select 'CONTROLLER_READY:'||pg_backend_pid();"""
+        transcript.append('-- controller\n' + control_sql)
+        controller.send(control_sql)
+        owned_pids[prefix + 'controller'] = int(controller.marker('CONTROLLER_READY:').split(':')[1])
+        # Repeat the empty guard AFTER acquiring the exclusive cross-connection
+        # fixture lock so a competing benchmark cannot win a check/use race.
+        checked = visibility_run(prefix + 'locked-empty-guard', bench.guard_sql(), 60)
+        if checked.returncode or checked.stdout.strip().splitlines() != bench.empty_guard_expected():
+            raise ValueError('Exclusive visibility setup requires the same empty owned PG17.11 database')
+        util = call('original-util', "select jsonb_build_object('definition',pg_get_functiondef('util.invoke_edge_function(text,jsonb,integer)'::regprocedure));")[0]['definition']
+        # pg_get_functiondef ends at the closing dollar quote, without a SQL
+        # terminator. Keep restoration a complete statement before appending SET.
+        util = util.rstrip().rstrip(';') + ';\n'
+        seed = source_fixture().replace('create extension if not exists pgtap with schema extensions;', '')
+        setup = "begin;set local statement_timeout='60s';set local work_mem='4MB';\n" + '\n'.join(statements) + seed + '\n' + util + "\nset local search_path='';select private.portal_display_assert_contract_v1();\n" + catalog_query() + ';commit;'
+        rows = call('committed-setup', setup)
+        setup_committed = True
+        report['fixtureRetained'] = report['resetRequired'] = True
+        if len(rows) != 1:
+            raise ValueError('One committed candidate metadata snapshot required')
+        installed_catalog = rows[0]
+        if (installed_catalog | {'targetDefinitions': None, 'manifest': None}) != (initial_catalog | {'targetDefinitions': None, 'manifest': None}):
+            raise ValueError('Committed setup changed unapproved permanent metadata or util definition')
+        old = capture('old-candidate')
+        report['oldResponses'] = old
+        writer = VisibilitySession(prefix + 'writer')
+        write_sql = f"""begin;set local statement_timeout='60s';
+do $$begin
+ update private.dataset_display_settings set is_visible=false
+ where dataset_kind='process' and dataset_id='80700000-0000-4000-8000-000000000101'
+  and dataset_version='01.00.000' and is_visible;
+ if not found then raise exception 'Exact real display hide fixture missing';end if;
+end$$;
+select 'WRITER_MUTATED:'||pg_backend_pid();
+select pg_advisory_xact_lock(864,{gate});
+commit;
+select 'WRITER_COMMITTED';
+\\q"""
+        transcript.append('-- real display writer\n' + write_sql)
+        writer.send(write_sql)
+        owned_pids[prefix + 'writer'] = int(writer.marker('WRITER_MUTATED:').split(':')[1])
+        report['waitBeforeRead'] = observe('wait-before-reader')
+        during = capture('uncommitted-reader')
+        report['waitAfterRead'] = observe('wait-after-reader')
+        if during != old:
+            raise ValueError('Uncommitted real hide changed the independent anonymous response')
+        report['uncommittedResponses'] = during
+        controller.send(f"select pg_advisory_unlock(864,{gate});select 'GATE_RELEASED';")
+        controller.marker('GATE_RELEASED')
+        writer.marker('WRITER_COMMITTED')
+        writer.close()
+        new = capture('committed-reader')
+        if old['navigation_geography_tiangong']['totals']['process'] != 1 or new['navigation_geography_tiangong']['totals']['process'] != 0:
+            raise ValueError('Committed hide did not synchronously remove the exact visible Process')
+        if old['facets_tiangong'] == new['facets_tiangong'] or old['facets_bafu_control'] != new['facets_bafu_control']:
+            raise ValueError('Committed Facets hide or unaffected-brand control failed')
+        replay = capture('predecessor-replay', replay=True)
+        if replay != new:
+            raise ValueError('Same committed data differs from transaction-only predecessor replay')
+        report.update({'newResponses': new, 'predecessorReplayResponses': replay,
+            'uncommittedReadEqualsOld': True, 'committedReadEqualsPredecessor': True,
+            'immediateReadAfterObservedCommit': True, 'fullResponseComparisons': 2 * len(visibility_queries()),
+            'utilInvocationDefinitionRestoredBeforeCommit': True, 'passed': True})
+    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        report['failure'] = str(exc)
+    finally:
+        report['ownedSessionPids'] = dict(owned_pids)
+        # Never cancel an unrelated client: require the exact unique nonce/app,
+        # and also its observed PID whenever the first marker supplied one.
+        try:
+            try:
+                if writer is not None and writer.process.poll() is None:
+                    pid = owned_pids.get(prefix + 'writer')
+                    pid_guard = f'pid={pid} and ' if pid is not None else ''
+                    # The nonce/application is known before the first marker;
+                    # this also handles a failure before the PID is returned.
+                    call('cancel-own-writer', f"select jsonb_build_object('terminated',coalesce(bool_and(pg_terminate_backend(pid)),true)) from pg_stat_activity where {pid_guard}application_name={bench.literal(prefix+'writer')};", 30)
+                    writer.close()
+            finally:
+                if controller is not None:
+                    controller.close()
+            final = call('final-receipt', catalog_query() + ";select jsonb_build_object('nonceSessions',(select count(*) from pg_stat_activity where pid<>pg_backend_pid() and application_name like " + bench.literal(prefix+'%') + "),'fixtureExclusiveLockReleased',pg_try_advisory_xact_lock(864,1),'manifestValid',(select identity=private.portal_display_contract_identity_v1() from private.portal_display_contract_manifest where singleton),'processRows',(select count(*) from public.processes),'flowRows',(select count(*) from public.flows),'settingsRows',(select count(*) from private.dataset_display_settings),'writersEnabled',not exists(select 1 from pg_trigger where not tgisinternal and tgenabled='D' and tgrelid in ('public.processes'::regclass,'public.flows'::regclass,'private.dataset_display_settings'::regclass)));")
+            if len(final) != 2:
+                raise ValueError('Unique final metadata and retained-resource receipt required')
+            metadata, receipt = final
+            restored = installed_catalog is not None and metadata == installed_catalog
+            retained = setup_committed or bool(receipt['processRows'] or receipt['flowRows'] or receipt['settingsRows'])
+            report['fixtureRetained'] = retained
+            report['resetRequired'] = retained
+            report['cleanup'] = receipt | {'candidateMetadataAndFunctionsRestored': restored,
+                'retained': retained, 'resetRequired': retained,
+                'disposition': 'Retain committed task-local fixture for Main-owned reset; no container or volume was created'}
+            if not (restored and receipt['nonceSessions'] == 0 and receipt['fixtureExclusiveLockReleased'] and receipt['manifestValid'] and receipt['writersEnabled']):
+                report['passed'] = False
+        except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            report['passed'] = False
+            report['cleanupFailure'] = str(exc)
+        for session in (controller, writer):
+            if session is not None:
+                logs.append('-- ' + session.application + '\n' + ''.join(session.lines) + '\n' + ''.join(session.errors))
+        stem.with_suffix('.sql').write_text('\n'.join(transcript))
+        stem.with_suffix('.log').write_text('\n'.join(logs))
+        report['sqlSha256'] = bench.sha(stem.with_suffix('.sql').read_bytes())
+        report['logPath'] = str(stem.with_suffix('.log'))
+        args.report.write_text(json.dumps(report, indent=2) + '\n')
+    print(json.dumps({'report': str(args.report), 'passed': report['passed'],
+        'fixtureRetained': report['fixtureRetained'], 'resetRequired': report['resetRequired'],
+        'failure': report.get('failure'), 'cleanup': report['cleanup']}, indent=2))
+    return int(not report['passed'])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--container', required=True, choices=[bench.CONTAINER])
@@ -390,17 +726,25 @@ def main() -> int:
     parser.add_argument('--report', type=Path, required=True)
     parser.add_argument('--synthetic-processes', type=int, default=0)
     parser.add_argument('--synthetic-flows', type=int, default=0)
+    parser.add_argument('--committed-visibility', action='store_true',
+        help='Commit real local fixtures, prove another writer/anonymous reader visibility, retain for owned reset')
     args = parser.parse_args()
+    args.visibility_nonce = uuid.uuid4().hex[:12] if args.committed_visibility else None
     if not args.report.resolve().is_relative_to(bench.OWNER.parent.resolve()):
         parser.error('Evidence must stay in the task-owned private scratch directory')
     real_stem = args.report.with_name(args.report.stem + '-real')
     volume_stem = args.report.with_name(args.report.stem + '-synthetic')
     paths = [args.report] + [s.with_suffix(ext) for s in (real_stem, volume_stem) for ext in ('.sql', '.log')]
+    if args.committed_visibility:
+        visibility_stem = args.report.with_name(args.report.stem + '-visibility')
+        paths = [args.report, visibility_stem.with_suffix('.sql'), visibility_stem.with_suffix('.log')]
     if len(set(paths)) != len(paths) or any(p.exists() for p in paths):
         parser.error('Report and SQL/log evidence paths must all be new')
     if not ((args.synthetic_processes == args.synthetic_flows == 0) or
             (20 <= args.synthetic_processes <= 20000 and 40 <= args.synthetic_flows <= 100000)):
         parser.error('Synthetic counts must both be omitted, or Process20..20000 and Flow40..100000')
+    if args.committed_visibility and (args.synthetic_processes or args.synthetic_flows):
+        parser.error('Committed visibility and synthetic volume timing are separate qualification modes')
     try:
         context = json.loads(subprocess.check_output(['docker', 'context', 'inspect'], text=True))[0]
         inspected = json.loads(subprocess.check_output(['docker', 'inspect', bench.CONTAINER], text=True))[0]
@@ -417,12 +761,19 @@ def main() -> int:
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         parser.error(str(exc))
     expected = bench.empty_guard_expected()
-    initial = bench.run(bench.guard_sql(), 60)
+    app_prefix = ('set application_name=' + bench.literal('portal864-cv-' + args.visibility_nonce + '-initial-guard') + ';') if args.committed_visibility else ''
+    initial = (visibility_run('portal864-cv-' + args.visibility_nonce + '-initial-guard', app_prefix + bench.guard_sql(), 60)
+               if args.committed_visibility else bench.run(bench.guard_sql(), 60))
     if initial.returncode or initial.stdout.strip().splitlines() != expected:
         parser.error('Refusing unknown, nonempty, nonlocal or wrong-version target')
-    initial_catalog = bench.run(catalog_query() + ';', 60)
+    catalog_prefix = ('set application_name=' + bench.literal('portal864-cv-' + args.visibility_nonce + '-initial-catalog') + ';') if args.committed_visibility else ''
+    initial_catalog = (visibility_run('portal864-cv-' + args.visibility_nonce + '-initial-catalog', catalog_prefix + catalog_query() + ';', 60)
+                       if args.committed_visibility else bench.run(catalog_query() + ';', 60))
     if initial_catalog.returncode:
         parser.error('Initial permanent metadata/manifest snapshot failed')
+    if args.committed_visibility:
+        return committed_visibility(args, context, inspected, owner, base, migration,
+            statements, predecessor, json.loads(initial_catalog.stdout))
     args.report.parent.mkdir(parents=True, exist_ok=True)
     report = {'schemaVersion': 'portal.facets-navigation-upgrade.v1', 'passed': False,
         'classification': 'local rollback-only real source-writer/full-migration upgrade; not hosted latency',
@@ -448,7 +799,7 @@ def main() -> int:
         before, after = (real['snapshots'][phase]['targetDefinitions'] for phase in ('baseline', 'candidate'))
         if set(before) != set(TARGETS) or set(after) != set(TARGETS) or any(before[name] == after[name] for name in TARGETS):
             raise ValueError('Every approved target must have exactly one changed definition')
-        if len(real['checks']) != 6 or not real['sourceWriterTriggersEnabled'] or real['realSourceRows'] != {'processes': 4, 'flows': 2}:
+        if set(real['checks']) != CHECK_LABELS or not real['sourceWriterTriggersEnabled'] or real['realSourceRows'] != {'processes': 4, 'flows': 2}:
             raise ValueError('Incomplete rollback guards or real source-writer fixture')
         report['realWriterUpgrade'] = real | {'sqlSha256': digest, 'completeResponseComparisons': case_count,
                                             'repeatApplication': True, 'fullMigrationStatements': len(statements)}
@@ -459,6 +810,7 @@ def main() -> int:
                 raise ValueError('Incomplete separately classified synthetic guard-volume result')
             report['syntheticGuardVolume'] = {'processVersions': 2 * args.synthetic_processes,
                 'flowVersions': 2 * args.synthetic_flows, 'sqlSha256': digest,
+                'summaryPaddingBytes': 3072,
                 'guardElapsedMs': records[0]['guardElapsedMs'], 'result': records[1],
                 'sourceWriterProof': False}
         report['passed'] = True

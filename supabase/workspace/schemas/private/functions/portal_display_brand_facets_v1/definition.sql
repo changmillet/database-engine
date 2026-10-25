@@ -3,15 +3,27 @@ CREATE OR REPLACE FUNCTION "private"."portal_display_brand_facets_v1"("p_page" "
     SET "search_path" TO ''
     SET "row_security" TO 'on'
     AS $$
+ -- Wide empty matching adds no filter after the symmetric coverage guard.
+ -- Retain the original selective Process path, where direct V1 scanning regresses.
+ -- Every existing projection writer maintains these exact version sets.
  select jsonb_set(p_page,'{groups}',(p_page->'groups') || jsonb_build_array(jsonb_build_object(
   'id','brand','label',jsonb_build_array(jsonb_build_object('language','en','value','Database brand')),
-  'hasMore',false,'values',coalesce((select jsonb_agg(jsonb_build_object(
+  'hasMore',false,'values',case when lower(btrim(coalesce(p_query,'')))='' and private.display_normalize_filters_v1(p_filters)='{}'::jsonb
+   and lower(btrim(p_kind)) <> 'process'
+ then coalesce((select jsonb_agg(jsonb_build_object(
+   'value',brand,'label',jsonb_build_array(jsonb_build_object('language','en','value',private.portal_brand_v1(brand)->>'name')),
+   'count',total) order by brand)
+   from (select p.brand,count(*) as total
+    from private.display_catalog_search_rows_v1 p
+    where lower(btrim(p_kind))='all' or p.dataset_kind=lower(btrim(p_kind))
+    group by p.brand) counted),'[]'::jsonb)
+ else coalesce((select jsonb_agg(jsonb_build_object(
    'value',brand,'label',jsonb_build_array(jsonb_build_object('language','en','value',private.portal_brand_v1(brand)->>'name')),
    'count',total) order by brand)
    from (select p.brand,count(*) as total
     from private.display_navigation_matched_versions_v1(lower(btrim(p_kind)),lower(btrim(coalesce(p_query,''))),private.display_normalize_filters_v1(p_filters)) k
     join private.display_catalog_search_rows_v1 p using(dataset_kind,id,version)
-    group by p.brand) counted),'[]'::jsonb))))
+    group by p.brand) counted),'[]'::jsonb) end)))
 $$;
 
 ALTER FUNCTION "private"."portal_display_brand_facets_v1"("p_page" "jsonb", "p_kind" "text", "p_query" "text", "p_filters" "jsonb") OWNER TO "portal_display_executor";
