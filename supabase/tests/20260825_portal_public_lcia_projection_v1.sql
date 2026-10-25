@@ -4,6 +4,8 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, auth;
 
 select extensions.no_plan();
+\ir fixtures/20261025_lcia_current_receipts.inc
+
 
 -- Frozen cross-language record vectors.  Worker must frame the schema and
 -- hash-contract domains in this exact order before every record field.
@@ -1104,6 +1106,9 @@ select pg_catalog.set_config(
   'request.jwt.claims', '{"role":"service_role"}', true
 );
 
+select pg_temp.worker339_bind_current_result('52710000-0000-4000-8000-000000000404',
+  '[{"id":"52710000-0000-4000-8000-000000000201","version":"01.00.000"},{"id":"52710000-0000-4000-8000-000000000202","version":"01.00.000"}]');
+
 create temporary table portal_lcia_package_response (response jsonb not null)
 on commit drop;
 
@@ -1119,14 +1124,16 @@ values (
     p_latest_all_unit_result_id =>
       '52710000-0000-4000-8000-000000000405',
     p_available_impact_categories => jsonb_build_array(
-      '52710000-0000-4000-8000-000000000301',
-      '52710000-0000-4000-8000-000000000302'
+      '52710000-0000-4000-8000-000000000201',
+      '52710000-0000-4000-8000-000000000202'
     ),
-    p_artifact_manifest => jsonb_build_object(
+    p_default_impact_category => '52710000-0000-4000-8000-000000000201',
+    p_package_result_hash => repeat('b',64),
+    p_artifact_manifest => pg_temp.worker339_result_manifest('52710000-0000-4000-8000-000000000404',jsonb_build_object(
       'schemaVersion', 'portal-lcia-test-artifacts.v1',
       'resultSha256', repeat('b', 64),
       'querySha256', repeat('c', 64)
-    ),
+    )),
     p_audit => '{}'::jsonb
   )
 );
@@ -1237,6 +1244,24 @@ select extensions.is(
 );
 
 reset role;
+
+insert into private.lca_results (
+  id, job_id, snapshot_id, payload, diagnostics, artifact_url,
+  artifact_sha256, artifact_byte_size, artifact_format, worker_job_id,
+  is_pinned
+)
+values (
+  '52710000-0000-4000-8000-000000000430',
+  (select id from portal_lcia_ids where label = 'build_v3'),
+  '52710000-0000-4000-8000-000000000403', '{}'::jsonb, '{}'::jsonb,
+  's3://portal-lcia-test/private/v3-result.json', repeat('b', 64), 301,
+  'application/json',
+  (select id from portal_lcia_ids where label = 'worker_job_v3'), false
+);
+
+select pg_temp.worker339_bind_current_result('52710000-0000-4000-8000-000000000430',
+  '[{"id":"52710000-0000-4000-8000-000000000201","version":"01.00.000"},{"id":"52710000-0000-4000-8000-000000000202","version":"01.00.000"}]',
+  jsonb_build_object('schemaVersion','tiangong.calculation-bundle.v2','calculationId',(select id from portal_lcia_ids where label='build_v3'),'bundleContentHash',repeat('d',64),'manifestSha256',repeat('e',64),'manifestUrl','s3://portal-lcia-test/private/calculation-bundle.json','manifestByteSize',100,'artifactCount',3));
 
 create or replace function pg_temp.portal_lcia_process_record(
   p_process_index integer,
@@ -2100,6 +2125,13 @@ select
 from private.worker_jobs as job
 where job.id = (select id from portal_lcia_ids where label = 'worker_job_v3');
 
+insert into private.lca_network_snapshots(id,scope,status,process_filter)
+values('52710000-0000-4000-8000-000000000441','data_product','ready','{}');
+update private.worker_jobs set payload_json=jsonb_set(payload_json,'{snapshot_id}','"52710000-0000-4000-8000-000000000441"') where id='52710000-0000-4000-8000-000000000421';
+insert into private.lca_results(id,job_id,snapshot_id,worker_job_id,diagnostics,artifact_url,artifact_sha256,artifact_byte_size,artifact_format)
+values('52710000-0000-4000-8000-000000000442','52710000-0000-4000-8000-000000000422','52710000-0000-4000-8000-000000000441','52710000-0000-4000-8000-000000000421','{}','s3://portal-lcia-test/private/boundary-result.json',repeat('b',64),301,'application/json');
+select pg_temp.worker339_bind_current_result('52710000-0000-4000-8000-000000000442',(select methods from portal_lcia_boundary_methods));
+
 create temporary table portal_lcia_boundary_begin (response jsonb not null)
 on commit drop;
 
@@ -2305,19 +2337,6 @@ from pg_catalog.pg_proc as routine
 where routine.oid =
   'private.cmd_lcia_result_package_mark_ready_without_closure_recheck(uuid,text,uuid,uuid,uuid,jsonb,jsonb,jsonb,jsonb,text,text,jsonb)'::regprocedure;
 
-insert into private.lca_results (
-  id, job_id, snapshot_id, payload, diagnostics, artifact_url,
-  artifact_sha256, artifact_byte_size, artifact_format, worker_job_id,
-  is_pinned
-)
-values (
-  '52710000-0000-4000-8000-000000000430',
-  (select id from portal_lcia_ids where label = 'build_v3'),
-  '52710000-0000-4000-8000-000000000403', '{}'::jsonb, '{}'::jsonb,
-  's3://portal-lcia-test/private/v3-result.json', repeat('b', 64), 301,
-  'application/json',
-  (select id from portal_lcia_ids where label = 'worker_job_v3'), false
-);
 
 update private.lca_latest_all_unit_results
 set job_id = (select id from portal_lcia_ids where label = 'build_v3'),
@@ -2356,6 +2375,7 @@ select extensions.is(
       'artifactByteSize', 302,
       'artifactFormat', 'application/json'
     ),
+    pg_temp.worker339_result_manifest('52710000-0000-4000-8000-000000000430',
     jsonb_build_object(
       'bundleContentHash', repeat('d', 64),
       'bundleManifestSha256', repeat('e', 64),
@@ -2364,6 +2384,7 @@ select extensions.is(
         (select id::text from portal_lcia_ids where label = 'stage'),
       'portalProjectionContentHash',
         (select response #>> '{data,contentHash}' from portal_lcia_seal_response)
+    )
     ),
     jsonb_build_array(
       '52710000-0000-4000-8000-000000000201',
@@ -2428,6 +2449,7 @@ as $function$
       'artifactByteSize', 302,
       'artifactFormat', 'application/json'
     ),
+    pg_temp.worker339_result_manifest('52710000-0000-4000-8000-000000000430',
     jsonb_build_object(
       'bundleContentHash', repeat('d', 64),
       'bundleManifestSha256', repeat('e', 64),
@@ -2437,6 +2459,7 @@ as $function$
       'portalProjectionContentHash',
         (select response #>> '{data,contentHash}'
          from pg_temp.portal_lcia_seal_response)
+    )
     ),
     jsonb_build_array(
       '52710000-0000-4000-8000-000000000201',
@@ -2597,6 +2620,7 @@ select extensions.is(
     '52710000-0000-4000-8000-000000000405',
     jsonb_build_object('artifactSha256', repeat('0', 64)),
     jsonb_build_object('artifactSha256', repeat('c', 64)),
+    pg_temp.worker339_result_manifest('52710000-0000-4000-8000-000000000430',
     jsonb_build_object(
       'bundleContentHash', repeat('d', 64),
       'bundleManifestSha256', repeat('e', 64),
@@ -2605,6 +2629,7 @@ select extensions.is(
         (select id::text from portal_lcia_ids where label = 'stage'),
       'portalProjectionContentHash',
         (select response #>> '{data,contentHash}' from portal_lcia_seal_response)
+    )
     ),
     jsonb_build_array(
       '52710000-0000-4000-8000-000000000201',
@@ -2639,6 +2664,7 @@ select extensions.is(
       'artifactByteSize', 302,
       'artifactFormat', 'application/json'
     ),
+    pg_temp.worker339_result_manifest('52710000-0000-4000-8000-000000000430',
     jsonb_build_object(
       'bundleContentHash', repeat('d', 64),
       'bundleManifestSha256', repeat('e', 64),
@@ -2647,6 +2673,7 @@ select extensions.is(
         (select id::text from portal_lcia_ids where label = 'stage'),
       'portalProjectionContentHash',
         (select response #>> '{data,contentHash}' from portal_lcia_seal_response)
+    )
     ),
     jsonb_build_array(
       '52710000-0000-4000-8000-000000000202',
@@ -2685,6 +2712,7 @@ values (
       'artifactByteSize', 302,
       'artifactFormat', 'application/json'
     ),
+    pg_temp.worker339_result_manifest('52710000-0000-4000-8000-000000000430',
     jsonb_build_object(
       'bundleContentHash', repeat('d', 64),
       'bundleManifestSha256', repeat('e', 64),
@@ -2693,6 +2721,7 @@ values (
         (select id::text from portal_lcia_ids where label = 'stage'),
       'portalProjectionContentHash',
         (select response #>> '{data,contentHash}' from portal_lcia_seal_response)
+    )
     ),
     jsonb_build_array(
       '52710000-0000-4000-8000-000000000201',
@@ -2791,6 +2820,7 @@ values (
       'artifactByteSize', 302,
       'artifactFormat', 'application/json'
     ),
+    pg_temp.worker339_result_manifest('52710000-0000-4000-8000-000000000430',
     jsonb_build_object(
       'bundleContentHash', repeat('d', 64),
       'bundleManifestSha256', repeat('e', 64),
@@ -2799,6 +2829,7 @@ values (
         (select id::text from portal_lcia_ids where label = 'stage'),
       'portalProjectionContentHash',
         (select response #>> '{data,contentHash}' from portal_lcia_seal_response)
+    )
     ),
     jsonb_build_array(
       '52710000-0000-4000-8000-000000000201',
@@ -2878,6 +2909,7 @@ values (
       'artifactByteSize', 302,
       'artifactFormat', 'application/json'
     ),
+    pg_temp.worker339_result_manifest('52710000-0000-4000-8000-000000000430',
     jsonb_build_object(
       'bundleContentHash', repeat('d', 64),
       'bundleManifestSha256', repeat('e', 64),
@@ -2886,6 +2918,7 @@ values (
         (select id::text from portal_lcia_ids where label = 'stage'),
       'portalProjectionContentHash',
         (select response #>> '{data,contentHash}' from portal_lcia_seal_response)
+    )
     ),
     jsonb_build_array(
       '52710000-0000-4000-8000-000000000201',

@@ -37,6 +37,8 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, api, private, auth;
 select no_plan();
+\ir fixtures/20261025_lcia_current_receipts.inc
+
 
 -- Every state this suite inserts is accepted by the table CHECK today, so no
 -- unrepresentable-state fixture is smuggled past the constraint.
@@ -1013,6 +1015,11 @@ select is(
 
 -- --------------------------------------------------------- formal release binding
 
+-- Seed pre-migration publication history, not a new complete-result transition.
+do $worker339_historical_release$ begin
+  if exists(select 1 from pg_trigger where tgrelid='private.lca_release_runs'::regclass and tgname='lca_release_category_completeness_v1') then
+    alter table private.lca_release_runs disable trigger lca_release_category_completeness_v1;
+  end if;
 insert into private.lca_release_runs(
   id, release_version, selection_manifest_hash, input_manifest_hash,
   calculation_bundle_hash, calculation_bundle_ref, profile_lock_hash,
@@ -1024,6 +1031,12 @@ insert into private.lca_release_runs(
   '{}', repeat('f', 64), repeat('9', 64), '{}', 'published',
   'state120-release', repeat('1', 64), '64600000-0000-4000-8000-000000000001'
 );
+  if exists(select 1 from pg_trigger where tgrelid='private.lca_release_runs'::regclass and tgname='lca_release_category_completeness_v1') then
+    alter table private.lca_release_runs enable trigger lca_release_category_completeness_v1;
+  end if;
+end $worker339_historical_release$;
+select ok(not exists(select 1 from pg_trigger where tgrelid='private.lca_release_runs'::regclass and tgname='lca_release_category_completeness_v1' and tgenabled<>'O'),'complete-result guard is restored before exercising historical readback and transitions');
+
 insert into private.lca_release_approvals(
   id, release_run_id, publish_plan_hash, approval_hash, approved_by,
   approved_at, expires_at
@@ -1196,13 +1209,26 @@ values (
   's3://state120-test/result.json'
 );
 
+update private.worker_jobs set subject_type='lcia_result_build',subject_id=id,
+  requested_by='64600000-0000-4000-8000-000000000001' where id='64600000-0000-4000-8000-000000000060';
+update private.worker_jobs set subject_type='lcia_result_build',subject_id='64600000-0000-4000-8000-000000000065',
+  requested_by='64600000-0000-4000-8000-000000000001' where id='64600000-0000-4000-8000-000000000066';
+update private.lca_results set artifact_sha256=repeat('a',64),artifact_byte_size=123,artifact_format='application/json'
+  where id='64600000-0000-4000-8000-000000000062';
+insert into private.lca_results(id,job_id,snapshot_id,worker_job_id,artifact_url,artifact_sha256,artifact_byte_size,artifact_format)
+values('64600000-0000-4000-8000-000000000067','64600000-0000-4000-8000-000000000065','64600000-0000-4000-8000-000000000061','64600000-0000-4000-8000-000000000066','s3://state120-test/current-result.json',repeat('b',64),123,'application/json');
+select pg_temp.worker339_bind_current_result('64600000-0000-4000-8000-000000000062',
+  '[{"id":"64600000-0000-4000-8000-000000000054","version":"01.01.000"}]');
+select pg_temp.worker339_bind_current_result('64600000-0000-4000-8000-000000000067',
+  '[{"id":"64600000-0000-4000-8000-000000000054","version":"01.01.000"}]');
+
 -- Stale evidence: the retired predicate literal, its retired status filter, and a
 -- manifest hash that no longer matches the live eligible set.
 insert into private.lcia_result_packages(
   id, build_id, build_worker_job_id, package_version, coverage_mode,
   input_status_filter, eligibility_definition, eligibility_resolved_at,
   eligible_input_count, included_input_count, input_manifest_hash,
-  input_manifest, snapshot_id, result_id, result_artifact_ref, status,
+  input_manifest, snapshot_id, result_id, result_artifact_ref, artifact_manifest,package_result_hash,available_impact_categories,default_impact_category,status,
   created_by
 ) values (
   '64600000-0000-4000-8000-000000000063',
@@ -1218,8 +1244,8 @@ insert into private.lcia_result_packages(
   '{"predicateVersion": "published-state-code-100-199:latest-per-id:v1", "selectionMode": "all_eligible", "processes": []}'::jsonb,
   '64600000-0000-4000-8000-000000000061',
   '64600000-0000-4000-8000-000000000062',
-  '{"artifactUrl": "s3://state120-test/result.json"}'::jsonb,
-  'preview_ready',
+  jsonb_build_object('artifactUrl','s3://state120-test/result.json','artifactSha256',repeat('a',64)),
+  pg_temp.worker339_result_manifest('64600000-0000-4000-8000-000000000062'),repeat('a',64),'["64600000-0000-4000-8000-000000000054"]'::jsonb,'64600000-0000-4000-8000-000000000054','preview_ready',
   '64600000-0000-4000-8000-000000000001'
 );
 
@@ -1286,7 +1312,7 @@ insert into private.lcia_result_packages(
   id, build_id, build_worker_job_id, package_version, coverage_mode,
   input_status_filter, eligibility_definition, eligibility_resolved_at,
   eligible_input_count, included_input_count, input_manifest_hash,
-  input_manifest, snapshot_id, result_id, result_artifact_ref, status,
+  input_manifest, snapshot_id, result_id, result_artifact_ref, artifact_manifest,package_result_hash,available_impact_categories,default_impact_category,status,
   created_by
 ) values (
   '64600000-0000-4000-8000-000000000064',
@@ -1303,15 +1329,15 @@ insert into private.lcia_result_packages(
   api.lcia_result_current_eligible_manifest()->>'inputManifestHash',
   api.lcia_result_current_eligible_manifest()->'inputManifest',
   '64600000-0000-4000-8000-000000000061',
-  '64600000-0000-4000-8000-000000000062',
-  '{"artifactUrl": "s3://state120-test/result.json"}'::jsonb,
-  'preview_ready',
+  '64600000-0000-4000-8000-000000000067',
+  jsonb_build_object('artifactUrl','s3://state120-test/current-result.json','artifactSha256',repeat('b',64)),
+  pg_temp.worker339_result_manifest('64600000-0000-4000-8000-000000000067'),repeat('b',64),'["64600000-0000-4000-8000-000000000054"]'::jsonb,'64600000-0000-4000-8000-000000000054','preview_ready',
   '64600000-0000-4000-8000-000000000001'
 );
 
 select is(
   api.cmd_lcia_result_package_publish(
-    '64600000-0000-4000-8000-000000000064', 'climate-change', null
+    '64600000-0000-4000-8000-000000000064', '64600000-0000-4000-8000-000000000054', null
   )->>'ok',
   'true',
   'the guarded publisher accepts a package bound to the current predicate'

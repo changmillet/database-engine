@@ -4,6 +4,8 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, auth;
 
 select no_plan();
+\ir fixtures/20261025_lcia_current_receipts.inc
+
 
 select has_table('private', 'lca_release_runs', 'release runs table exists');
 select has_table('private', 'lca_release_dataset_versions', 'release dataset index exists');
@@ -151,6 +153,19 @@ values (
   '00000000-0000-0000-0000-000000000000',
   'data_product_manager'
 );
+
+create or replace function pg_temp.release_bundle_ref() returns jsonb language sql immutable as $$
+select jsonb_build_object('schemaVersion','tiangong.calculation-bundle.v2','calculationId','a7160000-0000-4000-8000-000000004001',
+  'bundleContentHash',repeat('c',64),'manifestSha256',repeat('b',64),'manifestUrl','s3://bundle/manifest.json','manifestByteSize',100,'artifactCount',3)
+$$;
+grant execute on function pg_temp.release_bundle_ref() to authenticated,service_role;
+insert into private.worker_jobs(id,job_kind,worker_queue,requester_type,requested_by,status,payload_schema_version,payload_json)
+values('a7160000-0000-4000-8000-000000004001','lca.solve_all_unit','solver','user','a7160000-0000-4000-8000-000000001001','completed','lca.solve_all_unit.request.v1','{}');
+insert into private.lca_network_snapshots(id,scope,status,process_filter) values('a7160000-0000-4000-8000-000000004002','full_library','ready','{}');
+insert into private.lca_results(id,job_id,snapshot_id,diagnostics,worker_job_id,artifact_url,artifact_sha256,artifact_byte_size,artifact_format)
+values('a7160000-0000-4000-8000-000000004003','a7160000-0000-4000-8000-000000004001','a7160000-0000-4000-8000-000000004002','{}','a7160000-0000-4000-8000-000000004001','s3://worker339-fixture/formal-result.h5',repeat('c',64),100,'hdf5:v1');
+select pg_temp.worker339_bind_current_result('a7160000-0000-4000-8000-000000004003',
+  '[{"id":"a7160000-0000-4000-8000-000000004101","version":"01.00.000"}]',pg_temp.release_bundle_ref());
 
 create or replace function pg_temp.release_publish_plan()
 returns jsonb
@@ -313,7 +328,7 @@ select is(
 select is(
   api.cmd_lca_release_prepare(
     'a7160000-0000-4000-8000-000000002001', '01.00.000', repeat('a', 64), repeat('b', 64),
-    jsonb_build_object('manifestUrl', 's3://bundle/manifest.json'), repeat('c', 64), repeat('d', 64),
+    pg_temp.release_bundle_ref(), repeat('c', 64), repeat('d', 64),
     pg_temp.release_publish_plan(), repeat('e', 64), 'release-prepare-1', '{}'::jsonb
   )->>'code',
   'auth_required',
@@ -331,7 +346,7 @@ select is(
 select is(
   api.cmd_lca_release_prepare(
     'a7160000-0000-4000-8000-000000002001', '01.00.000', repeat('a', 64), repeat('b', 64),
-    jsonb_build_object('manifestUrl', 's3://bundle/manifest.json'), repeat('c', 64), repeat('d', 64),
+    pg_temp.release_bundle_ref(), repeat('c', 64), repeat('d', 64),
     pg_temp.release_publish_plan(), repeat('e', 64), 'release-prepare-1', '{}'::jsonb
   )->>'code',
   'not_data_product_manager',
@@ -361,7 +376,7 @@ select is(
 select is(
   api.cmd_lca_release_prepare(
     'a7160000-0000-4000-8000-000000002001', '01.00.000', repeat('a', 64), repeat('b', 64),
-    jsonb_build_object('manifestUrl', 's3://bundle/manifest.json'), repeat('c', 64), repeat('d', 64),
+    pg_temp.release_bundle_ref(), repeat('c', 64), repeat('d', 64),
     pg_temp.release_publish_plan() || jsonb_build_object('planHash', repeat('0', 64)),
     repeat('e', 64), 'release-prepare-1', '{}'::jsonb
   )->>'code',
@@ -372,7 +387,7 @@ select is(
 select is(
   api.cmd_lca_release_prepare(
     'a7160000-0000-4000-8000-000000002001', '01.00.000', repeat('a', 64), repeat('b', 64),
-    jsonb_build_object('manifestUrl', 's3://bundle/manifest.json'), repeat('c', 64), repeat('d', 64),
+    pg_temp.release_bundle_ref(), repeat('c', 64), repeat('d', 64),
     pg_temp.release_publish_plan(), repeat('e', 64), 'release-prepare-1', '{}'::jsonb
   )->'data'->>'status',
   'prepared',
@@ -381,7 +396,7 @@ select is(
 select ok(
   (api.cmd_lca_release_prepare(
     'a7160000-0000-4000-8000-000000002001', '01.00.000', repeat('a', 64), repeat('b', 64),
-    jsonb_build_object('manifestUrl', 's3://bundle/manifest.json'), repeat('c', 64), repeat('d', 64),
+    pg_temp.release_bundle_ref(), repeat('c', 64), repeat('d', 64),
     pg_temp.release_publish_plan(), repeat('e', 64), 'release-prepare-1', '{}'::jsonb
   )->>'reused')::boolean,
   'identical prepare retry is idempotent'
@@ -389,7 +404,7 @@ select ok(
 select is(
   api.cmd_lca_release_prepare(
     'a7160000-0000-4000-8000-000000002001', '01.00.000', repeat('a', 64), repeat('0', 64),
-    jsonb_build_object('manifestUrl', 's3://bundle/manifest.json'), repeat('c', 64), repeat('d', 64),
+    pg_temp.release_bundle_ref(), repeat('c', 64), repeat('d', 64),
     pg_temp.release_publish_plan(), repeat('e', 64), 'release-prepare-1', '{}'::jsonb
   )->>'code',
   'release_prepare_conflict',

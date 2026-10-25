@@ -21,6 +21,8 @@ end;
 $$;
 
 select plan(35);
+\ir fixtures/20261025_lcia_current_receipts.inc
+
 
 select has_table('private', 'lcia_result_packages', 'LCIA result packages table exists');
 select has_table('private', 'lcia_result_publications', 'LCIA result publications table exists');
@@ -424,6 +426,11 @@ values (
   (select id from lcia_result_test_ids where label = 'worker_job')
 );
 
+update private.worker_jobs set status='running',lease_token='98230000-0000-4000-8000-000000000302',lease_expires_at=clock_timestamp()+interval '10 minutes' where id=(select id from lcia_result_test_ids where label='worker_job');
+-- Current Worker callbacks resolve the frozen canonical axis, not display aliases.
+select pg_temp.worker339_bind_current_result((select id from lcia_result_test_ids where label='result'),
+  '[{"id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","version":"01.00.000"},{"id":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","version":"01.00.000"}]');
+
 set local role service_role;
 select set_config('request.jwt.claim.role', 'service_role', true);
 select set_config('request.jwt.claims', '{"role":"service_role"}', true);
@@ -439,8 +446,10 @@ from (
     p_snapshot_id => (select id from lcia_result_test_ids where label = 'snapshot'),
     p_result_id => (select id from lcia_result_test_ids where label = 'result'),
     p_latest_all_unit_result_id => (select id from lcia_result_test_ids where label = 'latest_all_unit'),
-    p_available_impact_categories => jsonb_build_array('climate-change', 'acidification'),
-    p_artifact_manifest => jsonb_build_object('persistenceMode', 'pinned'),
+    p_available_impact_categories => jsonb_build_array('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
+    p_default_impact_category => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    p_package_result_hash => repeat('a',64),
+    p_artifact_manifest => pg_temp.worker339_result_manifest((select id from lcia_result_test_ids where label='result'),jsonb_build_object('persistenceMode','pinned')),
     p_audit => '{}'::jsonb
   ) as result
 ) as marked;
@@ -494,7 +503,7 @@ select
 from (
   select api.cmd_lcia_result_package_publish(
     p_package_id => (select id from lcia_result_test_ids where label = 'package'),
-    p_display_default_impact_category => 'climate-change',
+    p_display_default_impact_category => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     p_reason => 'publish pgtap package',
     p_audit => '{}'::jsonb
   ) as result
@@ -524,7 +533,7 @@ select is(
   api.get_published_lcia_result_package(
     '98230000-0000-4000-8000-000000000101',
     '01.00.001',
-    'climate-change'
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   )->'data'->'resultArtifact'->>'artifactUrl',
   's3://bucket/lcia-result.json',
   'anon can read only the current public LCIA package artifact reference'

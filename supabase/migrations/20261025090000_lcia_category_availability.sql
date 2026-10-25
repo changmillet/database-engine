@@ -286,6 +286,7 @@ declare
   v_result jsonb;
   v_package private.lcia_result_packages%rowtype;
   v_package_id uuid;
+  v_suppress_default boolean;
 begin
   if not coalesce(util.is_service_request(), false) then
     return api.lcia_result_error('service_role_required',403,'Service role is required');
@@ -305,18 +306,23 @@ begin
   if v_receipt is null or p_artifact_manifest->'lciaAvailability' is distinct from v_receipt then
     return api.lcia_result_error('lcia_package_availability_binding_invalid',409,'Current immutable category availability is required');
   end if;
+  -- Complete legacy calls must reach their original certificate diagnostics
+  -- without firing the payload-admission trigger on a no-op UPDATE.
+  v_suppress_default := v_receipt->>'completeness'<>'complete'
+    and p_default_impact_category is null
+    and nullif(btrim(coalesce(v_job.payload_json->>'default_impact_category','')),'') is not null;
   begin
-    update private.worker_jobs
-      set payload_schema_version = v_job.payload_schema_version,
-          payload_json = case when p_default_impact_category is null then v_job.payload_json - 'default_impact_category' else v_job.payload_json end
-      where id = v_job.id;
+    if v_suppress_default then
+      update private.worker_jobs set payload_json=v_job.payload_json-'default_impact_category' where id=v_job.id;
+    end if;
     v_result := private.lcia_package_mark_ready_before_category_availability_v1(
       p_build_worker_job_id,p_package_version,p_snapshot_id,p_result_id,
       p_latest_all_unit_result_id,p_result_artifact_ref,p_query_artifact_ref,
       p_artifact_manifest,p_available_impact_categories,p_default_impact_category,
       p_package_result_hash,p_audit);
-    update private.worker_jobs set payload_schema_version = v_job.payload_schema_version,
-      payload_json = v_job.payload_json where id = v_job.id;
+    if v_suppress_default then
+      update private.worker_jobs set payload_json=v_job.payload_json where id=v_job.id;
+    end if;
     if coalesce((v_result->>'ok')::boolean,false) then
       v_package_id := (v_result->'data'->>'packageId')::uuid;
       select * into v_package from private.lcia_result_packages where id = v_package_id;

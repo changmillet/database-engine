@@ -3,12 +3,14 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public, auth;
 select no_plan();
+\ir fixtures/20261025_lcia_current_receipts.inc
+
 
 -- The upgrade helper supplies the canonical base revision before replaying the
 -- actual migration. Ordinary head validation requires the current revision.
 \if :{?scope_closure_initial_scanner}
 \else
-\set scope_closure_initial_scanner 'scope-closure-validator-scanner.v1+cutoff-readiness-r5'
+\set scope_closure_initial_scanner 'scope-closure-validator-scanner.v1+cutoff-readiness-r7'
 \endif
 
 select is(
@@ -39,8 +41,19 @@ insert into private.teams(id,json,rank,is_public) values ('00000000-0000-0000-00
 insert into private.roles(user_id,team_id,role) values ('c7220000-0000-4000-8000-000000000001','00000000-0000-0000-0000-000000000000','data_product_manager');
 insert into private.roles(user_id,team_id,role) values ('c7220000-0000-4000-8000-000000000002','00000000-0000-0000-0000-000000000000','data_product_manager');
 
+-- Seed pre-migration publication history, not a new complete-result transition.
+do $worker339_historical_release$ begin
+  if exists(select 1 from pg_trigger where tgrelid='private.lca_release_runs'::regclass and tgname='lca_release_category_completeness_v1') then
+    alter table private.lca_release_runs disable trigger lca_release_category_completeness_v1;
+  end if;
 insert into private.lca_release_runs(id,release_version,selection_manifest_hash,input_manifest_hash,calculation_bundle_hash,calculation_bundle_ref,profile_lock_hash,publish_plan_hash,publish_plan,artifact_set_hash,release_manifest_hash,release_manifest,status,idempotency_key,request_hash,created_by)
 values ('c7220000-0000-4000-8000-000000000010','77.00.001',repeat('a',64),repeat('b',64),repeat('c',64),'{}',repeat('d',64),repeat('e',64),'{}',repeat('f',64),repeat('9',64),'{}','published','closure-e2e-release',repeat('1',64),'c7220000-0000-4000-8000-000000000001');
+  if exists(select 1 from pg_trigger where tgrelid='private.lca_release_runs'::regclass and tgname='lca_release_category_completeness_v1') then
+    alter table private.lca_release_runs enable trigger lca_release_category_completeness_v1;
+  end if;
+end $worker339_historical_release$;
+select ok(not exists(select 1 from pg_trigger where tgrelid='private.lca_release_runs'::regclass and tgname='lca_release_category_completeness_v1' and tgenabled<>'O'),'complete-result guard is restored before exercising historical readback and transitions');
+
 insert into private.lca_release_approvals(id,release_run_id,publish_plan_hash,approval_hash,approved_by,approved_at,expires_at)
 values ('c7220000-0000-4000-8000-000000000011','c7220000-0000-4000-8000-000000000010',repeat('e',64),repeat('2',64),'c7220000-0000-4000-8000-000000000001',now(),now()+interval '1 day');
 insert into private.lca_release_publications(id,release_run_id,release_version,approval_id,approval_hash,publish_plan_hash,release_manifest_hash,artifact_set_hash,approved_by,executed_by,credential_fingerprint,idempotency_key,published_at)
@@ -748,13 +761,42 @@ select is(
   'schema cutover does not leave a public service helper behind'
 );
 
+-- Preserve the historical r4/r5 scenarios above and independently exercise the
+-- active r7 identity. New tokens share r7 work but cannot select r5/r6 scans.
+select set_config('request.jwt.claim.role','authenticated',true);
+update private.lcia_scope_closure_config set expected_validator_scanner_fingerprint='scope-closure-validator-scanner.v1+cutoff-readiness-r6' where singleton;
+select is(api.cmd_lcia_scope_closure_check_request_v2(
+  '{"coverageMode":"subset","processes":[{"id":"c7220000-0000-4000-8000-000000000020","version":"01.00.000"}],"lciaMethods":[{"id":"c7220000-0000-4000-8000-000000000021","version":"01.00.000"}]}',
+  'closure-e2e-r6-prior','{}')->>'ok','true','r6 predecessor request is retained as separate prior work');
+update private.lcia_scope_closure_config set expected_validator_scanner_fingerprint='scope-closure-validator-scanner.v1+cutoff-readiness-r7' where singleton;
+select is(api.cmd_lcia_scope_closure_check_request_v2(
+  '{"coverageMode":"subset","processes":[{"id":"c7220000-0000-4000-8000-000000000020","version":"01.00.000"}],"lciaMethods":[{"id":"c7220000-0000-4000-8000-000000000021","version":"01.00.000"}]}',
+  'closure-e2e-r7-current-a','{}')->>'ok','true','active r7 request is admitted through the normal command');
+select is(api.cmd_lcia_scope_closure_check_request_v2(
+  '{"coverageMode":"subset","processes":[{"id":"c7220000-0000-4000-8000-000000000020","version":"01.00.000"}],"lciaMethods":[{"id":"c7220000-0000-4000-8000-000000000021","version":"01.00.000"}]}',
+  'closure-e2e-r7-current-b','{}')->>'ok','true','distinct current tokens share r7 work');
+select ok((select a.expected_validator_scanner_fingerprint='scope-closure-validator-scanner.v1+cutoff-readiness-r7'
+  and a.scan_execution_id=b.scan_execution_id and a.id<>b.id
+  and not exists(select 1 from private.lcia_scope_closure_checks prior
+    where prior.expected_validator_scanner_fingerprint in ('scope-closure-validator-scanner.v1+cutoff-readiness-r5','scope-closure-validator-scanner.v1+cutoff-readiness-r6')
+      and (prior.scan_execution_id=a.scan_execution_id or prior.request_fingerprint=a.request_fingerprint))
+  from private.lcia_scope_closure_checks a join private.lcia_scope_closure_checks b on true
+  where a.request_idempotency_token='closure-e2e-r7-current-a' and b.request_idempotency_token='closure-e2e-r7-current-b'),
+  'r7 tokens share their own execution and avoid all existing r5/r6 request fingerprints and scans');
+
 -- A content change with the same exact process identity is a new public
 -- release, hence a new snapshot/fingerprint. Frozen evidence remains valid;
 -- only a current-membership policy is evaluated against the new binding.
 alter table private.lca_release_publications disable trigger user;
 update private.lca_release_publications set is_current=false,status='superseded' where id='c7220000-0000-4000-8000-000000000012';
+do $worker339_historical_release2$ begin
+  alter table private.lca_release_runs disable trigger lca_release_category_completeness_v1;
 insert into private.lca_release_runs(id,release_version,selection_manifest_hash,input_manifest_hash,calculation_bundle_hash,calculation_bundle_ref,profile_lock_hash,publish_plan_hash,publish_plan,artifact_set_hash,release_manifest_hash,release_manifest,status,idempotency_key,request_hash,created_by)
 values ('c7220000-0000-4000-8000-000000000030','77.00.002',repeat('a',64),repeat('b',64),repeat('c',64),'{}',repeat('d',64),repeat('e',64),'{}',repeat('f',64),repeat('0',64),'{}','published','closure-e2e-release-2',repeat('1',64),'c7220000-0000-4000-8000-000000000001');
+  alter table private.lca_release_runs enable trigger lca_release_category_completeness_v1;
+end $worker339_historical_release2$;
+select ok((select tgenabled='O' from pg_trigger where tgrelid='private.lca_release_runs'::regclass and tgname='lca_release_category_completeness_v1'),'complete-result guard is restored before changed-release readback');
+
 insert into private.lca_release_approvals(id,release_run_id,publish_plan_hash,approval_hash,approved_by,approved_at,expires_at) values ('c7220000-0000-4000-8000-000000000031','c7220000-0000-4000-8000-000000000030',repeat('e',64),repeat('2',64),'c7220000-0000-4000-8000-000000000001',now(),now()+interval '1 day');
 insert into private.lca_release_publications(id,release_run_id,release_version,approval_id,approval_hash,publish_plan_hash,release_manifest_hash,artifact_set_hash,approved_by,executed_by,credential_fingerprint,idempotency_key,published_at) values ('c7220000-0000-4000-8000-000000000032','c7220000-0000-4000-8000-000000000030','77.00.002','c7220000-0000-4000-8000-000000000031',repeat('2',64),repeat('e',64),repeat('0',64),repeat('f',64),'c7220000-0000-4000-8000-000000000001','c7220000-0000-4000-8000-000000000001',repeat('3',64),'closure-e2e-publication-2',now());
 insert into private.lca_release_dataset_versions(release_run_id,dataset_type,dataset_role,dataset_uuid,dataset_version,source_process_uuid,source_process_version,version_significant_hash,semantic_hash,canonical_content_hash,artifact_ref) values ('c7220000-0000-4000-8000-000000000030','process','unit_process','c7220000-0000-4000-8000-000000000020','01.00.000','c7220000-0000-4000-8000-000000000020','01.00.000',repeat('4',64),repeat('5',64),repeat('0',64),'{}'),('c7220000-0000-4000-8000-000000000030','lciamethod','support','c7220000-0000-4000-8000-000000000021','01.00.000',null,null,repeat('7',64),repeat('8',64),repeat('9',64),'{}');
@@ -775,6 +817,8 @@ select ok((select count(*)=1 from private.worker_jobs j join closure_build_ids b
 insert into closure_build_ids select 'build-b',(r->'data'->>'buildId')::uuid from (select api.cmd_lcia_result_build_request_v2('frozen build two',null,'subset',null,'[]'::jsonb,'closure-e2e-build-b',(select id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),(select requested_scope_hash from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),(select policy_fingerprint from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),'{}') r) q;
 select ok((select count(*)=2 and count(distinct subject_id)=2 from private.worker_jobs where job_kind='lcia_result.package_build' and payload_json->>'closure_check_id'=(select id::text from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a')),'two explicit Build V2 requests create independent jobs bound to the same certificate');
 insert into closure_build_ids select 'build-revoked',(r->'data'->>'buildId')::uuid from (select api.cmd_lcia_result_build_request_v2('revocation fence build',null,'subset',null,'[]'::jsonb,'closure-e2e-build-revoked',(select id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),(select requested_scope_hash from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),(select policy_fingerprint from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),'{}') r) q;
+insert into closure_build_ids select 'build-revoked-partial-fallback',(r->'data'->>'buildId')::uuid from
+(select api.cmd_lcia_result_build_request_v2('partial fallback revocation fence',null,'subset','c7220000-0000-4000-8000-000000000021','[]'::jsonb,'closure-e2e-partial-revoked-fallback',(select id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),(select requested_scope_hash from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),(select policy_fingerprint from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),'{}') r) q;
 insert into closure_build_ids select 'build-reused',(r->'data'->>'buildId')::uuid from (select api.cmd_lcia_result_build_request_v2('reused certificate build',null,'subset',null,'[]'::jsonb,'closure-e2e-build-reused',(select id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-b'),(select requested_scope_hash from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-b'),(select policy_fingerprint from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-b'),'{}') r) q;
 select ok((select count(*)=1 from private.worker_jobs j join closure_build_ids b on j.subject_id=b.id where b.label='build-reused' and j.job_kind='lcia_result.package_build' and j.payload_json->>'closure_check_id'=(select id::text from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-b')),'reused certificate passes calculation admission and enqueues a target-bound build');
 
@@ -789,6 +833,15 @@ insert into private.lca_latest_all_unit_results (id,snapshot_id,job_id,result_id
 values ('c7220000-0000-4000-8000-000000000402',(select snapshot_id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),(select id from private.worker_jobs where subject_id=(select id from closure_build_ids where label='build-a')),'c7220000-0000-4000-8000-000000000401','s3://test/closure-e2e-query.json',repeat('d',64),64,'application/json','ready',(select id from private.worker_jobs where subject_id=(select id from closure_build_ids where label='build-a')));
 insert into private.lca_results (id,job_id,snapshot_id,payload,diagnostics,artifact_url,artifact_sha256,artifact_byte_size,artifact_format,worker_job_id,is_pinned)
 values ('c7220000-0000-4000-8000-000000000404',(select id from private.worker_jobs where subject_id=(select id from closure_build_ids where label='build-reused')),(select snapshot_id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-b'),'{}'::jsonb,'{}'::jsonb,'s3://test/closure-e2e-reused-result.json',repeat('e',64),128,'application/json',(select id from private.worker_jobs where subject_id=(select id from closure_build_ids where label='build-reused')),false);
+
+select pg_temp.worker339_bind_current_result('c7220000-0000-4000-8000-000000000401',(select effective_scope_manifest->'lciaMethods' from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'));
+select pg_temp.worker339_bind_current_result('c7220000-0000-4000-8000-000000000404',(select effective_scope_manifest->'lciaMethods' from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-b'));
+-- Wrong-snapshot control has internally valid current evidence; only its
+-- mismatch with this build's certificate is the tested rejection condition.
+insert into private.lca_results(id,job_id,snapshot_id,diagnostics,artifact_url,artifact_sha256,artifact_byte_size,artifact_format,worker_job_id)
+select 'c7220000-0000-4000-8000-000000000407',id,'c7220000-0000-4000-8000-000000000302','{}','s3://test/wrong-snapshot-result.json',repeat('c',64),128,'application/json',id
+from private.worker_jobs where subject_id=(select id from closure_build_ids where label='build-b');
+select pg_temp.worker339_bind_current_result('c7220000-0000-4000-8000-000000000407',(select effective_scope_manifest->'lciaMethods' from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'));
 
 update private.worker_jobs
 set status='running',lease_token=gen_random_uuid(),lease_expires_at=now()+interval '10 minutes',started_at=coalesce(started_at,now())
@@ -858,7 +911,7 @@ select is(private.cmd_lcia_result_package_mark_ready(
   'closure-e2e-package-tampered-methods',
   (select snapshot_id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),
   'c7220000-0000-4000-8000-000000000401',null,
-  '{}'::jsonb,'{}'::jsonb,'{}'::jsonb,jsonb_build_array('climate-change'),'climate-change','tampered-methods','{}'::jsonb
+  '{}'::jsonb,'{}'::jsonb,pg_temp.worker339_result_manifest('c7220000-0000-4000-8000-000000000401'),jsonb_build_array('c7220000-0000-4000-8000-000000000021'),'c7220000-0000-4000-8000-000000000021',repeat('c',64),'{}'::jsonb
 )->>'code','closure_certificate_binding_mismatch','mark_ready rechecks and rejects a tampered LCIA method axis');
 update private.worker_jobs
 set payload_json=jsonb_set(
@@ -879,7 +932,7 @@ from (
     (select snapshot_id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),
     'c7220000-0000-4000-8000-000000000401',
     'c7220000-0000-4000-8000-000000000402',
-    '{}'::jsonb,'{}'::jsonb,jsonb_build_object('persistenceMode','pinned'),jsonb_build_array('climate-change'),'climate-change','closure-e2e-package-result','{}'::jsonb
+    '{}'::jsonb,'{}'::jsonb,pg_temp.worker339_result_manifest('c7220000-0000-4000-8000-000000000401',jsonb_build_object('persistenceMode','pinned')),jsonb_build_array('c7220000-0000-4000-8000-000000000021'),'c7220000-0000-4000-8000-000000000021',repeat('c',64),'{}'::jsonb
   ) r
 ) q;
 select ok((
@@ -899,7 +952,7 @@ from (
     (select snapshot_id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-b'),
     'c7220000-0000-4000-8000-000000000404',
     null,
-    '{}'::jsonb,'{}'::jsonb,jsonb_build_object('persistenceMode','pinned'),jsonb_build_array('climate-change'),'climate-change','closure-e2e-package-reused-result','{}'::jsonb
+    '{}'::jsonb,'{}'::jsonb,pg_temp.worker339_result_manifest('c7220000-0000-4000-8000-000000000404',jsonb_build_object('persistenceMode','pinned')),jsonb_build_array('c7220000-0000-4000-8000-000000000021'),'c7220000-0000-4000-8000-000000000021',repeat('e',64),'{}'::jsonb
   ) r
 ) q;
 select ok((
@@ -917,8 +970,8 @@ select is(private.cmd_lcia_result_package_mark_ready(
   (select id from private.worker_jobs where subject_id=(select id from closure_build_ids where label='build-b')),
   'closure-e2e-package-wrong-snapshot',
   'c7220000-0000-4000-8000-000000000302',
-  'c7220000-0000-4000-8000-000000000401',
-  null,'{}'::jsonb,'{}'::jsonb,'{}'::jsonb,jsonb_build_array('climate-change'),'climate-change','wrong-snapshot','{}'::jsonb
+  'c7220000-0000-4000-8000-000000000407',
+  null,'{}'::jsonb,'{}'::jsonb,pg_temp.worker339_result_manifest('c7220000-0000-4000-8000-000000000407'),jsonb_build_array('c7220000-0000-4000-8000-000000000021'),'c7220000-0000-4000-8000-000000000021',repeat('c',64),'{}'::jsonb
 )->>'code','closure_certificate_binding_mismatch','mark_ready fails closed when a build supplies a snapshot other than its certificate snapshot');
 update private.worker_jobs
 set payload_json=jsonb_set(payload_json,'{snapshot_hash}','"tampered-snapshot-hash"'::jsonb)
@@ -928,7 +981,7 @@ select is(private.cmd_lcia_result_package_mark_ready(
   'closure-e2e-package-tampered-hash',
   (select snapshot_id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),
   'c7220000-0000-4000-8000-000000000401',
-  null,'{}'::jsonb,'{}'::jsonb,'{}'::jsonb,jsonb_build_array('climate-change'),'climate-change','tampered-snapshot-hash','{}'::jsonb
+  null,'{}'::jsonb,'{}'::jsonb,pg_temp.worker339_result_manifest('c7220000-0000-4000-8000-000000000401'),jsonb_build_array('c7220000-0000-4000-8000-000000000021'),'c7220000-0000-4000-8000-000000000021',repeat('c',64),'{}'::jsonb
 )->>'code','closure_certificate_binding_mismatch','mark_ready fails closed when the queued certificate snapshot hash is tampered');
 
 -- The global Task Center consumes the server projection.  Assert a true
@@ -1000,14 +1053,50 @@ values (
   '{}'::jsonb,'{}'::jsonb,'s3://test/closure-e2e-revoked-result.json',repeat('e',64),64,'application/json',
   (select id from private.worker_jobs where subject_id=(select id from closure_build_ids where label='build-revoked')),false
 );
+select pg_temp.worker339_bind_current_result('c7220000-0000-4000-8000-000000000403',(select effective_scope_manifest->'lciaMethods' from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'));
+create temporary table worker339_payload_observer(reject_updates boolean,updates integer);
+insert into worker339_payload_observer values(true,0);
+create or replace function pg_temp.worker339_observe_payload_update() returns trigger language plpgsql as $$ begin
+  if new.subject_id in (select id from pg_temp.closure_build_ids where label in ('build-revoked','build-revoked-partial-fallback')) then
+    if (select reject_updates from pg_temp.worker339_payload_observer) then raise exception 'complete revoked callback unexpectedly attempted a payload UPDATE'; end if;
+    update pg_temp.worker339_payload_observer set updates=updates+1;
+  end if;
+  return new;
+end $$;
+create trigger aaa_worker339_observe_payload before update of payload_json on private.worker_jobs for each row execute function pg_temp.worker339_observe_payload_update();
+create temporary table worker339_complete_revoked_before as select to_jsonb(j) body from private.worker_jobs j where subject_id=(select id from closure_build_ids where label='build-revoked');
 select is(private.cmd_lcia_result_package_mark_ready(
   (select id from private.worker_jobs where subject_id=(select id from closure_build_ids where label='build-revoked')),
   'closure-e2e-package-revoked',
   (select snapshot_id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),
   'c7220000-0000-4000-8000-000000000403',null,
-  '{}'::jsonb,'{}'::jsonb,'{}'::jsonb,'[]'::jsonb,null,'revoked-result','{}'::jsonb
+  '{}'::jsonb,'{}'::jsonb,pg_temp.worker339_result_manifest('c7220000-0000-4000-8000-000000000403'),'[]'::jsonb,null,repeat('e',64),'{}'::jsonb
 )->>'code','closure_check_revoked','mark_ready rejects a certificate revoked after the build acquired its lease');
 select is((select count(*) from private.lcia_result_packages where package_version='closure-e2e-package-revoked'),0::bigint,'revocation-before-ready inserts no package row');
+select is((select updates from worker339_payload_observer),0,'complete revoked V2 callback causes no payload-trigger side effects');
+select is((select to_jsonb(j) from private.worker_jobs j where subject_id=(select id from closure_build_ids where label='build-revoked')),(select body from worker339_complete_revoked_before),'complete revoked V2 callback preserves the entire job row');
+update worker339_payload_observer set reject_updates=false;
+-- The partial vectors keep the same frozen method axis, with its one category
+-- explicitly unavailable. A requested unavailable fallback may never commit.
+insert into private.lca_results(id,job_id,snapshot_id,diagnostics,artifact_url,artifact_sha256,artifact_byte_size,artifact_format,worker_job_id)
+select 'c7220000-0000-4000-8000-000000000408',id,(select snapshot_id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),'{}','s3://test/partial-revoked-result.json',repeat('e',64),64,'application/json',id
+from private.worker_jobs where subject_id=(select id from closure_build_ids where label='build-revoked-partial-fallback');
+select pg_temp.worker339_bind_current_result('c7220000-0000-4000-8000-000000000408',(select effective_scope_manifest->'lciaMethods' from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'));
+create temporary table worker339_unavailable_receipt as select jsonb_set(jsonb_set(jsonb_set(diagnostics->'lcia_availability','{completeness}','"unavailable"'),'{categories,0,status}','"unavailable"'),'{categories,0,reasons}','["lcia_factor_location_semantics_unresolved"]') receipt from private.lca_results where id='c7220000-0000-4000-8000-000000000408';
+update private.lca_network_snapshots set process_filter=jsonb_set(process_filter,'{lcia_availability}',(select receipt from worker339_unavailable_receipt)) where id=(select snapshot_id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a');
+update private.lca_results set diagnostics=jsonb_set(jsonb_set(diagnostics,'{lcia_availability}',(select receipt from worker339_unavailable_receipt)),'{calculation_bundle,schemaVersion}','"tiangong.calculation-bundle.v3"') where id in ('c7220000-0000-4000-8000-000000000403','c7220000-0000-4000-8000-000000000408');
+create temporary table worker339_partial_revoked_before as select id,to_jsonb(j) body from private.worker_jobs j where subject_id in (select id from closure_build_ids where label in ('build-revoked','build-revoked-partial-fallback'));
+select ok((private.cmd_lcia_result_package_mark_ready(
+  (select id from private.worker_jobs where subject_id=(select id from closure_build_ids where label='build-revoked')),'partial-revoked-no-fallback',
+  (select snapshot_id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),'c7220000-0000-4000-8000-000000000403',null,'{}','{}',pg_temp.worker339_result_manifest('c7220000-0000-4000-8000-000000000403'),'[]',null,repeat('e',64),'{}')->>'ok')::boolean is false,'partial V2 without fallback fails closed under revocation');
+select ok((private.cmd_lcia_result_package_mark_ready(
+  (select id from private.worker_jobs where subject_id=(select id from closure_build_ids where label='build-revoked-partial-fallback')),'partial-revoked-with-fallback',
+  (select snapshot_id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-a'),'c7220000-0000-4000-8000-000000000408',null,'{}','{}',pg_temp.worker339_result_manifest('c7220000-0000-4000-8000-000000000408'),'[]',null,repeat('e',64),'{}')->>'ok')::boolean is false,'partial V2 with fallback fails closed under revocation');
+select is((select count(*) from private.lcia_result_packages where package_version in ('partial-revoked-no-fallback','partial-revoked-with-fallback')),0::bigint,'neither revoked partial vector inserts a package');
+select ok(not exists(select 1 from worker339_partial_revoked_before b join private.worker_jobs j using(id) where to_jsonb(j) is distinct from b.body),'partial revoked callbacks preserve both complete original job rows');
+select is((select updates from worker339_payload_observer),0,'failed partial default suppression leaves no hidden trigger mutation');
+drop trigger aaa_worker339_observe_payload on private.worker_jobs;
+
 update private.worker_jobs set status='stale',updated_at=clock_timestamp()
 where id=(select worker_job_id from private.lcia_scope_closure_checks where request_idempotency_token='closure-e2e-b');
 select set_config('request.jwt.claim.role','authenticated',true);

@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(26);
+select plan(29);
 
 select is(
   (
@@ -89,7 +89,8 @@ select is(
   -- Database #828 adds the owner-only bounded AI deadline expiry helper.
   -- Database #838 adds six pure matcher/validation and private display reader helpers.
   -- Two Model-only invoker kernels preserve the existing raw RLS boundary.
-  608::bigint,
+  -- Worker #339 adds nine applicability/readiness helpers and retains one owner-only predecessor.
+  618::bigint,
   'Twenty-five navigation helpers plus: private contains the active helpers, including the Open Data filter and three dataset display helpers, the reviewer Contact reference-readiness helper, the review rejection-reason extractor, rejected-report exact-reference matcher, submitted-decision sync helper and shared reviewer workload classifier, the twenty-five exact-version, thirteen composite-name and one review-search internals, two partial-import helpers, two whole-package helpers, the example write guard, the two state-120 candidate-cache helpers, the state-120 lifecycle guard, the seven manager-attested Result publication helpers, the nineteen versioned v2 Time-alias helpers (four exact-numeric, ten leaf/derivation helpers, the guarded v2 batch executor, the plan key set, the six-key derivative-target checker, the guarded v2 plan executor and the deterministic derivative-chunk partition), and the eight closed Length*time profile helpers (the closed discriminator, the plan key set, the factor constant, the exact multiply, the instance rewrite, the guarded Length*time executor, the null-safe required-scalar check and the null-safe required-count check), the two Database #689 batch queue-cache helpers (the dispatch-body candidate-id extractor and the per-batch queue cache builder), the Database #703 internal derivative scheduler picker, and the Database #828 owner-only AI deadline expiry helper'
 );
 
@@ -132,7 +133,8 @@ select is(
       and namespace.nspname in ('api', 'private', 'public', 'util')
   ),
   -- Database #807 adds 15 display synchronization triggers; legacy inventory remains included.
-  146::bigint,
+  -- Worker #339 adds five exact applicability/completeness triggers.
+  151::bigint,
   'Two private navigation writers and one seed guard plus: all active application triggers and two Process composite-name sync triggers plus seven example write guards remain present, including the review submitted-decision sync trigger, the Result lifecycle guard and the append-only Result guard and seven dataset display source-cleanup triggers'
 );
 
@@ -372,6 +374,46 @@ select lives_ok(
 );
 
 reset role;
+
+
+create temporary table worker339_expected_functions(identity text primary key,security_definer boolean,service_callable boolean) on commit drop;
+insert into worker339_expected_functions values
+('private.lcia_category_availability_valid_v1(jsonb,boolean)',false,false),
+('private.lcia_registered_result_availability_v1(uuid,uuid,boolean)',true,false),
+('private.lcia_package_availability_valid_v1(uuid,boolean)',true,false),
+('private.lcia_package_category_availability_guard_v1()',true,false),
+('private.lcia_public_category_completeness_guard_v1()',true,false),
+('private.lcia_package_mark_ready_before_category_availability_v1(uuid,text,uuid,uuid,uuid,jsonb,jsonb,jsonb,jsonb,text,text,jsonb)',true,false),
+('private.lcia_partial_package_request_hash_v1(private.worker_jobs)',false,false),
+('private.lcia_partial_package_binding_valid_v1(uuid,uuid)',true,false),
+('private.svc_lcia_result_package_ready_readback_v1(uuid,uuid)',true,true),
+('private.svc_lcia_result_package_partial_mark_ready_v1(uuid,uuid,text,uuid,uuid,uuid,jsonb,jsonb,jsonb,jsonb,text,text,jsonb)',true,true);
+select ok((select count(*)=10 and bool_and(coalesce(p.proowner='postgres'::regrole and p.prosecdef=e.security_definer and
+  case when p.proname='lcia_package_mark_ready_before_category_availability_v1'
+    then p.proconfig @> array['search_path=private, api, public, util, extensions, pg_temp']
+    else p.proconfig @> array['search_path=""'] end,false))
+  from worker339_expected_functions e join pg_proc p on p.oid=to_regprocedure(e.identity)),
+  'all ten named LCIA helpers have their exact identities, owners, definer modes and trusted search paths');
+select ok((select count(*)=10 and bool_and(not has_function_privilege('anon',p.oid,'execute')
+  and not has_function_privilege('authenticated',p.oid,'execute')
+  and not has_function_privilege('api_internal_executor',p.oid,'execute')
+  and has_function_privilege('service_role',p.oid,'execute')=e.service_callable
+  and not exists(select 1 from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a where a.grantee=0 and a.privilege_type='EXECUTE'))
+  from worker339_expected_functions e join pg_proc p on p.oid=to_regprocedure(e.identity))
+  and has_function_privilege('service_role','private.cmd_lcia_result_package_mark_ready(uuid,text,uuid,uuid,uuid,jsonb,jsonb,jsonb,jsonb,text,text,jsonb)','execute')
+  and has_function_privilege('api_internal_executor','private.cmd_lcia_result_package_mark_ready(uuid,text,uuid,uuid,uuid,jsonb,jsonb,jsonb,jsonb,text,text,jsonb)','execute'),
+  'new internal predicates/predecessor remain owner-only, leased facades stay service-only and the V2 signature keeps its established service/internal ACL');
+select is((select count(*) from (values
+  ('private.lcia_result_packages','lcia_result_packages_category_availability_v1',7,'private.lcia_package_category_availability_guard_v1()'),
+  ('private.portal_lcia_projection_headers','portal_lcia_projection_category_completeness_v1',23,'private.lcia_public_category_completeness_guard_v1()'),
+  ('private.lcia_result_publications','lcia_result_publications_category_completeness_v1',23,'private.lcia_public_category_completeness_guard_v1()'),
+  ('private.portal_lcia_projection_publications','portal_lcia_publications_category_completeness_v1',23,'private.lcia_public_category_completeness_guard_v1()'),
+  ('private.lca_release_runs','lca_release_category_completeness_v1',23,'private.lcia_public_category_completeness_guard_v1()')
+) e(relation_name,trigger_name,type_bits,function_name) join pg_trigger t
+  on t.tgrelid=to_regclass(e.relation_name) and t.tgname=e.trigger_name
+  and t.tgtype=e.type_bits and t.tgfoid=to_regprocedure(e.function_name)
+  and t.tgenabled='O' and t.tgnargs=0 and not t.tgisinternal),5::bigint,
+  'the five named LCIA triggers retain exact table, event/timing, function and enabled bindings');
 
 select * from finish();
 
