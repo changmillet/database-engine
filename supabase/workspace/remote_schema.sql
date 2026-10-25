@@ -12087,6 +12087,8 @@ CREATE OR REPLACE FUNCTION "api"."cmd_lcia_scope_closure_check_request_v2"("p_re
     AS $$
 declare
   v_actor uuid := auth.uid();
+  v_calculation_fingerprint text;
+  v_payload_hash text := private.lcia_scope_closure_sha256(p_requested_scope);
   v_scope jsonb;
   v_policy jsonb;
   v_requested_scope_hash text;
@@ -12122,6 +12124,25 @@ begin
       'invalid_closure_request', 400, 'Idempotency token is required'
     );
   end if;
+
+  -- A retry is the original operation, even after a new calculation contract activates.
+  perform pg_advisory_xact_lock(hashtextextended(v_actor::text || ':' || trim(p_request_idempotency_token), 873));
+  select * into v_check from private.lcia_scope_closure_checks
+    where requested_by=v_actor and request_idempotency_token=trim(p_request_idempotency_token)
+    order by created_at, id limit 1 for update;
+  if v_check.id is not null then
+    if v_check.request_payload_hash is not null and v_check.request_payload_hash is distinct from v_payload_hash then
+      return api.lcia_scope_closure_error('idempotency_payload_conflict',409,'Idempotency token belongs to another request');
+    end if;
+    select * into v_job from private.worker_jobs where id=v_check.worker_job_id;
+    return jsonb_build_object('ok',true,'data',jsonb_build_object(
+      'closureCheckId',v_check.id,'requestedScopeHash',v_check.requested_scope_hash,
+      'policyFingerprint',v_check.policy_fingerprint,'dataSnapshotToken',v_check.data_snapshot_token,
+      'scanExecutionId',v_check.scan_execution_id,'calculationFingerprint',v_check.calculation_fingerprint,
+      'workerJob',private.worker_job_payload(v_job,false),'reused',true));
+  end if;
+  select fingerprint into v_calculation_fingerprint
+    from private.lca_active_calculation_contract where singleton for share;
 
   v_scope := private.lcia_scope_closure_normalize_request(p_requested_scope);
 
@@ -12291,7 +12312,8 @@ begin
 
   v_request_fingerprint := encode(extensions.digest(
     v_requested_scope_hash || '|' || v_policy_fingerprint || '|'
-      || v_expected_validator || '|' || v_snapshot_token,
+      || v_expected_validator || '|' || v_snapshot_token
+      || case when v_calculation_fingerprint is null then '' else '|calculation:' || v_calculation_fingerprint end,
     'sha256'
   ), 'hex');
   v_request_key := encode(extensions.digest(
@@ -12369,10 +12391,13 @@ begin
       policy_fingerprint = v_policy_fingerprint,
       request_fingerprint = v_request_fingerprint,
       request_key = v_request_key,
+      calculation_fingerprint = v_calculation_fingerprint,
+      request_payload_hash = v_payload_hash,
       updated_at = now()
   where id = v_check.id
   returning * into v_check;
 
+  perform pg_advisory_xact_lock(hashtextextended(v_request_fingerprint, 873));
   select *
   into v_execution
   from private.lcia_scope_closure_scan_executions
@@ -12384,13 +12409,15 @@ begin
       requested_scope_hash,
       policy_fingerprint,
       data_snapshot_token,
-      validator_scanner_fingerprint
+      validator_scanner_fingerprint,
+      calculation_fingerprint
     ) values (
       v_request_fingerprint,
       v_requested_scope_hash,
       v_policy_fingerprint,
       v_snapshot_token,
-      v_expected_validator
+      v_expected_validator,
+      v_calculation_fingerprint
     )
     returning * into v_execution;
   end if;
@@ -12417,6 +12444,7 @@ begin
           ),
         'lcia_method_set', v_scope->'lciaMethods',
         'request_fingerprint', v_request_fingerprint,
+        'calculation_fingerprint', v_calculation_fingerprint,
         'scan_execution_id', v_execution.id,
         'data_snapshot_token', v_snapshot_token
       ),
@@ -12432,6 +12460,7 @@ begin
       'policyFingerprint', v_check.policy_fingerprint,
       'dataSnapshotToken', v_snapshot_token,
       'scanExecutionId', v_execution.id,
+      'calculationFingerprint', v_calculation_fingerprint,
       'workerJob', private.worker_job_payload(v_job, false),
       'reused', false
     )
@@ -32611,6 +32640,7 @@ CREATE OR REPLACE FUNCTION "api"."svc_lca_snapshot_build_enqueue"("p_scope" "tex
     SET "search_path" TO ''
     AS $$
 declare
+  v_calculation_fingerprint text;
   v_scope text := lower(btrim(coalesce(p_scope, '')));
   v_request_key text := nullif(btrim(p_request_key), '');
   v_concurrency_key text;
@@ -32629,6 +32659,11 @@ begin
     return jsonb_build_object('ok', false, 'code', 'INVALID_PROCESS_FILTER', 'status', 400);
   end if;
 
+  select fingerprint into v_calculation_fingerprint
+    from private.lca_active_calculation_contract where singleton for share;
+  if v_calculation_fingerprint is not null then
+    v_request_key := encode(extensions.digest(v_request_key || '|calculation:' || v_calculation_fingerprint, 'sha256'), 'hex');
+  end if;
   v_concurrency_key := 'lca.build_snapshot:' || v_scope || ':' || v_request_key;
   perform pg_advisory_xact_lock(hashtextextended(v_concurrency_key, 0));
 
@@ -32678,6 +32713,7 @@ begin
     p_job_kind => 'lca.build_snapshot',
     p_payload_json => coalesce(p_payload, '{}'::jsonb) || jsonb_build_object(
       'job_id', p_job_id, 'snapshot_id', p_snapshot_id, 'scope', v_scope,
+      'calculation_fingerprint', v_calculation_fingerprint,
       'process_filter', coalesce(p_process_filter, '{}'::jsonb)
     ),
     p_payload_schema_version => p_payload_schema_version,
@@ -32737,16 +32773,20 @@ declare
   v_scope text := lower(btrim(coalesce(p_scope, '')));
   v_limit integer := greatest(1, least(coalesce(p_limit, 100), 100));
   v_rows jsonb;
+  v_calculation_fingerprint text;
 begin
   if v_scope not in ('full_library', 'data_product') then
     return jsonb_build_object('ok', false, 'code', 'INVALID_LCA_SCOPE', 'status', 400);
   end if;
+
+  select fingerprint into v_calculation_fingerprint from private.lca_active_calculation_contract where singleton;
 
   with candidates as (
     select
       snapshot.id,
       snapshot.scope,
       snapshot.process_filter,
+      (v_calculation_fingerprint is null or coalesce(snapshot.process_filter->>'calculation_fingerprint' = v_calculation_fingerprint, false)) as calculation_current,
       snapshot.source_hash,
       snapshot.created_at,
       artifact.id as artifact_id,
@@ -32787,6 +32827,7 @@ begin
         )
       )
     order by
+      calculation_current desc,
       case when p_snapshot_id is not null then 0 when active.snapshot_id is not null then 0 else 1 end,
       snapshot.created_at desc,
       snapshot.id
@@ -32799,6 +32840,7 @@ begin
     'sourceHash', source_hash,
     'createdAt', created_at,
     'isActive', is_active,
+    'calculationCurrent', calculation_current,
     'artifact', jsonb_build_object(
       'artifactId', artifact_id,
       'artifactUrl', artifact_url,
@@ -65764,6 +65806,18 @@ COMMENT ON FUNCTION "private"."hybrid_search_simple_dataset_v2"("p_table" "regcl
 
 
 
+CREATE OR REPLACE FUNCTION "private"."lca_calculation_contract_is_current"("p_fingerprint" "text") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select fingerprint is null or fingerprint is not distinct from p_fingerprint
+  from private.lca_active_calculation_contract where singleton;
+$$;
+
+
+ALTER FUNCTION "private"."lca_calculation_contract_is_current"("p_fingerprint" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "private"."lca_enqueue_job"("p_queue_name" "text", "p_message" "jsonb") RETURNS bigint
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'private', 'api', 'public', 'util', 'extensions', 'pg_temp'
@@ -66750,6 +66804,8 @@ CREATE TABLE IF NOT EXISTS "private"."lcia_scope_closure_checks" (
     "complete_machine_result_artifact_id" "uuid",
     "valid_until" timestamp with time zone,
     "result_set_id" "uuid",
+    "calculation_fingerprint" "text",
+    "request_payload_hash" "text",
     CONSTRAINT "lcia_scope_closure_checks_certificate_check" CHECK (("certificate_status" = ANY (ARRAY['pending'::"text", 'valid'::"text", 'stale'::"text", 'revoked'::"text", 'unavailable'::"text"]))),
     CONSTRAINT "lcia_scope_closure_checks_completeness_check" CHECK ((("scan_completeness" IS NULL) OR ("scan_completeness" = ANY (ARRAY['complete'::"text", 'incomplete'::"text", 'unknown'::"text"])))),
     CONSTRAINT "lcia_scope_closure_checks_effective_scope_manifest_check" CHECK ((("effective_scope_manifest" IS NULL) OR ("jsonb_typeof"("effective_scope_manifest") = 'object'::"text"))),
@@ -81461,6 +81517,40 @@ $$;
 ALTER FUNCTION "private"."sources_sync_jsonb_version"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "private"."svc_lca_calculation_contract_activate"("p_descriptor" "text", "p_expected_fingerprint" "text") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare v_current text; v_fingerprint text;
+begin
+  if not coalesce(util.is_service_request(), false) then
+    return jsonb_build_object('ok', false, 'code', 'SERVICE_ROLE_REQUIRED');
+  end if;
+  if p_descriptor is null or octet_length(p_descriptor) not between 2 and 16384
+     or jsonb_typeof(p_descriptor::jsonb) <> 'object' then
+    return jsonb_build_object('ok', false, 'code', 'INVALID_CALCULATION_DESCRIPTOR');
+  end if;
+  select fingerprint into v_current from private.lca_active_calculation_contract where singleton for update;
+  if v_current is distinct from p_expected_fingerprint then
+    return jsonb_build_object('ok', false, 'code', 'CALCULATION_ACTIVATION_CONFLICT', 'currentFingerprint', v_current);
+  end if;
+  v_fingerprint := encode(extensions.digest(p_descriptor, 'sha256'), 'hex');
+  insert into private.lca_calculation_contracts(fingerprint, descriptor) values (v_fingerprint, p_descriptor)
+    on conflict (fingerprint) do nothing;
+  if not exists (select 1 from private.lca_calculation_contracts where fingerprint=v_fingerprint and descriptor=p_descriptor) then
+    raise exception 'calculation_contract_identity_conflict';
+  end if;
+  update private.lca_active_calculation_contract set fingerprint=v_fingerprint, updated_at=now() where singleton;
+  return jsonb_build_object('ok', true, 'fingerprint', v_fingerprint);
+exception when invalid_text_representation then
+  return jsonb_build_object('ok', false, 'code', 'INVALID_CALCULATION_DESCRIPTOR');
+end;
+$$;
+
+
+ALTER FUNCTION "private"."svc_lca_calculation_contract_activate"("p_descriptor" "text", "p_expected_fingerprint" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "private"."svc_lcia_document_validation_evidence_lookup"("p_cache_keys" "jsonb") RETURNS "jsonb"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'private', 'api', 'public', 'util', 'extensions', 'pg_temp'
@@ -84244,7 +84334,8 @@ begin
     'publicationEpoch', v_data_snapshot.publication_epoch,
     'expectedValidatorScannerFingerprint', v_check.expected_validator_scanner_fingerprint,
     'requestFingerprint', v_check.request_fingerprint
-  ));
+  ) || case when v_check.calculation_fingerprint is null then '{}'::jsonb
+    else jsonb_build_object('calculationFingerprint', v_check.calculation_fingerprint) end);
 end;
 $$;
 
@@ -99057,6 +99148,17 @@ CREATE TABLE IF NOT EXISTS "private"."identity_center_users" (
 ALTER TABLE "private"."identity_center_users" OWNER TO "postgres";
 
 
+CREATE TABLE IF NOT EXISTS "private"."lca_active_calculation_contract" (
+    "singleton" boolean DEFAULT true NOT NULL,
+    "fingerprint" "text",
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "lca_active_calculation_contract_singleton_check" CHECK ("singleton")
+);
+
+
+ALTER TABLE "private"."lca_active_calculation_contract" OWNER TO "postgres";
+
+
 CREATE TABLE IF NOT EXISTS "private"."lca_active_snapshots" (
     "scope" "text" NOT NULL,
     "snapshot_id" "uuid" NOT NULL,
@@ -99068,6 +99170,20 @@ CREATE TABLE IF NOT EXISTS "private"."lca_active_snapshots" (
 
 
 ALTER TABLE "private"."lca_active_snapshots" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "private"."lca_calculation_contracts" (
+    "fingerprint" "text" NOT NULL,
+    "descriptor" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "lca_calculation_contracts_descriptor_check" CHECK ((("octet_length"("descriptor") >= 2) AND ("octet_length"("descriptor") <= 16384))),
+    CONSTRAINT "lca_calculation_contracts_fingerprint_check" CHECK (("fingerprint" ~ '^[0-9a-f]{64}$'::"text")),
+    CONSTRAINT "lca_calculation_descriptor_hash" CHECK (("fingerprint" = "encode"("extensions"."digest"("descriptor", 'sha256'::"text"), 'hex'::"text"))),
+    CONSTRAINT "lca_calculation_descriptor_object" CHECK (("jsonb_typeof"(("descriptor")::"jsonb") = 'object'::"text"))
+);
+
+
+ALTER TABLE "private"."lca_calculation_contracts" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "private"."lca_network_snapshots" (
@@ -99770,6 +99886,7 @@ CREATE TABLE IF NOT EXISTS "private"."lcia_scope_closure_scan_executions" (
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "completed_at" timestamp with time zone,
     "numerical_snapshot_id" "uuid" NOT NULL,
+    "calculation_fingerprint" "text",
     CONSTRAINT "lcia_scope_closure_scan_executions_check" CHECK ((("status" = 'running'::"text") = (("lease_token" IS NOT NULL) AND ("leased_by_job_id" IS NOT NULL) AND ("lease_expires_at" IS NOT NULL)))),
     CONSTRAINT "lcia_scope_closure_scan_executions_status_check" CHECK (("status" = ANY (ARRAY['queued'::"text", 'running'::"text", 'completed'::"text", 'failed'::"text"])))
 );
@@ -101786,8 +101903,18 @@ ALTER TABLE ONLY "private"."identity_center_users"
 
 
 
+ALTER TABLE ONLY "private"."lca_active_calculation_contract"
+    ADD CONSTRAINT "lca_active_calculation_contract_pkey" PRIMARY KEY ("singleton");
+
+
+
 ALTER TABLE ONLY "private"."lca_active_snapshots"
     ADD CONSTRAINT "lca_active_snapshots_pkey" PRIMARY KEY ("scope");
+
+
+
+ALTER TABLE ONLY "private"."lca_calculation_contracts"
+    ADD CONSTRAINT "lca_calculation_contracts_pkey" PRIMARY KEY ("fingerprint");
 
 
 
@@ -103064,6 +103191,14 @@ CREATE INDEX "lcia_scope_closure_certificate_events_check_created_idx" ON "priva
 
 
 
+CREATE INDEX "lcia_scope_closure_checks_actor_token_idx" ON "private"."lcia_scope_closure_checks" USING "btree" ("requested_by", "request_idempotency_token", "created_at", "id");
+
+
+
+CREATE INDEX "lcia_scope_closure_checks_calculation_idx" ON "private"."lcia_scope_closure_checks" USING "btree" ("calculation_fingerprint") WHERE ("calculation_fingerprint" IS NOT NULL);
+
+
+
 CREATE INDEX "lcia_scope_closure_checks_closure_bundle_artifact_idx" ON "private"."lcia_scope_closure_checks" USING "btree" ("closure_bundle_artifact_id") WHERE ("closure_bundle_artifact_id" IS NOT NULL);
 
 
@@ -103109,6 +103244,10 @@ CREATE INDEX "lcia_scope_closure_issue_occurrences_issue_idx" ON "private"."lcia
 
 
 CREATE INDEX "lcia_scope_closure_issues_check_id_idx" ON "private"."lcia_scope_closure_issues" USING "btree" ("closure_check_id", "severity", "issue_code", "id");
+
+
+
+CREATE INDEX "lcia_scope_closure_scan_calculation_idx" ON "private"."lcia_scope_closure_scan_executions" USING "btree" ("calculation_fingerprint") WHERE ("calculation_fingerprint" IS NOT NULL);
 
 
 
@@ -104746,6 +104885,11 @@ ALTER TABLE ONLY "private"."identity_center_users"
 
 
 
+ALTER TABLE ONLY "private"."lca_active_calculation_contract"
+    ADD CONSTRAINT "lca_active_calculation_contract_fingerprint_fkey" FOREIGN KEY ("fingerprint") REFERENCES "private"."lca_calculation_contracts"("fingerprint");
+
+
+
 ALTER TABLE ONLY "private"."lca_active_snapshots"
     ADD CONSTRAINT "lca_active_snapshots_snapshot_fk" FOREIGN KEY ("snapshot_id") REFERENCES "private"."lca_network_snapshots"("id") ON DELETE RESTRICT;
 
@@ -104937,6 +105081,11 @@ ALTER TABLE ONLY "private"."lcia_scope_closure_certificate_events"
 
 
 ALTER TABLE ONLY "private"."lcia_scope_closure_checks"
+    ADD CONSTRAINT "lcia_scope_closure_checks_calculation_fingerprint_fkey" FOREIGN KEY ("calculation_fingerprint") REFERENCES "private"."lca_calculation_contracts"("fingerprint");
+
+
+
+ALTER TABLE ONLY "private"."lcia_scope_closure_checks"
     ADD CONSTRAINT "lcia_scope_closure_checks_closure_bundle_artifact_fkey" FOREIGN KEY ("closure_bundle_artifact_id") REFERENCES "private"."worker_job_artifacts"("id") ON DELETE RESTRICT NOT VALID;
 
 
@@ -104983,6 +105132,11 @@ ALTER TABLE ONLY "private"."lcia_scope_closure_issues"
 
 ALTER TABLE ONLY "private"."lcia_scope_closure_retention_summaries"
     ADD CONSTRAINT "lcia_scope_closure_retention_summaries_closure_check_id_fkey" FOREIGN KEY ("closure_check_id") REFERENCES "private"."lcia_scope_closure_checks"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "private"."lcia_scope_closure_scan_executions"
+    ADD CONSTRAINT "lcia_scope_closure_scan_executions_calculation_fingerprint_fkey" FOREIGN KEY ("calculation_fingerprint") REFERENCES "private"."lca_calculation_contracts"("fingerprint");
 
 
 
@@ -105398,11 +105552,17 @@ CREATE POLICY "insert by authenticated" ON "private"."teams" FOR INSERT TO "auth
 
 
 
+ALTER TABLE "private"."lca_active_calculation_contract" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "private"."lca_active_snapshots" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "lca_active_snapshots_service_role_all" ON "private"."lca_active_snapshots" TO "service_role" USING (true) WITH CHECK (true);
 
+
+
+ALTER TABLE "private"."lca_calculation_contracts" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "private"."lca_factorization_registry" ENABLE ROW LEVEL SECURITY;
@@ -109762,6 +109922,12 @@ GRANT ALL ON FUNCTION "private"."hybrid_search_simple_dataset_v2"("p_table" "reg
 
 
 
+REVOKE ALL ON FUNCTION "private"."lca_calculation_contract_is_current"("p_fingerprint" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "private"."lca_calculation_contract_is_current"("p_fingerprint" "text") TO "service_role";
+GRANT ALL ON FUNCTION "private"."lca_calculation_contract_is_current"("p_fingerprint" "text") TO "api_internal_executor";
+
+
+
 REVOKE ALL ON FUNCTION "private"."lca_enqueue_job"("p_queue_name" "text", "p_message" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."lca_enqueue_job"("p_queue_name" "text", "p_message" "jsonb") TO "service_role";
 GRANT ALL ON FUNCTION "private"."lca_enqueue_job"("p_queue_name" "text", "p_message" "jsonb") TO "api_internal_executor";
@@ -110861,6 +111027,11 @@ GRANT ALL ON FUNCTION "private"."semantic_simple_dataset_search"("p_table" "regc
 REVOKE ALL ON FUNCTION "private"."sources_sync_jsonb_version"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "private"."sources_sync_jsonb_version"() TO "service_role";
 GRANT ALL ON FUNCTION "private"."sources_sync_jsonb_version"() TO "api_internal_executor";
+
+
+
+REVOKE ALL ON FUNCTION "private"."svc_lca_calculation_contract_activate"("p_descriptor" "text", "p_expected_fingerprint" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "private"."svc_lca_calculation_contract_activate"("p_descriptor" "text", "p_expected_fingerprint" "text") TO "service_role";
 
 
 

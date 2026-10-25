@@ -3,6 +3,7 @@ CREATE OR REPLACE FUNCTION "api"."svc_lca_snapshot_build_enqueue"("p_scope" "tex
     SET "search_path" TO ''
     AS $$
 declare
+  v_calculation_fingerprint text;
   v_scope text := lower(btrim(coalesce(p_scope, '')));
   v_request_key text := nullif(btrim(p_request_key), '');
   v_concurrency_key text;
@@ -21,6 +22,11 @@ begin
     return jsonb_build_object('ok', false, 'code', 'INVALID_PROCESS_FILTER', 'status', 400);
   end if;
 
+  select fingerprint into v_calculation_fingerprint
+    from private.lca_active_calculation_contract where singleton for share;
+  if v_calculation_fingerprint is not null then
+    v_request_key := encode(extensions.digest(v_request_key || '|calculation:' || v_calculation_fingerprint, 'sha256'), 'hex');
+  end if;
   v_concurrency_key := 'lca.build_snapshot:' || v_scope || ':' || v_request_key;
   perform pg_advisory_xact_lock(hashtextextended(v_concurrency_key, 0));
 
@@ -70,6 +76,7 @@ begin
     p_job_kind => 'lca.build_snapshot',
     p_payload_json => coalesce(p_payload, '{}'::jsonb) || jsonb_build_object(
       'job_id', p_job_id, 'snapshot_id', p_snapshot_id, 'scope', v_scope,
+      'calculation_fingerprint', v_calculation_fingerprint,
       'process_filter', coalesce(p_process_filter, '{}'::jsonb)
     ),
     p_payload_schema_version => p_payload_schema_version,

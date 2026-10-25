@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS "private"."lcia_scope_closure_scan_executions" (
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "completed_at" timestamp with time zone,
     "numerical_snapshot_id" "uuid" NOT NULL,
+    "calculation_fingerprint" "text",
     CONSTRAINT "lcia_scope_closure_scan_executions_check" CHECK ((("status" = 'running'::"text") = (("lease_token" IS NOT NULL) AND ("leased_by_job_id" IS NOT NULL) AND ("lease_expires_at" IS NOT NULL)))),
     CONSTRAINT "lcia_scope_closure_scan_executions_status_check" CHECK (("status" = ANY (ARRAY['queued'::"text", 'running'::"text", 'completed'::"text", 'failed'::"text"])))
 );
@@ -34,6 +35,9 @@ ALTER TABLE ONLY "private"."lcia_scope_closure_scan_executions"
 
 ALTER TABLE ONLY "private"."lcia_scope_closure_scan_executions"
     ADD CONSTRAINT "lcia_scope_closure_scan_executions_scan_key_key" UNIQUE ("scan_key");
+
+ALTER TABLE ONLY "private"."lcia_scope_closure_scan_executions"
+    ADD CONSTRAINT "lcia_scope_closure_scan_executions_calculation_fingerprint_fkey" FOREIGN KEY ("calculation_fingerprint") REFERENCES "private"."lca_calculation_contracts"("fingerprint");
 
 ALTER TABLE ONLY "private"."lcia_scope_closure_scan_executions"
     ADD CONSTRAINT "lcia_scope_closure_scan_executions_completed_check_id_fkey" FOREIGN KEY ("completed_check_id") REFERENCES "private"."lcia_scope_closure_checks"("id") ON DELETE SET NULL;
