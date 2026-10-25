@@ -225,5 +225,44 @@ select is((select count(*) from private.lcia_result_packages where build_worker_
 select is((select to_jsonb(j) from private.worker_jobs j where id=pg_temp.case_id(5,1)),(select body from partial_rollback_before),'late failure restores the entire job row including original schema and payload');
 drop trigger z_partial_late_drift on private.lcia_result_packages;
 
+-- Complete legacy default normalization is distinct from deliberate partial
+-- NULL. Use the real certificate chain and reject even attempted payload UPDATEs.
+create function pg_temp.prepare_complete_v2(p_case integer,p_payload_default text) returns void language plpgsql as $$ begin
+  perform pg_temp.prepare_partial_v3(p_case);
+  update private.lca_network_snapshots set process_filter=jsonb_set(process_filter,'{lcia_availability}',pg_temp.availability('complete')) where id=pg_temp.case_id(p_case,3);
+  update private.lca_results set diagnostics=jsonb_set(jsonb_set(diagnostics,'{lcia_availability}',pg_temp.availability('complete')),'{calculation_bundle,schemaVersion}','"tiangong.calculation-bundle.v2"') where id=pg_temp.case_id(p_case,4);
+  update private.worker_jobs set payload_schema_version='lcia_result.package_build.request.v2',payload_json=jsonb_set(payload_json,'{default_impact_category}',coalesce(to_jsonb(p_payload_default),'null'::jsonb)) where id=pg_temp.case_id(p_case,1);
+end $$;
+select lives_ok($$select pg_temp.prepare_complete_v2(10,'  bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb  ')$$,'prepare complete V2 with a whitespace-padded available payload default');
+select lives_ok($$select pg_temp.prepare_complete_v2(11,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')$$,'prepare complete V2 empty-caller fallback control');
+select lives_ok($$select pg_temp.prepare_complete_v2(12,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')$$,'prepare complete V2 spaces-caller fallback control');
+select lives_ok($$select pg_temp.prepare_complete_v2(13,'   ')$$,'prepare complete V2 whitespace-only payload default');
+select lives_ok($$select pg_temp.prepare_complete_v2(14,'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb')$$,'prepare complete V2 explicit caller override');
+create temporary table complete_v2_request_before as select id,jsonb_build_object('payload',payload_json,'schema',payload_schema_version,'lease',lease_token,'expires',lease_expires_at) body from private.worker_jobs where id in (pg_temp.case_id(10,1),pg_temp.case_id(11,1),pg_temp.case_id(12,1),pg_temp.case_id(13,1),pg_temp.case_id(14,1));
+create function pg_temp.reject_complete_v2_payload_update() returns trigger language plpgsql as $$ begin
+  if new.id in (pg_temp.case_id(10,1),pg_temp.case_id(11,1),pg_temp.case_id(12,1),pg_temp.case_id(13,1),pg_temp.case_id(14,1)) then raise exception 'complete V2 callback attempted a payload UPDATE';end if;
+  return new;
+end $$;
+create trigger aaa_complete_v2_no_payload_update before update of payload_json on private.worker_jobs for each row execute function pg_temp.reject_complete_v2_payload_update();
+create function pg_temp.complete_v2_ready(p_case integer,p_caller_default text) returns jsonb language sql as $$
+  select private.cmd_lcia_result_package_mark_ready(j.id,'complete-v2-default-'||p_case,r.snapshot_id,r.id,a.id,
+    jsonb_build_object('artifactUrl',r.artifact_url,'artifactSha256',r.artifact_sha256,'artifactByteSize',r.artifact_byte_size,'artifactFormat',r.artifact_format),
+    jsonb_build_object('artifactUrl',a.query_artifact_url,'artifactSha256',a.query_artifact_sha256,'artifactByteSize',a.query_artifact_byte_size,'artifactFormat',a.query_artifact_format),
+    jsonb_build_object('lciaAvailability',r.diagnostics->'lcia_availability','calculationBundle',r.diagnostics->'calculation_bundle'),
+    '["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"]',p_caller_default,r.artifact_sha256,'{}')
+  from private.worker_jobs j join private.lca_results r on r.id=pg_temp.case_id(p_case,4)
+    join private.lca_latest_all_unit_results a on a.id=pg_temp.case_id(p_case,6) where j.id=pg_temp.case_id(p_case,1)
+$$;
+select is(pg_temp.complete_v2_ready(10,null)->>'ok','true','complete V2 NULL caller default preserves available normalized payload fallback');
+select is(pg_temp.complete_v2_ready(11,'')->>'ok','true','complete V2 empty caller default preserves payload fallback');
+select is(pg_temp.complete_v2_ready(12,'   ')->>'ok','true','complete V2 spaces caller default preserves payload fallback');
+select is(pg_temp.complete_v2_ready(13,null)->>'ok','true','complete V2 whitespace-only payload remains absent without inventing a first category');
+select is(pg_temp.complete_v2_ready(14,'  aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa  ')->>'ok','true','complete V2 explicit caller default is normalized and overrides payload fallback');
+select is((select count(*) from private.lcia_result_packages where build_worker_job_id in (pg_temp.case_id(10,1),pg_temp.case_id(11,1),pg_temp.case_id(12,1)) and default_impact_category='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),3::bigint,'all three complete fallback packages retain the exact normalized payload method');
+select is((select default_impact_category from private.lcia_result_packages where build_worker_job_id=pg_temp.case_id(13,1)),null::text,'whitespace-only complete fallback stays NULL');
+select is((select default_impact_category from private.lcia_result_packages where build_worker_job_id=pg_temp.case_id(14,1)),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','explicit complete caller default wins after the preserved trim rule');
+select ok(not exists(select 1 from complete_v2_request_before b join private.worker_jobs j using(id) where jsonb_build_object('payload',j.payload_json,'schema',j.payload_schema_version,'lease',j.lease_token,'expires',j.lease_expires_at) is distinct from b.body),'successful complete defaults preserve every payload/schema/lease field with no payload UPDATE');
+drop trigger aaa_complete_v2_no_payload_update on private.worker_jobs;
+
 select * from finish();
 rollback;

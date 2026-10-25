@@ -287,6 +287,7 @@ declare
   v_package private.lcia_result_packages%rowtype;
   v_package_id uuid;
   v_suppress_default boolean;
+  v_expected_default text;
 begin
   if not coalesce(util.is_service_request(), false) then
     return api.lcia_result_error('service_role_required',403,'Service role is required');
@@ -306,6 +307,12 @@ begin
   if v_receipt is null or p_artifact_manifest->'lciaAvailability' is distinct from v_receipt then
     return api.lcia_result_error('lcia_package_availability_binding_invalid',409,'Current immutable category availability is required');
   end if;
+  -- Match the preserved helper's complete-call normalization exactly. NULL
+  -- for a partial callback remains an intentional absence, never a fallback.
+  v_expected_default:=case when v_receipt->>'completeness'='complete' then coalesce(
+    nullif(trim(coalesce(p_default_impact_category,'')),''),
+    nullif(trim(coalesce(v_job.payload_json->>'default_impact_category','')),''))
+    else p_default_impact_category end;
   -- Complete legacy calls must reach their original certificate diagnostics
   -- without firing the payload-admission trigger on a no-op UPDATE.
   v_suppress_default := v_receipt->>'completeness'<>'complete'
@@ -330,7 +337,7 @@ begin
          or v_package.snapshot_id is distinct from p_snapshot_id or v_package.result_id is distinct from p_result_id
          or v_package.artifact_manifest is distinct from p_artifact_manifest
          or v_package.available_impact_categories is distinct from p_available_impact_categories
-         or v_package.default_impact_category is distinct from p_default_impact_category
+         or v_package.default_impact_category is distinct from v_expected_default
          or not private.lcia_package_availability_valid_v1(v_package.id,false) then
         raise exception 'lcia_private_package_post_insert_validation_failed' using errcode = 'P5272';
       end if;
