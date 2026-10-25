@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
-lastReviewedNote: "Database #864: reviewed serial/concurrent source-bound proof, full populated migration, rejection/rollback/repeat, committed visibility, real writers, canonical per-file suites and deterministic exports. Hosted qualification remains required."
+lastReviewedCommit: 356a06099669c7b4aa2d9261e37bc5cb33644385
+lastReviewedNote: "Database #869: reviewed 408-case upgrade boundaries, actual writer/DDL/in-flight fences, committed volume timing, nested writer WAL, 528 serial pairs and 2780 SQL assertions. Final four-client, independent review and hosted gates remain separate."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

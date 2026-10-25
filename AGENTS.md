@@ -38,8 +38,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
-lastReviewedNote: "Database #864: scoped Facets/Navigation optimization preserves exact versions, caller permissions, writers and request budgets. Main-hotfix, managed deployment, Dev synchronization and Root integration remain separate required gates."
+lastReviewedCommit: 356a06099669c7b4aa2d9261e37bc5cb33644385
+lastReviewedNote: "Database #869: native Flow CAS lookup extends the existing navigation projection/writer, preserving exact versions, Process lexical behavior, public permissions and budgets. Main-hotfix, managed delivery, Dev synchronization and Root integration remain required."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md

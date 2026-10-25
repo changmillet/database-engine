@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
-lastReviewedNote: "Database #864: reviewed narrow exact-key matching, four-way projection coverage, selective CAS/Process retention and batched Navigation target IDs; no new projection, index, writer or privilege."
+lastReviewedCommit: 356a06099669c7b4aa2d9261e37bc5cb33644385
+lastReviewedNote: "Database #869: reviewed two-phase scalar fact/index activation, source and navigation DDL fences, ordinary-catalog snapshot fallback, repeat drift guards and unchanged public/RLS semantics."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
-lastReviewedNote: "Database #864: reviewed guarded serial, four-client, full-upgrade and committed-visibility entrypoints, exact source receipts, bounded artifacts and owned reset/cleanup dispositions."
+lastReviewedCommit: 356a06099669c7b4aa2d9261e37bc5cb33644385
+lastReviewedNote: "Database #869: reviewed exact owned-local admission, dense CAS benchmarks, upgrade/cutover/volume/nested-WAL collectors and artifact/cleanup limits. Commands preserve real source guards, request budgets and receipt provenance."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml

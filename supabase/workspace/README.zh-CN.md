@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
-lastReviewedNote: "Database #864: exact-local five-schema and type generation is deterministic across 2167 files. Only four existing reader definitions change; Data API/Portal types and generated-workspace ownership remain unchanged."
+lastReviewedCommit: 356a06099669c7b4aa2d9261e37bc5cb33644385
+lastReviewedNote: "Database #869: exact-local five-schema and type regeneration is deterministic across 2168 files. Generated changes are the existing writer/matcher, native CAS column and index; Data API/Portal types and generated-workspace ownership remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
