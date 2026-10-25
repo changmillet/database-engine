@@ -32,9 +32,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-21
-lastReviewedCommit: 96d042679810e8df0427d4d4ecd34e2c1b6a5d61
-lastReviewedNote: "Database #857: reviewed one-current-assigned-approval finalization and batch eligibility. Exact-local schema is generated from clean migration history; authority, revision, target-only publication, metadata, helper ACLs and independent rejection remain unchanged. Focused and populated-upgrade proof is tracked on the Issue."
+lastReviewedAt: 2026-10-25
+lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
+lastReviewedNote: "Database #864: reviewed serial/concurrent source-bound proof, full populated migration, rejection/rollback/repeat, committed visibility, real writers, canonical per-file suites and deterministic exports. Hosted qualification remains required."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
