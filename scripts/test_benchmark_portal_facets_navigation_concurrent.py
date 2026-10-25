@@ -5,11 +5,101 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import subprocess
+import sys
 from unittest.mock import patch
 import benchmark_portal_facets_navigation_concurrent as b
+from test_benchmark_portal_facets_navigation import native_snapshot, native_plan_groups
 
 
 class ConcurrentCollectorTests(unittest.TestCase):
+    def test_native_selection_rejects_missing_cas_or_controls_before_target_admission(self):
+        b.validate_case_selection(b.NATIVE_DEFAULT_CASES, True)
+        b.validate_case_selection(b.NATIVE_DEFAULT_CASES + ('facets_all_lexical',), True)
+        b.validate_case_selection(('facets_all_empty',), False)
+        with self.assertRaisesRegex(ValueError, 'complete CAS/control matrix'):
+            b.validate_case_selection(('facets_all_empty',), True)
+        for missing in b.NATIVE_DEFAULT_CASES:
+            with self.subTest(missing=missing), self.assertRaisesRegex(ValueError, 'complete CAS/control matrix'):
+                b.validate_case_selection(tuple(case for case in b.NATIVE_DEFAULT_CASES if case != missing), True)
+        with self.assertRaisesRegex(ValueError, 'Duplicate'):
+            b.validate_case_selection(b.NATIVE_DEFAULT_CASES + b.NATIVE_DEFAULT_CASES[:1], True)
+
+    def test_native_defaults_cover_required_cas_and_control_cases(self):
+        required = {f'{api}_{kind}_cas_{population}'
+                    for api in ('facets', 'navigation') for kind in ('flow', 'all')
+                    for population in ('rare', 'absent', 'common')}
+        self.assertTrue(required.issubset(b.NATIVE_DEFAULT_CASES))
+        self.assertEqual(len(b.NATIVE_DEFAULT_CASES), len(set(b.NATIVE_DEFAULT_CASES)))
+        self.assertTrue(set(b.NATIVE_DEFAULT_CASES).issubset(b.ALL_CASES))
+        self.assertIn('facets_process_empty', b.NATIVE_DEFAULT_CASES)
+        self.assertIn('navigation_geography', b.NATIVE_DEFAULT_CASES)
+
+    def dense_reference(self,native=False):
+        candidate = 'create or replace function private.display_test() returns integer language sql as $$select 1$$;'
+        definitions = b.serial.reader_definitions(candidate)
+        variants = {name:b.serial.definitions_sql(definitions) for name in ('baseline','candidate')}
+        selected = list(b.serial.NATIVE_RARE_CASES) if native else ['facets_flow_cas_rare','navigation_all_cas_absent']
+        sql, cases = b.serial.build_sql(variants,20,40,0,2,b.SCOPES,selected_cases=selected,plan_min_ms=1,fixture_profile='cas-dense',native_cas_fact=native)
+        rows=[]
+        def row(variant,label,ordinal,payload):
+            canonical=json.dumps(payload)
+            return {'variant':variant,'label':label,'ordinal':ordinal,'payload':payload,'canonicalJson':canonical,
+                    'sha256':b.serial.sha(canonical),'error':None,'sessionRole':'anon','workMem':'4MB','statementTimeout':'8s'}
+        for scope in b.SCOPES:
+            for name in ('navigation_world','navigation_page2','navigation_geography'):
+                rows.append(row('baseline',scope+':'+name,-2,{'nextCursor':'actual'}))
+            for variant in variants:
+                for ordinal in (-1,0,1):
+                    for name in selected: rows.append(row(variant,scope+':'+name,ordinal,{'ok':True}))
+        report={'schemaVersion':'portal.facets-navigation-serial.v1','passed':True,'baselineOnly':False,
+                'candidateLocalP95TargetPassed':True,'cleanup':{'emptyRowsAndLocalIdentityVerified':True},
+                'baseCommit':'exact','candidateSha256':b.serial.sha(candidate),'collectorSha256':b.serial.file_sha(Path(b.serial.__file__)),
+                'collectorArtifact':b.serial.__file__,'baselineSourceSha256':b.serial.sha(variants['baseline']),
+                'candidateReaderSha256':b.serial.sha(variants['candidate']),'fixture':b.serial.fixture_metadata(20,40,0,'cas-dense',native),
+                'samples':rows,'selectedCases':selected,'nestedPlanMinDurationMs':1,'sqlSha256':b.serial.sha(sql),
+                'fixtureActual':{'processVersions':40,'flowVersions':80,'publicSourceRows':0,'casCounts':b.serial.expected_dense_cas_counts(40)},
+                'equivalence':[{'equal':True}]}
+        if native:
+            snapshot=native_snapshot()
+            report.update(nativeSchemaBefore=snapshot,nativeSchema=copy.deepcopy(snapshot),nativeSchemaFingerprint=b.serial.schema_fingerprint(snapshot),
+                          nestedPlanCoverage={'groups':native_plan_groups(b.SCOPES)})
+            expected=b.serial.expected_dense_cas_counts(40)
+            report['fixtureActual']['nativeCasFact']={k:expected[k] for k in ('nonNull','rare','common')}|{'mismatches':0}
+        return report,candidate,definitions
+
+    def test_native_reference_binds_schema_population_and_bounded_plan_proof(self):
+        report,candidate,definitions=self.dense_reference(True)
+        with patch.object(b.serial,'baseline',return_value=definitions):
+            b.validate_reference(report,candidate,'exact')
+            for mutation in ('schema','fact','plan','flag'):
+                bad=copy.deepcopy(report)
+                if mutation=='schema':bad['nativeSchema']['index']['ready']=False
+                if mutation=='fact':bad['fixtureActual']['nativeCasFact']['mismatches']=1
+                if mutation=='plan':bad['nestedPlanCoverage']['groups']=[]
+                if mutation=='flag':bad['fixture']['nativeCasFact']=False
+                with self.assertRaises(ValueError):b.validate_reference(bad,candidate,'exact')
+
+    def test_dense_reference_binds_profile_cases_sql_and_actual_distribution(self):
+        report,candidate,definitions=self.dense_reference()
+        with patch.object(b.serial,'baseline',return_value=definitions):
+            variants,cases,indexed=b.validate_reference(report,candidate,'exact')
+            self.assertEqual(len(b.request_cases(cases,indexed,tuple(report['selectedCases']))),4)
+            for mutate in ('profile','width','distribution','sql'):
+                bad=copy.deepcopy(report)
+                if mutate=='profile':bad['fixture']['profile']='legacy'
+                if mutate=='width':bad['fixture']['documentWidthCohorts']['shortBytes']=1
+                if mutate=='distribution':bad['fixtureActual']['casCounts']['rare']=3
+                if mutate=='sql':bad['sqlSha256']='wrong'
+                with self.assertRaises(ValueError):b.validate_reference(bad,candidate,'exact')
+
+    def test_concurrent_summary_is_shared_and_help_is_bounded(self):
+        self.assertEqual(b.fixture_summary_sql(),b.serial.fixture_summary_sql())
+        result=subprocess.run([sys.executable,b.__file__,'--help'],capture_output=True,text=True)
+        self.assertEqual(result.returncode,0)
+        self.assertLess(len(result.stdout),10000)
+        self.assertIn('1..10',result.stdout)
+
     def sample(self, variant, client):
         return {'variant':variant,'label':'scope:case','ordinal':0,'client':client,
                 'matchesSerial':True,'wallMs':100,'error':None,'pid':100+client,

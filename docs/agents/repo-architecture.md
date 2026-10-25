@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
-lastReviewedNote: "Database #864: reviewed narrow exact-key matching, four-way projection coverage, selective CAS/Process retention and batched Navigation target IDs; no new projection, index, writer or privilege."
+lastReviewedCommit: 356a06099669c7b4aa2d9261e37bc5cb33644385
+lastReviewedNote: "Database #869: reviewed two-phase scalar fact/index activation, source and navigation DDL fences, ordinary-catalog snapshot fallback, repeat drift guards and unchanged public/RLS semantics."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -1335,6 +1335,48 @@ both dataset kinds; `hasChildren`, admission and pagination retain their existin
 rules. These are reader changes only:
 writers, indexes, request-scope settings, RLS, owners, ACLs, API signatures,
 eight-second budgets and cursor fingerprints remain unchanged.
+
+### Native Flow CAS matching (Database #869)
+
+Exact Flow CAS matching for display Facets and Navigation reads nullable
+`cas_number text` on `private.display_navigation_versions_v1`. The existing
+navigation writer derives it from the same original V1 string/type/shape/length
+predicate; Process rows keep NULL and their CAS-shaped text continues through
+the original lexical candidate helper. A partial B-tree over
+`(dataset_kind, cas_number, id, version)` admits only Flow rows with a non-NULL
+CAS. Equality on this native text fact can remain an index condition under the
+existing forced RLS. Historical versions and every navigation filter retain
+their exact keys; no new public field or RPC is introduced.
+
+Migration `20261025103759` prepares the nullable column and existing writer in a
+short transaction while the old reader remains active. It fences source
+projection writers in their established V1-then-V2 order before replacing the
+helper. This separate commit avoids holding ADD COLUMN's `ACCESS EXCLUSIVE`
+lock through the volume backfill. Migration `20261025103800` takes the same
+source fence, then `SHARE ROW EXCLUSIVE` on navigation before preflight, and
+atomically backfills, creates the index, activates the reader and refreshes the
+manifest. Ordinary SELECT readers remain admitted; concurrent writers and index
+DDL serialize with activation under their own existing budgets. Migration lock
+acquisition retains its five-second timeout. Both phases require an
+RLS-bypassing migration role and retain the sixty-second migration
+statement budget. A failed activation leaves the prepared phase compatible
+with the original reader.
+
+The first activation rejects an index that predates native activation. On
+reapplication, the native matcher marker also identifies active state after
+index loss, so fact drift is rejected before backfill rather than silently
+repaired. Coverage, native-column shape, exact index definition and
+valid/ready/live flags are checked before activation. These guards are scoped
+to the governed migration/writer path; privileged body or manifest replacement
+does not establish historical data provenance.
+
+An in-flight STABLE RPC may execute the new matcher body with its original data
+snapshot. The matcher therefore reads the activation index's `pg_class` and
+`pg_index` rows through ordinary SQL using that same snapshot. A snapshot that
+cannot see the index created with the complete backfill uses the original Main
+CAS query. Fresh snapshots use native equality. This witness must not become a
+syscache or `to_regclass` existence check. The existing eight-second request
+budget, owners, ACLs, RLS, rollout state and source data remain unchanged.
 
 ## Shared dataset classification readers (Database #838)
 

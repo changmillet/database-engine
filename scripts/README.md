@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
-lastReviewedNote: "Database #864: reviewed guarded serial, four-client, full-upgrade and committed-visibility entrypoints, exact source receipts, bounded artifacts and owned reset/cleanup dispositions."
+lastReviewedCommit: 816a78c23b8b7a006ab54a05ab2c37533dcb9f75
+lastReviewedNote: "Database #869: reviewed mandatory native concurrent CAS/control admission after independent P2 finding. All18 defaults are required before target access; incomplete CLI selection is rejected. The actual20-case960-request run satisfies the guard and all960 request SQL files are unchanged;57 offline collector tests pass. Product SQL and prior runtime evidence remain unchanged."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -1019,6 +1019,106 @@ The serial profile rolls back; concurrency restores candidate readers but keeps
 its committed synthetic fixture for the main agent's owned reset. Both preserve
 4 MB session work memory, existing routine overrides and eight-second requests.
 See the validation guide for complete correctness, performance and cleanup gates.
+
+### Native Flow CAS qualification (Database #869)
+
+The same owned local project admits the explicit CAS profile. Begin upgrade and
+each cutover mode from a fresh canonical empty Main predecessor; neither command
+accepts a hosted target. The upgrade profile loads the ordered prepare/activate
+migrations itself and records raw SQL rehearsal separately from migration history.
+
+```bash
+python3 supabase/tests/upgrade/test_portal_facets_navigation_upgrade.py \
+  --profile 869 --container supabase_db_portal-facets-864 \
+  --base-ref 6a880838efbf4d453103a1141e9282db130171e8 \
+  --report <new-private-upgrade-json>
+python3 supabase/tests/upgrade/collect_portal_flow_cas_cutover.py \
+  --mode reader-cutover --container supabase_db_portal-facets-864 \
+  --base-ref 6a880838efbf4d453103a1141e9282db130171e8 \
+  --report <new-private-cutover-json>
+```
+
+The cutover collector also supports `--mode fence` for observed real-writer
+ordering and `--mode cost` for root-statement buffers/WAL and trigger-inclusive
+execution time. Root ModifyTable WAL excludes navigation writes performed by
+AFTER triggers, so this mode cannot establish native-index write amplification.
+Reset only this owned project between modes; committed modes retain their fixture and
+verify session/helper/lock cleanup. See the validation guide for the full proof
+requirements and the distinction between real committed lock duration and a
+rollback-only rehearsal.
+
+The separate nested-WAL collector uses a fresh canonical empty predecessor and
+real source CAS updates. Fixed warmup plus three measured single-row/three-row
+batch samples per variant capture each actual navigation UPSERT. It sums each
+exact root WAL event once, including distinct invocations with identical SQL.
+The result covers navigation heap plus all index maintenance, not isolated CAS
+index bytes or the whole trigger tree, and does not measure overall throughput.
+Nested profiling times remain diagnostic; the separate `cost` mode's source
+execution time includes trigger execution. Logging is bounded and enabled only
+around actual source updates. All schema, metadata and logical data roll back; physical pages
+may remain, so the owner must reset before other qualification.
+
+```bash
+python3 scripts/collect_portal_flow_cas_writer_wal.py \
+  --container supabase_db_portal-facets-864 --report <new-private-writer-wal-json>
+```
+
+The independent DDL-fence collector requires another fresh canonical empty
+predecessor. It observes regular/CIC exact-index creation blocked by the
+navigation fence before activation preflight, with ordinary reads available,
+then checks the B-created witness and complete responses. It retains the
+committed fixture/native schema for the owner's reset and leaves the migration
+ledger unchanged.
+
+```bash
+python3 supabase/tests/upgrade/collect_portal_flow_cas_ddl_fence.py \
+  --container supabase_db_portal-facets-864 \
+  --base-ref 6a880838efbf4d453103a1141e9282db130171e8 \
+  --report <new-private-ddl-fence-json>
+```
+
+The separate fixed-volume collector starts from that same canonical empty
+predecessor, commits its dense synthetic fixture and both actual migrations,
+and records phase timestamps, held locks, index/table bytes and full control
+responses. Its durations include instrumentation overhead. It writes no
+migration ledger and retains rows/native schema for the owner's exact reset;
+it does not measure concurrent load or real-writer throughput.
+
+```bash
+python3 scripts/collect_portal_flow_cas_volume_upgrade.py \
+  --container supabase_db_portal-facets-864 --report <new-private-volume-json>
+```
+
+Before native read benchmarks, apply both actual migrations to the empty owned
+project through the local migration CLI. The collector admits the installed
+column, index, existing writer, forced RLS and ACLs; it creates no product DDL.
+It compares predecessor/candidate readers on that same physical schema/writer.
+
+```bash
+python3 scripts/benchmark_portal_facets_navigation.py \
+  --container supabase_db_portal-facets-864 \
+  --base-ref 6a880838efbf4d453103a1141e9282db130171e8 \
+  --candidate supabase/migrations/20261025103800_activate_portal_flow_cas_fact.sql \
+  --fixture-profile cas-dense --native-cas-fact \
+  --process-datasets 10000 --flow-datasets 69000 --card-padding 3072 \
+  --samples 10 --plan-min-ms 1 --report <new-private-native-serial-json>
+python3 scripts/benchmark_portal_facets_navigation_concurrent.py \
+  --container supabase_db_portal-facets-864 \
+  --base-ref 6a880838efbf4d453103a1141e9282db130171e8 \
+  --reference-report <successful-native-serial-json> --native-cas-fact \
+  --candidate supabase/migrations/20261025103800_activate_portal_flow_cas_fact.sql \
+  --rounds 3 --report <new-private-native-concurrent-json>
+```
+
+Rebuild the owned project to the same native migration state before concurrency;
+its exact source/fixture/schema hashes must match the successful serial receipt.
+Omitting `--case` includes all required native volume cases and controls. Native
+concurrent custom selections must retain all eighteen default CAS/control cases;
+additional cases are allowed, and omissions fail before database admission. Use
+`--smoke` only for correctness diagnostics. Dense fixture distributions, native
+rare-key natural plans, relative CAS performance and the two-second local target
+are enforced by the collectors. Their read comparison does not measure migration
+or writer cost and does not establish hosted p95.
 
 ### Calculation export upgrade qualification
 
