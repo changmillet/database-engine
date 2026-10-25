@@ -185,6 +185,7 @@ jobs:
           supabase test db supabase/tests/20261014_snapshot_build_terminal_guard.sql
           supabase test db supabase/tests/20261016_all_unit_terminal_guard.sql
           supabase test db supabase/tests/20261016_calculation_exports.sql
+          supabase test db supabase/tests/20261025_lcia_category_availability.sql
           supabase test db supabase/tests/20261002_oauth_release_cli_capabilities.sql
           python3 scripts/test_oauth_release_migration_guard.py --local-container supabase_db_database-engine
           python3 scripts/test_release_manifest_drift.py --local-container supabase_db_database-engine

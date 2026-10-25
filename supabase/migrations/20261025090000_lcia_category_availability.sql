@@ -25,7 +25,7 @@ begin
   if not p_receipt ?& array['schema_version','policy_version','completeness','categories']
      or (select count(*) from jsonb_object_keys(p_receipt)) <> 4
      or p_receipt->>'schema_version' is distinct from 'lcia.category-availability.v1'
-     or p_receipt->>'policy_version' is distinct from 'lcia.applicability.source-bound.v2'
+     or p_receipt->>'policy_version' is distinct from 'lcia.applicability.source-bound.v3'
      or jsonb_typeof(p_receipt->'categories') is distinct from 'array' then
     return false;
   end if;
@@ -90,7 +90,7 @@ begin
   v_receipt := v_snapshot.process_filter->'lcia_availability';
   if v_snapshot.id is null or v_snapshot.status <> 'ready'
      or v_snapshot.process_filter->>'lcia_applicability_policy_version'
-          is distinct from 'lcia.applicability.source-bound.v2'
+          is distinct from 'lcia.applicability.source-bound.v3'
      or not private.lcia_category_availability_valid_v1(v_receipt, p_require_complete)
      or v_result.diagnostics->'lcia_availability' is distinct from v_receipt then
     return null;
@@ -156,7 +156,7 @@ begin
   -- Legacy private metadata remains import/read-compatible. Its missing receipt
   -- never passes the independent current-compute or public-publication gates.
   if v_snapshot.process_filter->>'lcia_applicability_policy_version'
-       is distinct from 'lcia.applicability.source-bound.v2'
+       is distinct from 'lcia.applicability.source-bound.v3'
      and not new.artifact_manifest ? 'lciaAvailability'
      and not coalesce(v_result.diagnostics, '{}'::jsonb) ? 'lcia_availability' then
     return new;
@@ -590,9 +590,9 @@ revoke all on function private.svc_lcia_result_package_partial_mark_ready_v1(uui
 grant execute on function private.svc_lcia_result_package_partial_mark_ready_v1(uuid,uuid,text,uuid,uuid,uuid,jsonb,jsonb,jsonb,jsonb,text,text,jsonb) to service_role;
 
 -- New scope requests cannot reuse a completed pre-applicability numerical scan.
--- The matching Worker explicitly supports r6; old requests keep frozen revisions.
+-- The matching Worker explicitly supports r7; old requests keep frozen revisions.
 insert into private.lcia_scope_closure_config(singleton,expected_validator_scanner_fingerprint)
-values(true,'scope-closure-validator-scanner.v1+cutoff-readiness-r6')
+values(true,'scope-closure-validator-scanner.v1+cutoff-readiness-r7')
 on conflict(singleton) do update
 set expected_validator_scanner_fingerprint = excluded.expected_validator_scanner_fingerprint,
     updated_at = statement_timestamp();

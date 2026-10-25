@@ -7,7 +7,7 @@ create function pg_temp.availability(p_kind text default 'partial') returns json
 language sql immutable as $$
 select jsonb_build_object(
   'schema_version','lcia.category-availability.v1',
-  'policy_version','lcia.applicability.source-bound.v2',
+  'policy_version','lcia.applicability.source-bound.v3',
   'completeness',p_kind,
   'categories',jsonb_build_array(
     jsonb_build_object('impact_index',0,'method_id','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -26,6 +26,7 @@ select ok(not private.lcia_category_availability_valid_v1(null,false),'missing r
 select ok(not private.lcia_category_availability_valid_v1('[]',false),'wrong JSON type fails closed');
 select ok(not private.lcia_category_availability_valid_v1(jsonb_set(pg_temp.availability(),'{completeness}','"complete"'),false),'claimed completeness must equal category status');
 select ok(not private.lcia_category_availability_valid_v1(jsonb_set(pg_temp.availability(),'{policy_version}','"old"'),false),'stale policy is not current receipt evidence');
+select ok(not private.lcia_category_availability_valid_v1(jsonb_set(pg_temp.availability(),'{policy_version}','"lcia.applicability.source-bound.v2"'),false),'retired unbounded-generic policy cannot authorize current category availability');
 select ok(not private.lcia_category_availability_valid_v1(jsonb_set(pg_temp.availability(),'{categories,1,impact_index}','1.0'),false),'index must retain integer wire representation');
 select ok(not private.lcia_category_availability_valid_v1(jsonb_set(pg_temp.availability(),'{categories,1,method_id}','"not-a-uuid"'),false),'non UUID method identity is rejected');
 select ok(not private.lcia_category_availability_valid_v1(jsonb_set(pg_temp.availability(),'{categories,1,method_version}','"v2"'),false),'exact ILCD method version is mandatory');
@@ -35,7 +36,7 @@ select ok(not private.lcia_category_availability_valid_v1(jsonb_set(pg_temp.avai
 select ok(not private.lcia_category_availability_valid_v1(jsonb_set(pg_temp.availability(),'{categories,1,reasons}','["not a code"]'),false),'arbitrary prose cannot enter a reason code');
 select ok(not private.lcia_category_availability_valid_v1(pg_temp.availability() || '{"extra":true}',false),'unknown receipt authority is rejected');
 select is((select expected_validator_scanner_fingerprint from private.lcia_scope_closure_config where singleton),
-  'scope-closure-validator-scanner.v1+cutoff-readiness-r6','new admission uses r6 instead of selecting a completed r5 numerical snapshot');
+  'scope-closure-validator-scanner.v1+cutoff-readiness-r7','new admission uses r7 instead of selecting a completed r5/r6 numerical snapshot');
 
 select ok(not has_function_privilege('authenticated','private.lcia_category_availability_valid_v1(jsonb,boolean)','execute'),'browser cannot execute private receipt helper');
 select ok(not has_function_privilege('service_role','private.lcia_package_availability_valid_v1(uuid,boolean)','execute'),'service cannot invoke an internal publication predicate as a facade');
@@ -72,7 +73,7 @@ begin
   insert into private.worker_jobs(id,job_kind,worker_queue,requester_type,requested_by,status,payload_schema_version,payload_json)
     values(pg_temp.case_id(p_case,1),'lcia_result.package_build','solver','user','83400000-0000-4000-8000-000000000001','completed','lcia_result.package_build.request.v1','{}');
   insert into private.lca_network_snapshots(id,scope,status,process_filter)
-    values(pg_temp.case_id(p_case,3),'full_library','ready',jsonb_build_object('lcia_applicability_policy_version','lcia.applicability.source-bound.v2','lcia_availability',v_receipt));
+    values(pg_temp.case_id(p_case,3),'full_library','ready',jsonb_build_object('lcia_applicability_policy_version','lcia.applicability.source-bound.v3','lcia_availability',v_receipt));
   insert into private.lca_results(id,job_id,snapshot_id,diagnostics,worker_job_id,artifact_url,artifact_sha256,artifact_byte_size,artifact_format)
     values(pg_temp.case_id(p_case,4),pg_temp.case_id(p_case,2),pg_temp.case_id(p_case,3),jsonb_build_object('lcia_availability',v_receipt,'calculation_bundle',v_bundle),pg_temp.case_id(p_case,1),'s3://lca_results/test/result',repeat('c',64),100,'hdf5:v1');
   insert into private.lcia_result_packages(id,build_id,build_worker_job_id,package_version,coverage_mode,eligibility_resolved_at,eligible_input_count,included_input_count,input_manifest_hash,input_manifest,snapshot_id,result_id,result_artifact_ref,artifact_manifest,package_result_hash,available_impact_categories,default_impact_category,status,created_by)
@@ -94,7 +95,7 @@ select ok(not private.lcia_package_availability_valid_v1(pg_temp.case_id(1,5),fa
 update private.lca_results set diagnostics=jsonb_set(diagnostics,'{lcia_availability}',pg_temp.availability()) where id=pg_temp.case_id(1,4);
 update private.lca_network_snapshots set process_filter=jsonb_set(process_filter,'{lcia_applicability_policy_version}','"old"') where id=pg_temp.case_id(1,3);
 select ok(not private.lcia_package_availability_valid_v1(pg_temp.case_id(1,5),false),'stale snapshot policy is rejected even when result and package receipts match');
-update private.lca_network_snapshots set process_filter=jsonb_set(process_filter,'{lcia_applicability_policy_version}','"lcia.applicability.source-bound.v2"') where id=pg_temp.case_id(1,3);
+update private.lca_network_snapshots set process_filter=jsonb_set(process_filter,'{lcia_applicability_policy_version}','"lcia.applicability.source-bound.v3"') where id=pg_temp.case_id(1,3);
 
 create function pg_temp.insert_projection(p_case integer) returns void
 language plpgsql as $$ begin
@@ -150,7 +151,7 @@ begin
   insert into private.lca_snapshot_artifacts(id,snapshot_id,artifact_url,artifact_sha256,artifact_byte_size,artifact_format,process_count,flow_count,impact_count,a_nnz,b_nnz,c_nnz,status,snapshot_index_sha256,snapshot_build_contract_hash,effective_scope_hash,data_snapshot_token,closure_bundle_hash)
     values(pg_temp.case_id(p_case,25),pg_temp.case_id(p_case,3),'s3://partial-ready-test/snapshot.h5',repeat('7',64),100,'snapshot-hdf5:v1',1,1,2,1,1,1,'ready',repeat('9',64),repeat('a',64),repeat('3',64),'partial-ready-snapshot-'||p_case,repeat('6',64));
   insert into private.lcia_scope_closure_checks(id,worker_job_id,requested_by,request_idempotency_token,request_key,request_fingerprint,requested_scope_hash,effective_scope_hash,policy_fingerprint,data_snapshot_token,expected_validator_scanner_fingerprint,status,scan_completeness,certificate_status,certificate_hash,report_artifact_id,result_summary,finished_at,requested_scope_manifest,effective_scope_manifest,certificate_schema_version,source_fingerprint,resolution_map_hash,closure_bundle_hash,snapshot_id,snapshot_hash,report_artifact_manifest_hash,evidence_hash,closure_bundle_artifact_id,snapshot_artifact_id,snapshot_index_sha256,snapshot_build_contract_hash,complete_machine_result_artifact_id,valid_until)
-    values(pg_temp.case_id(p_case,21),pg_temp.case_id(p_case,20),'83400000-0000-4000-8000-000000000001','partial-ready-'||p_case,'partial-ready-'||p_case,repeat('f',64),repeat('1',64),repeat('3',64),repeat('2',64),'partial-ready-snapshot-'||p_case,'scope-closure-validator-scanner.v1+cutoff-readiness-r6','passed','complete','valid',repeat('4',64),pg_temp.case_id(p_case,22),'{}',clock_timestamp(),'{"certificateFreshnessPolicy":"frozen-artifact-reusable-v1"}',v_scope,'lcia.scope-closure-certificate.v2','partial-ready-fixture',repeat('5',64),repeat('6',64),pg_temp.case_id(p_case,3),repeat('7',64),v_report_hash,repeat('8',64),pg_temp.case_id(p_case,24),pg_temp.case_id(p_case,25),repeat('9',64),repeat('a',64),pg_temp.case_id(p_case,23),now()+interval '1 day');
+    values(pg_temp.case_id(p_case,21),pg_temp.case_id(p_case,20),'83400000-0000-4000-8000-000000000001','partial-ready-'||p_case,'partial-ready-'||p_case,repeat('f',64),repeat('1',64),repeat('3',64),repeat('2',64),'partial-ready-snapshot-'||p_case,'scope-closure-validator-scanner.v1+cutoff-readiness-r7','passed','complete','valid',repeat('4',64),pg_temp.case_id(p_case,22),'{}',clock_timestamp(),'{"certificateFreshnessPolicy":"frozen-artifact-reusable-v1"}',v_scope,'lcia.scope-closure-certificate.v2','partial-ready-fixture',repeat('5',64),repeat('6',64),pg_temp.case_id(p_case,3),repeat('7',64),v_report_hash,repeat('8',64),pg_temp.case_id(p_case,24),pg_temp.case_id(p_case,25),repeat('9',64),repeat('a',64),pg_temp.case_id(p_case,23),now()+interval '1 day');
   select * into v_check from private.lcia_scope_closure_checks where id=pg_temp.case_id(p_case,21);
   update private.worker_jobs set status='running',subject_type='lcia_result_build',subject_id=pg_temp.case_id(p_case,2),lease_token='83400000-0000-4000-8000-000000000098',lease_expires_at=clock_timestamp()+interval '1 hour',payload_schema_version='lcia_result.package_build.request.v3',
     payload_json=jsonb_build_object('type','lcia_result_package_build','job_id',pg_temp.case_id(p_case,2),'build_id',pg_temp.case_id(p_case,2),'coverage_mode','subset','input_manifest',v_input,'input_manifest_hash',v_input_hash,'effective_scope',v_scope,'lcia_method_set',v_scope->'lciaMethods','eligibility_resolved_at',v_resolved,'eligible_input_count',1,'included_input_count',1,'default_impact_category','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
