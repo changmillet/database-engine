@@ -23,8 +23,8 @@ checkPaths:
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
-lastReviewedNote: "Database #864: reviewed one added CI SQL suite on the Main-hotfix route. Official Preview, managed Main migration, Dev backmerge and Root integration boundaries are unchanged."
+lastReviewedCommit: 0bfbff04bedd0002516e81ff4c607c55abb8bf54
+lastReviewedNote: "Reviewed the additional LCIA category-availability CI suite after canonical 5a13b159 integration. Local native qualification and generated snapshots do not grant Preview, persistent-Dev or production deployment authority; branch bindings and credentials are unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

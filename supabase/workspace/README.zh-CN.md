@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
-lastReviewedNote: "Database #864: exact-local five-schema and type generation is deterministic across 2167 files. Only four existing reader definitions change; Data API/Portal types and generated-workspace ownership remain unchanged."
+lastReviewedCommit: 0bfbff04bedd0002516e81ff4c607c55abb8bf54
+lastReviewedNote: "Reviewed combined canonical 5a13b159 and Worker #339 output from native PostgreSQL17.6/PGroonga3.2.5 after 441 migrations and 94 suites. Two normal five-schema and Data API type generations are identical across 2,155 files with zero committed drift; exact-local provenance remains distinct from hosted provenance."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

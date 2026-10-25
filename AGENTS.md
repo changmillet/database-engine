@@ -38,8 +38,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
-lastReviewedNote: "Database #864: scoped Facets/Navigation optimization preserves exact versions, caller permissions, writers and request budgets. Main-hotfix, managed deployment, Dev synchronization and Root integration remain separate required gates."
+lastReviewedCommit: 0bfbff04bedd0002516e81ff4c607c55abb8bf54
+lastReviewedNote: "Reviewed Worker #339 private partial availability and complete-only publication against canonical 5a13b159, preserving Portal reader ownership, API permissions, exact revisions and branch/deployment boundaries. Native blank 441 / 94 suites and populated upgrade passed; Root acceptance and hosted delivery remain separate."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md
