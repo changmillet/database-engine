@@ -13,6 +13,16 @@ from test_benchmark_portal_facets_navigation import native_snapshot, native_plan
 
 
 class ConcurrentCollectorTests(unittest.TestCase):
+    def test_native_defaults_cover_required_cas_and_control_cases(self):
+        required = {f'{api}_{kind}_cas_{population}'
+                    for api in ('facets', 'navigation') for kind in ('flow', 'all')
+                    for population in ('rare', 'absent', 'common')}
+        self.assertTrue(required.issubset(b.NATIVE_DEFAULT_CASES))
+        self.assertEqual(len(b.NATIVE_DEFAULT_CASES), len(set(b.NATIVE_DEFAULT_CASES)))
+        self.assertTrue(set(b.NATIVE_DEFAULT_CASES).issubset(b.ALL_CASES))
+        self.assertIn('facets_process_empty', b.NATIVE_DEFAULT_CASES)
+        self.assertIn('navigation_geography', b.NATIVE_DEFAULT_CASES)
+
     def dense_reference(self,native=False):
         candidate = 'create or replace function private.display_test() returns integer language sql as $$select 1$$;'
         definitions = b.serial.reader_definitions(candidate)

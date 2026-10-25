@@ -31,6 +31,13 @@ MAX_ARTIFACTS = 256 * 1024 * 1024
 DEFAULT_CASES = ('facets_all_empty', 'facets_all_geography', 'facets_all_history',
                  'facets_all_one', 'facets_flow_cas', 'navigation_geography',
                  'navigation_us', 'navigation_page3')
+NATIVE_DEFAULT_CASES = tuple(
+    f'{api}_{kind}_cas_{population}'
+    for api in ('facets', 'navigation') for kind in ('flow', 'all')
+    for population in ('rare', 'absent', 'common')
+) + ('facets_process_cas_rare', 'navigation_process_cas_rare',
+     'facets_all_empty', 'facets_process_empty',
+     'navigation_classification_root', 'navigation_geography')
 ALL_CASES = tuple(sorted(set(serial.cases(SCOPES[0], 'cas-dense')) |
                          {'navigation_page2', 'navigation_page3', 'navigation_cn_page2'}))
 INSPECT_FORMAT = '{"Id":{{json .Id}},"Name":{{json .Name}},"Config":{"Labels":{{json .Config.Labels}},"Image":{{json .Config.Image}}},"State":{"Running":{{json .State.Running}}},"HostConfig":{"NanoCpus":{{json .HostConfig.NanoCpus}},"CpuQuota":{{json .HostConfig.CpuQuota}},"CpuPeriod":{{json .HostConfig.CpuPeriod}},"CpusetCpus":{{json .HostConfig.CpusetCpus}},"Memory":{{json .HostConfig.Memory}},"MemorySwap":{{json .HostConfig.MemorySwap}}}}'
@@ -333,7 +340,7 @@ def main() -> int:
             raise ValueError('Candidate source exceeds bounded input limit')
         base = subprocess.check_output(['git', 'rev-parse', f'{args.base_ref}^{{commit}}'], cwd=serial.ROOT, text=True).strip()
         variants, cases, indexed = validate_reference(reference, candidate, base)
-        selected = tuple(args.selected or DEFAULT_CASES)
+        selected = tuple(args.selected or (NATIVE_DEFAULT_CASES if args.native_cas_fact else DEFAULT_CASES))
         if len(selected) != len(set(selected)):
             raise ValueError('Duplicate selected case')
         requests = request_cases(cases, indexed, selected)
