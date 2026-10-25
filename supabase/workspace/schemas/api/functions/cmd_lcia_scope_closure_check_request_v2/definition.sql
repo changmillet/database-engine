@@ -5,6 +5,8 @@ CREATE OR REPLACE FUNCTION "api"."cmd_lcia_scope_closure_check_request_v2"("p_re
     AS $$
 declare
   v_actor uuid := auth.uid();
+  v_calculation_fingerprint text;
+  v_payload_hash text := private.lcia_scope_closure_sha256(p_requested_scope);
   v_scope jsonb;
   v_policy jsonb;
   v_requested_scope_hash text;
@@ -40,6 +42,25 @@ begin
       'invalid_closure_request', 400, 'Idempotency token is required'
     );
   end if;
+
+  -- A retry is the original operation, even after a new calculation contract activates.
+  perform pg_advisory_xact_lock(hashtextextended(v_actor::text || ':' || trim(p_request_idempotency_token), 873));
+  select * into v_check from private.lcia_scope_closure_checks
+    where requested_by=v_actor and request_idempotency_token=trim(p_request_idempotency_token)
+    order by created_at, id limit 1 for update;
+  if v_check.id is not null then
+    if v_check.request_payload_hash is not null and v_check.request_payload_hash is distinct from v_payload_hash then
+      return api.lcia_scope_closure_error('idempotency_payload_conflict',409,'Idempotency token belongs to another request');
+    end if;
+    select * into v_job from private.worker_jobs where id=v_check.worker_job_id;
+    return jsonb_build_object('ok',true,'data',jsonb_build_object(
+      'closureCheckId',v_check.id,'requestedScopeHash',v_check.requested_scope_hash,
+      'policyFingerprint',v_check.policy_fingerprint,'dataSnapshotToken',v_check.data_snapshot_token,
+      'scanExecutionId',v_check.scan_execution_id,'calculationFingerprint',v_check.calculation_fingerprint,
+      'workerJob',private.worker_job_payload(v_job,false),'reused',true));
+  end if;
+  select fingerprint into v_calculation_fingerprint
+    from private.lca_active_calculation_contract where singleton for share;
 
   v_scope := private.lcia_scope_closure_normalize_request(p_requested_scope);
 
@@ -209,7 +230,8 @@ begin
 
   v_request_fingerprint := encode(extensions.digest(
     v_requested_scope_hash || '|' || v_policy_fingerprint || '|'
-      || v_expected_validator || '|' || v_snapshot_token,
+      || v_expected_validator || '|' || v_snapshot_token
+      || case when v_calculation_fingerprint is null then '' else '|calculation:' || v_calculation_fingerprint end,
     'sha256'
   ), 'hex');
   v_request_key := encode(extensions.digest(
@@ -287,10 +309,13 @@ begin
       policy_fingerprint = v_policy_fingerprint,
       request_fingerprint = v_request_fingerprint,
       request_key = v_request_key,
+      calculation_fingerprint = v_calculation_fingerprint,
+      request_payload_hash = v_payload_hash,
       updated_at = now()
   where id = v_check.id
   returning * into v_check;
 
+  perform pg_advisory_xact_lock(hashtextextended(v_request_fingerprint, 873));
   select *
   into v_execution
   from private.lcia_scope_closure_scan_executions
@@ -302,13 +327,15 @@ begin
       requested_scope_hash,
       policy_fingerprint,
       data_snapshot_token,
-      validator_scanner_fingerprint
+      validator_scanner_fingerprint,
+      calculation_fingerprint
     ) values (
       v_request_fingerprint,
       v_requested_scope_hash,
       v_policy_fingerprint,
       v_snapshot_token,
-      v_expected_validator
+      v_expected_validator,
+      v_calculation_fingerprint
     )
     returning * into v_execution;
   end if;
@@ -335,6 +362,7 @@ begin
           ),
         'lcia_method_set', v_scope->'lciaMethods',
         'request_fingerprint', v_request_fingerprint,
+        'calculation_fingerprint', v_calculation_fingerprint,
         'scan_execution_id', v_execution.id,
         'data_snapshot_token', v_snapshot_token
       ),
@@ -350,6 +378,7 @@ begin
       'policyFingerprint', v_check.policy_fingerprint,
       'dataSnapshotToken', v_snapshot_token,
       'scanExecutionId', v_execution.id,
+      'calculationFingerprint', v_calculation_fingerprint,
       'workerJob', private.worker_job_payload(v_job, false),
       'reused', false
     )

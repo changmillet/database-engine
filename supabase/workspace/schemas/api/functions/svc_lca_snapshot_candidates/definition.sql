@@ -6,16 +6,20 @@ declare
   v_scope text := lower(btrim(coalesce(p_scope, '')));
   v_limit integer := greatest(1, least(coalesce(p_limit, 100), 100));
   v_rows jsonb;
+  v_calculation_fingerprint text;
 begin
   if v_scope not in ('full_library', 'data_product') then
     return jsonb_build_object('ok', false, 'code', 'INVALID_LCA_SCOPE', 'status', 400);
   end if;
+
+  select fingerprint into v_calculation_fingerprint from private.lca_active_calculation_contract where singleton;
 
   with candidates as (
     select
       snapshot.id,
       snapshot.scope,
       snapshot.process_filter,
+      (v_calculation_fingerprint is null or coalesce(snapshot.process_filter->>'calculation_fingerprint' = v_calculation_fingerprint, false)) as calculation_current,
       snapshot.source_hash,
       snapshot.created_at,
       artifact.id as artifact_id,
@@ -56,6 +60,7 @@ begin
         )
       )
     order by
+      calculation_current desc,
       case when p_snapshot_id is not null then 0 when active.snapshot_id is not null then 0 else 1 end,
       snapshot.created_at desc,
       snapshot.id
@@ -68,6 +73,7 @@ begin
     'sourceHash', source_hash,
     'createdAt', created_at,
     'isActive', is_active,
+    'calculationCurrent', calculation_current,
     'artifact', jsonb_build_object(
       'artifactId', artifact_id,
       'artifactUrl', artifact_url,

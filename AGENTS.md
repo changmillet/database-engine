@@ -38,8 +38,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 356a06099669c7b4aa2d9261e37bc5cb33644385
-lastReviewedNote: "Database #869: native Flow CAS lookup extends the existing navigation projection/writer, preserving exact versions, Process lexical behavior, public permissions and budgets. Main-hotfix, managed delivery, Dev synchronization and Root integration remain required."
+lastReviewedCommit: e49be4835ffce76db5bfd25f0a8cddcfe647d53e
+lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md

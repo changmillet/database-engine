@@ -1,8 +1,8 @@
 version: 1
 layout: repo
 lastReviewedAt: "2026-10-25"
-lastReviewedCommit: "356a06099669c7b4aa2d9261e37bc5cb33644385"
-lastReviewedNote: "Database #869: reviewed existing ownership/routing for the additive navigation CAS fact, index, existing writer/matcher changes and qualification tooling. Governance, public permission and delivery boundaries remain unchanged."
+lastReviewedCommit: "e49be4835ffce76db5bfd25f0a8cddcfe647d53e"
+lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
 
 # Keep deterministic governance facts here.
 # AGENTS.md remains the repo contract entrypoint.
