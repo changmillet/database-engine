@@ -31,8 +31,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 356a06099669c7b4aa2d9261e37bc5cb33644385
-lastReviewedNote: "Database #869: reviewed two-phase scalar fact/index activation, source and navigation DDL fences, ordinary-catalog snapshot fallback, repeat drift guards and unchanged public/RLS semantics."
+lastReviewedCommit: e49be4835ffce76db5bfd25f0a8cddcfe647d53e
+lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -478,25 +478,36 @@ commands and Review Admin membership admission do not write this binding.
 
 ## National Carbon Process Statistics
 
-`api.qry_national_carbon_organization_contributions(integer)` returns the
-administrator-only `national_carbon_organization_contribution_v5` snapshot.
+`api.qry_national_carbon_organization_contributions_v6(integer)` returns the
+administrator-only `national_carbon_organization_contribution_v6` snapshot.
+The original `api.qry_national_carbon_organization_contributions(integer)` keeps
+its v5 fields and ranking unchanged for older strict clients; deploy v6 before
+publishing the frontend that consumes it. Both signatures use `NX-DASH-01`.
 Only `public.processes` contributes dataset counts; LifecycleModels are not read.
 The RPC has a function-level 30-second `statement_timeout` for browser calls.
 
 - `rankings` contains up to `p_limit` units with published processes, ordered by
-  published count, assigned-reviewer dataset count, and unassigned-reviewer
-  dataset count descending, then display name and normalized key in `C` order.
+  published, assigned-reviewer, unassigned-reviewer and draft dataset counts
+  descending, then display name and normalized key in `C` order. Draft counts
+  break ties only after the three preceding counts. Ranks use `row_number`.
   `organizations` uses that same order and contains every eligible non-empty
-  current profile organization, including pending-only and zero-data units.
+  current profile organization, including pending-only, draft-only and zero-data units.
   The limit never truncates `organizations` or summary metrics.
 - Unit attribution uses normalized `private.users.raw_user_meta_data.organization`.
   A user with `review-admin` or `review-member` in any team is excluded from
-  the unit catalog and its published/pending facts. This does not change the
+  the unit catalog and its published/pending/draft facts. This does not change the
   independent reviewer KPI, regional distribution, or daily activity.
   Published and pending-review summary counts retain the organization-attributed
   scope. Pending review uses the latest process version at state 20; its active
   root review state 1 means assigned, while state 0 or no active root means
   awaiting assignment. Counts represent datasets, not reviewer assignments.
+- `draftDatasetCount` counts one process ID only when its latest-current version
+  (version descending, then modification time descending) has `state_code = 0`.
+  Older drafts below a newer reviewing/published version do not count; multiple
+  draft versions count once. Use the same current-profile attribution and role
+  exclusions as other unit facts. Units without drafts return zero. Drafts do
+  not change the published/reviewing summary metrics, regions or daily activity
+  definitions; `dataAsOf` also considers latest-current draft modification times.
 - `summary.reviewerCount` counts distinct users whose role is `review-member` in
   the platform team (`00000000-0000-0000-0000-000000000000`); administrators and
   memberships in other teams are excluded.
@@ -1444,3 +1455,9 @@ selected kind.
 Snapshot auto-enqueue terminal guard (Database #842): under the existing request advisory lock, the service facade reuses active work, returns `SNAPSHOT_BUILD_BLOCKED` for blockage, and returns `SNAPSHOT_BUILD_FAILED` for the latest same-actor/request failure or cancellation regardless of retryability. It never inserts a replacement draft for those outcomes. A partial snapshot-request history index bounds this lookup. Existing explicit service-only `private.worker_retry_job` recovery requeues the same canonical job; a changed build contract has a new request key. Live source edits do not implicitly clear a same-key failure. Successful previous jobs retain normal refresh behavior, since request keys do not bind mutable dataset content.
 
 Database #846 adds `api.svc_lca_calculation_export(uuid,uuid,text,boolean)`: service-only, live manager authorization, completed package/result binding, server-resolved immutable Bundle, default Parquet and five allowed formats. The read mode never admits work. Explicit enqueue deduplicates all statuses under a request advisory lock; failures remain until explicit Worker retry. Worker job results provide lease-fenced export metadata independently of immutable package readiness. No numerical result or package is rewritten by export status transitions.
+
+## Opaque calculation identities
+
+`private.lca_calculation_contracts` stores exact Worker-authored descriptor bytes and SHA-256 identities. `private.lca_active_calculation_contract` holds the explicitly activated identity. The service-only private activation function uses a locked compare-and-set; application roles cannot mutate descriptors or activate identities. No algorithm version is selected by migrations or Worker startup. Worker owns descriptor semantics and the activation CLI; see its scope-closure contract for the rollout sequence.
+
+New scope-closure execution fingerprints and ordinary snapshot-build queue keys include the active opaque identity independently of scanner and data-policy versions. Recorded actor/token retries return the original closure task even after activation; newly recorded tokens additionally reject a changed input payload. Existing immutable packages and historical task IDs stay readable. `api.svc_lca_snapshot_candidates` projects `calculationCurrent` and orders compatible candidates first so Edge can admit new compute without embedding algorithm knowledge. The unconfigured bootstrap preserves existing admission until explicit activation; after activation, a missing or different ready-snapshot identity is incompatible. Missing geography and factor coverage do not affect this contract.

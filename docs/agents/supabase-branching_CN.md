@@ -23,8 +23,8 @@ checkPaths:
   - .env.supabase.dev.local.example
   - .env.supabase.main.local.example
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 356a06099669c7b4aa2d9261e37bc5cb33644385
-lastReviewedNote: "Database #869: reviewed added CI qualification registration on the Main-hotfix route; branch settings and deploy ownership are unchanged. The observed Dev deployment-owner discrepancy remains separately tracked by #868; official Preview/Main, Dev verification and Root integration are still required."
+lastReviewedCommit: e49be4835ffce76db5bfd25f0a8cddcfe647d53e
+lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

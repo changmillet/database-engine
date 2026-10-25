@@ -39,7 +39,8 @@ begin
     'publicationEpoch', v_data_snapshot.publication_epoch,
     'expectedValidatorScannerFingerprint', v_check.expected_validator_scanner_fingerprint,
     'requestFingerprint', v_check.request_fingerprint
-  ));
+  ) || case when v_check.calculation_fingerprint is null then '{}'::jsonb
+    else jsonb_build_object('calculationFingerprint', v_check.calculation_fingerprint) end);
 end;
 $$;
 

@@ -2152,6 +2152,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: Json
       }
+      qry_national_carbon_organization_contributions_v6: {
+        Args: { p_limit?: number }
+        Returns: Json
+      }
       qry_notification_get_my_data_count: {
         Args: { p_days?: number; p_last_view_at?: string }
         Returns: number

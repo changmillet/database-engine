@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 816a78c23b8b7a006ab54a05ab2c37533dcb9f75
-lastReviewedNote: "Database #869: reviewed mandatory native concurrent CAS/control admission after independent P2 finding. All18 defaults are required before target access; incomplete CLI selection is rejected. The actual20-case960-request run satisfies the guard and all960 request SQL files are unchanged;57 offline collector tests pass. Product SQL and prior runtime evidence remain unchanged."
+lastReviewedCommit: e49be4835ffce76db5bfd25f0a8cddcfe647d53e
+lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -1382,3 +1382,14 @@ For Database #846 run `20261016_all_unit_terminal_guard.sql` and `20261016_calcu
 `scripts/test_calculation_export_upgrade.sh` runs only in the matching isolated GitHub-hosted workspace with `CALCULATION_EXPORT_UPGRADE_ALLOW_RESET=isolated`. It resets the verified migration prefix to canonical `f7c0b829` / `20261014081710`, seeds completed jobs/results/packages, applies the two exact phase-one migration files, compares every historical row, runs export admission/lease/revocation tests and restores the candidate migration head. The rendering helper is read-only and can supply the same fixture to an explicitly owned local baseline.
 
 The terminal-cache replay compatibility fix is a separate forward migration (`20261016035632`) because an already-created Supabase Preview applies only new migrations. Preserve the original pending migration bytes; qualify both the canonical populated-base upgrade and the final Preview head.
+
+## National carbon organization drafts v6
+
+After a fresh migration rebuild, run `supabase test db supabase/tests/20260805_full_schema_cutover.sql supabase/tests/20260806_api_contract_closure.sql supabase/tests/20260901_national_carbon_organization_contributions.sql`. The exact API inventory adds only the v6 dashboard facade (339 total); schema readback must report the highest checked-in migration returned by `python3 scripts/resolve_migration_head.py` (`20261025103800` for the Database #869 Main-to-Dev backmerge). In addition to v5 compatibility, verify v6 admission/ACL/capability, latest-version state-0 counting, current-profile unit merging and reviewer-role exclusions, draft-only/zero units, all four numeric ranking priorities, deterministic name ties and continuous ranks. Keep chart membership/limits and summary/region/activity scopes covered.
+
+
+## Calculation identity qualification (Database #873)
+
+Run `supabase/tests/20261025_calculation_contract_identity.sql` after a blank migration rebuild, alongside scope-closure, snapshot-build terminal guards, API closure and exact schema inventory. Verify service-only descriptor activation, stale compare-and-set rejection, old-token pinning, distinct scan/build identities after activation, unchanged scanner/data identity, compatible-candidate ordering and immutable historical reads. Before activation the additive Worker input field is omitted for legacy decoders. Queue identity is derived from server state, never a caller-supplied fingerprint.
+
+Also apply the migration to a populated canonical-base fixture with an existing request, and run the actual Worker activation CLI against the isolated database. Verify the exact descriptor digest and an activation conflict, then feed actual candidate RPC projections to the Edge admission helper. Regenerate all five schema views and Data API types twice. These local receipts do not replace the original public-100 Manager BuildV2/Storage/download qualification or hosted Preview, deployment and integration proof. No migration selects an algorithm identity automatically.
