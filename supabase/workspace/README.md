@@ -20,9 +20,9 @@ checkPaths:
   - .githooks/pre-push
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-23
-lastReviewedCommit: 51a0b3e81287c691b18b885af8767d4a8f8fd47d
-lastReviewedNote: "Database #860: reviewed additive dashboard v6 migration, latest-current state-0 attribution, draft ranking, capability ACLs and generated schema; original v5, ownership and deployment workflow remain unchanged."
+lastReviewedAt: 2026-10-25
+lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
+lastReviewedNote: "Database #864: exact-local five-schema and type generation is deterministic across 2167 files. Only four existing reader definitions change; Data API/Portal types and generated-workspace ownership remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

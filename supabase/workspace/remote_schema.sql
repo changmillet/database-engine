@@ -56036,7 +56036,7 @@ CREATE OR REPLACE FUNCTION "private"."display_catalog_facets_v3_impl"("p_kind" "
     SET "row_security" TO 'on'
     AS $$
 begin
-  if p_query='' then
+  -- Canonical narrow facts preserve all six normalized values/labels.
     return (
 with matched as materialized (
     select * from private.display_navigation_matched_versions_v1(p_kind,p_query,p_filters)
@@ -56175,183 +56175,6 @@ with matched as materialized (
   )
   from groups
     );
-  end if;
-
-  -- Nonempty lexical candidate and matching semantics remain unchanged.
-  return (
-with matched as materialized (
-    select candidate.*
-    from private.display_catalog_facet_candidate_rows_v3(
-      p_kind,
-      p_query,
-      p_exact_id,
-      p_like_pattern
-    ) as candidate
-    where private.display_navigation_version_matches_v3(
-        candidate.dataset_kind, p_filters, candidate.id, candidate.version
-      )
-      and (
-        not (p_filters ? 'accessLevel')
-        or candidate.card ->> 'accessLevel' = p_filters ->> 'accessLevel'
-      )
-      and (
-        not (p_filters ? 'geography')
-        or pg_catalog.lower(pg_catalog.btrim(coalesce(
-          candidate.card #>> '{geography,code}',
-          ''
-        ))) = p_filters ->> 'geography'
-      )
-      and (
-        not (p_filters ? 'classification')
-        or exists (
-          select 1
-          from pg_catalog.jsonb_array_elements(
-            candidate.card -> 'classifications'
-          ) as classification(item)
-          where pg_catalog.lower(pg_catalog.btrim(
-            classification.item ->> 'code'
-          )) = p_filters ->> 'classification'
-        )
-      )
-      and (
-        not (p_filters ? 'referenceYearFrom')
-        or (candidate.card ->> 'referenceYear')::integer
-          >= (p_filters ->> 'referenceYearFrom')::integer
-      )
-      and (
-        not (p_filters ? 'referenceYearTo')
-        or (candidate.card ->> 'referenceYear')::integer
-          <= (p_filters ->> 'referenceYearTo')::integer
-      )
-      and (
-        not (p_filters ? 'processSubtype')
-        or pg_catalog.lower(pg_catalog.btrim(coalesce(
-          candidate.card ->> 'processSubtype',
-          ''
-        ))) = p_filters ->> 'processSubtype'
-      )
-      and (
-        not (p_filters ? 'source')
-        or pg_catalog.lower(pg_catalog.btrim(coalesce(
-          candidate.card ->> 'source',
-          ''
-        ))) = p_filters ->> 'source'
-      )
-  ), facet_values as materialized (
-    select 'kind'::text as group_id,
-      1 as group_order,
-      matched.dataset_kind as value,
-      matched.dataset_kind as label
-    from matched
-    union all
-    select 'accessLevel',
-      2,
-      matched.card ->> 'accessLevel',
-      matched.card ->> 'accessLevel'
-    from matched
-    union all
-    select 'geography',
-      3,
-      pg_catalog.lower(pg_catalog.btrim(
-        matched.card #>> '{geography,code}'
-      )),
-      matched.card #>> '{geography,code}'
-    from matched
-    union all
-    select 'referenceYear',
-      4,
-      pg_catalog.btrim(matched.card ->> 'referenceYear'),
-      pg_catalog.btrim(matched.card ->> 'referenceYear')
-    from matched
-    union all
-    select 'processSubtype',
-      5,
-      pg_catalog.lower(pg_catalog.btrim(
-        matched.card ->> 'processSubtype'
-      )),
-      matched.card ->> 'processSubtype'
-    from matched
-    where matched.dataset_kind = 'process'
-    union all
-    select 'source',
-      6,
-      pg_catalog.lower(pg_catalog.btrim(matched.card ->> 'source')),
-      matched.card ->> 'source'
-    from matched
-  ), counts as materialized (
-    select group_id,
-      group_order,
-      value,
-      pg_catalog.min(value) as label,
-      pg_catalog.count(*) as value_count
-    from facet_values
-    where nullif(pg_catalog.btrim(value), '') is not null
-      and pg_catalog.length(value) <= 128
-      and pg_catalog.octet_length(value) <= 512
-    group by group_id, group_order, value
-  ), ranked_counts as materialized (
-    select counts.*,
-      pg_catalog.row_number() over (
-        partition by counts.group_id
-        order by counts.value
-      ) as value_rank
-    from counts
-  ), grouped as materialized (
-    select ranked_counts.group_id,
-      ranked_counts.group_order,
-      pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
-        'value', ranked_counts.value,
-        'label', pg_catalog.jsonb_build_array(
-          pg_catalog.jsonb_build_object(
-            'language', 'und', 'value', ranked_counts.label
-          )
-        ),
-        'count', ranked_counts.value_count
-      ) order by ranked_counts.value)
-        filter (where ranked_counts.value_rank <= 100) as values_json,
-      pg_catalog.bool_or(ranked_counts.value_rank > 100) as has_more
-    from ranked_counts
-    group by ranked_counts.group_id, ranked_counts.group_order
-  ), groups as (
-    select coalesce(pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object(
-      'id', grouped.group_id,
-      'label', pg_catalog.jsonb_build_array(
-        pg_catalog.jsonb_build_object(
-          'language', 'en',
-          'value', case grouped.group_id
-            when 'kind' then 'Object type'
-            when 'accessLevel' then 'Access level'
-            when 'geography' then 'Geography'
-            when 'referenceYear' then 'Reference year'
-            when 'processSubtype' then 'Process subtype'
-            else 'Source'
-          end
-        ),
-        pg_catalog.jsonb_build_object(
-          'language', 'zh-CN',
-          'value', case grouped.group_id
-            when 'kind' then '对象类型'
-            when 'accessLevel' then '访问级别'
-            when 'geography' then '地区'
-            when 'referenceYear' then '参考年'
-            when 'processSubtype' then '过程类型'
-            else '数据源'
-          end
-        )
-      ),
-      'values', grouped.values_json,
-      'hasMore', grouped.has_more
-    ) order by grouped.group_order), '[]'::jsonb) as value
-    from grouped
-  )
-  select pg_catalog.jsonb_build_object(
-    'schemaVersion', 'portal.public-facets.v2',
-    'kind', p_kind,
-    'queryFingerprint', p_query_fingerprint,
-    'groups', groups.value
-  )
-  from groups
-  );
 end;
 $$;
 
@@ -61594,7 +61417,7 @@ begin
     where m.dimension=p_dimension and (p_kind='all' or m.dataset_kind=p_kind)
       and ((p_query='' and p_filters='{}'::jsonb)
         or (m.dataset_kind,m.id,m.version) in (select dataset_kind,id,version from matched))
-      and m.node_id in(select n.node_id from targets n)
+      and m.node_id = any(array(select n.node_id from targets n))
     group by m.node_id
   ), decorated as materialized (
     select n.node_id,n.code,jsonb_build_object(
@@ -61694,12 +61517,68 @@ begin
   else
     if p_query ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then v_exact:=p_query::uuid; end if;
     v_pattern := '%' || replace(replace(replace(p_query,chr(92),chr(92)||chr(92)),'%',chr(92)||'%'),'_',chr(92)||'_') || '%';
-    -- Reuse the exact UUID/CAS/literal/one-character candidate contract of V2.
+    -- Keep the established selective CAS plan; expanding it into the broad
+    -- key union is not qualified at representative volume.
+    if private.display_catalog_summary_valid_cas_v1(p_query) then
     return query select v.dataset_kind,v.id,v.version
     from private.display_catalog_facet_candidate_rows_v2(p_kind,p_query,v_exact,v_pattern) c
     join private.display_navigation_versions_v1 v
       on (v.dataset_kind,v.id,v.version)=(c.dataset_kind,c.id,c.version)
     where
+      (not (p_filters ? 'accessLevel') or v.access_level=p_filters->>'accessLevel')
+      and (not (p_filters ? 'geography') or v.geography_code=p_filters->>'geography')
+      and (not (p_filters ? 'classification') or v.classification_codes @> array[p_filters->>'classification'])
+      and (not (p_filters ? 'referenceYearFrom') or v.reference_year >= (p_filters->>'referenceYearFrom')::integer)
+      and (not (p_filters ? 'referenceYearTo') or v.reference_year <= (p_filters->>'referenceYearTo')::integer)
+      and (not (p_filters ? 'processSubtype') or v.process_subtype=p_filters->>'processSubtype')
+      and (not (p_filters ? 'source') or v.source=p_filters->>'source')
+      and (
+        not (p_filters ? 'classificationNodeId')
+        or (v.dataset_kind,v.id,v.version) in (
+          select m.dataset_kind,m.id,m.version
+          from private.display_navigation_membership_v1 m
+          where m.dimension='classification'
+            and m.node_id=p_filters->>'classificationNodeId'
+            and (p_kind='all' or m.dataset_kind=p_kind)
+            and (coalesce(p_filters->>'classificationScope','subtree')<>'direct' or m.direct)
+        )
+      ) and (
+        not (p_filters ? 'geographyNodeId')
+        or (v.dataset_kind,v.id,v.version) in (
+          select m.dataset_kind,m.id,m.version
+          from private.display_navigation_membership_v1 m
+          where m.dimension='geography'
+            and m.node_id=p_filters->>'geographyNodeId'
+            and (p_kind='all' or m.dataset_kind=p_kind)
+            and (coalesce(p_filters->>'geographyScope','subtree')<>'direct' or m.direct)
+        )
+      )
+;
+      return;
+    end if;
+
+    -- Pattern helpers and UUID lookup already read the authoritative current
+    -- projection under the same RLS. Their UNION has one row per exact key.
+    -- With empty filters the guarded complete navigation projection adds no
+    -- predicate, so the planner may remove this unique-key LEFT JOIN.
+    return query
+    with lexical_keys as materialized (
+      select 'process'::text dataset_kind,p.id,p.version
+      from private.display_catalog_process_pattern_versions_v1(v_pattern) p
+      where p_kind in ('all','process')
+      union
+      select 'flow'::text,p.id,p.version
+      from private.display_catalog_flow_pattern_versions_v1(v_pattern) p
+      where p_kind in ('all','flow')
+      union
+      select p.dataset_kind,p.id,p.version
+      from private.display_catalog_search_current_v2 p
+      where (p_kind='all' or p.dataset_kind=p_kind) and p.id=v_exact
+    )
+    select c.dataset_kind,c.id,c.version
+    from lexical_keys c left join private.display_navigation_versions_v1 v
+      on (v.dataset_kind,v.id,v.version)=(c.dataset_kind,c.id,c.version)
+    where (p_filters='{}'::jsonb or v.id is not null) and
       (not (p_filters ? 'accessLevel') or v.access_level=p_filters->>'accessLevel')
       and (not (p_filters ? 'geography') or v.geography_code=p_filters->>'geography')
       and (not (p_filters ? 'classification') or v.classification_codes @> array[p_filters->>'classification'])
@@ -71576,15 +71455,27 @@ CREATE OR REPLACE FUNCTION "private"."portal_display_brand_facets_v1"("p_page" "
     SET "search_path" TO ''
     SET "row_security" TO 'on'
     AS $$
+ -- Wide empty matching adds no filter after the symmetric coverage guard.
+ -- Retain the original selective Process path, where direct V1 scanning regresses.
+ -- Every existing projection writer maintains these exact version sets.
  select jsonb_set(p_page,'{groups}',(p_page->'groups') || jsonb_build_array(jsonb_build_object(
   'id','brand','label',jsonb_build_array(jsonb_build_object('language','en','value','Database brand')),
-  'hasMore',false,'values',coalesce((select jsonb_agg(jsonb_build_object(
+  'hasMore',false,'values',case when lower(btrim(coalesce(p_query,'')))='' and private.display_normalize_filters_v1(p_filters)='{}'::jsonb
+   and lower(btrim(p_kind)) <> 'process'
+ then coalesce((select jsonb_agg(jsonb_build_object(
+   'value',brand,'label',jsonb_build_array(jsonb_build_object('language','en','value',private.portal_brand_v1(brand)->>'name')),
+   'count',total) order by brand)
+   from (select p.brand,count(*) as total
+    from private.display_catalog_search_rows_v1 p
+    where lower(btrim(p_kind))='all' or p.dataset_kind=lower(btrim(p_kind))
+    group by p.brand) counted),'[]'::jsonb)
+ else coalesce((select jsonb_agg(jsonb_build_object(
    'value',brand,'label',jsonb_build_array(jsonb_build_object('language','en','value',private.portal_brand_v1(brand)->>'name')),
    'count',total) order by brand)
    from (select p.brand,count(*) as total
     from private.display_navigation_matched_versions_v1(lower(btrim(p_kind)),lower(btrim(coalesce(p_query,''))),private.display_normalize_filters_v1(p_filters)) k
     join private.display_catalog_search_rows_v1 p using(dataset_kind,id,version)
-    group by p.brand) counted),'[]'::jsonb))))
+    group by p.brand) counted),'[]'::jsonb) end)))
 $$;
 
 

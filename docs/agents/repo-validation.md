@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 3711a8e8e671decc5e77cd37341b9f5d83b622b6
-lastReviewedNote: "Reviewed Worker #339 / PR #340 local companion against base 3711a8e8: registered category receipts, private partial readiness/export, complete-only Portal/publication/release guards and r7 admission. Supplemental PostgreSQL17 WASM proof is recorded separately; full native history, generated workspace and hosted qualification remain pending."
+lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
+lastReviewedNote: "Database #864: reviewed serial/concurrent source-bound proof, full populated migration, rejection/rollback/repeat, committed visibility, real writers, canonical per-file suites and deterministic exports. Hosted qualification remains required."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -1168,6 +1168,56 @@ retains nested natural plans, and covers empty/filtered/lexical/UUID/escaped/
 one-character/zero-result shapes in single- and multi-brand deployments. These
 are local synthetic warm samples, not hosted p95 or concurrent-load acceptance.
 
+### Facets and Navigation reader qualification (Database #864)
+
+Run `20261025_portal_facets_navigation.sql` after a blank rebuild, all Portal
+suites and adjacent full-schema/API/OAuth/display/publication contracts. The
+focused real-writer suite covers exact historical versions, nullable Flow years,
+CAS-shaped Process text, UUID/literal matching, brand isolation and immediate
+source update/withdrawal. Keep the API closure migration head exact.
+
+The guarded serial collector compares complete baseline/candidate JSON and
+predecessor-issued cursors on the same rollback-only synthetic projections.
+Its full smoke matrix is distinct from representative-volume qualification.
+Include empty, filtered, broad lexical, single-character, CAS and populated
+classification/geography nodes. Record exact source/collector hashes, image,
+card width, versions, sample counts, routine configurations and nested natural
+plans. Normal latency samples run without `auto_explain`; plan collection uses
+a duration threshold and bounded streamed artifacts. A partial or oversized
+plan collection is failed evidence, even if completed timing rows can be
+recovered for diagnosis. Candidate local p95 must not exceed two seconds;
+the public eight-second timeout and existing function work-memory overrides
+remain unchanged.
+
+`test_portal_facets_navigation_upgrade.py` executes the entire migration on real
+source-writer fixtures. It compares full responses, source/settings/projections,
+unmodified routines, existing function metadata, roles, ACLs, RLS, triggers and
+indexes; it also rejects missing/drifted projection facts, proves rollback after
+an injected intermediate failure and verifies repeat application. The guard must
+run with RLS bypass, compare V1/current/navigation/facet key coverage and preserve
+facet year text independently of navigation's integer year. Its optional volume
+guard measurement is separately classified and uses the bounded migration budget,
+not an increased request timeout.
+
+Its `--committed-visibility` mode uses a real settings writer and an observed
+advisory-lock barrier: an independent anonymous reader must see the old complete
+response while the writer is uncommitted, then the new response immediately
+after its COMMIT marker. Replaying the predecessor on that same committed data
+must agree. The fixture's external webhook stub is restored before commit;
+normal projection writers remain enabled. This mode retains its real fixture
+for an owned reset and verifies that its connections and locks are released.
+
+Rebuild only the owned isolated project between serial and concurrent profiles.
+The four-client collector requires the exact successful serial receipt and
+fixture, compares every successful response to that reference, proves overlapping
+database execution and applies a two-second candidate wall-p95 target including
+client overhead. It restores candidate readers but deliberately retains synthetic
+rows; reset that owned project before writer suites and deterministic exports.
+Preserve receipts and release task-owned resources through the workspace cleanup
+workflow. Local qualification does not establish hosted p95 or identify the
+arguments of historical production failures. Official Preview/CI, exact Main
+deployment and readback, Dev synchronization and Root integration remain required.
+
 ## Seven-kind classification catalog qualification (Database #838)
 
 After rebuilding an explicitly owned isolated database, run
@@ -1231,4 +1281,4 @@ The terminal-cache replay compatibility fix is a separate forward migration (`20
 
 ## National carbon organization drafts v6
 
-After a fresh migration rebuild, run `supabase test db supabase/tests/20260805_full_schema_cutover.sql supabase/tests/20260806_api_contract_closure.sql supabase/tests/20260901_national_carbon_organization_contributions.sql`. The exact API inventory adds only the v6 dashboard facade (339 total); schema readback must report migration head `20261023020324`. In addition to v5 compatibility, verify v6 admission/ACL/capability, latest-version state-0 counting, current-profile unit merging and reviewer-role exclusions, draft-only/zero units, all four numeric ranking priorities, deterministic name ties and continuous ranks. Keep chart membership/limits and summary/region/activity scopes covered.
+After a fresh migration rebuild, run `supabase test db supabase/tests/20260805_full_schema_cutover.sql supabase/tests/20260806_api_contract_closure.sql supabase/tests/20260901_national_carbon_organization_contributions.sql`. The exact API inventory adds only the v6 dashboard facade (339 total); schema readback must report the highest checked-in migration (`20261025052607` after the Database #864 Main-to-Dev backmerge). In addition to v5 compatibility, verify v6 admission/ACL/capability, latest-version state-0 counting, current-profile unit merging and reviewer-role exclusions, draft-only/zero units, all four numeric ranking priorities, deterministic name ties and continuous ranks. Keep chart membership/limits and summary/region/activity scopes covered.

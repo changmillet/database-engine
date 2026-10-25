@@ -54,7 +54,7 @@ begin
     where m.dimension=p_dimension and (p_kind='all' or m.dataset_kind=p_kind)
       and ((p_query='' and p_filters='{}'::jsonb)
         or (m.dataset_kind,m.id,m.version) in (select dataset_kind,id,version from matched))
-      and m.node_id in(select n.node_id from targets n)
+      and m.node_id = any(array(select n.node_id from targets n))
     group by m.node_id
   ), decorated as materialized (
     select n.node_id,n.code,jsonb_build_object(

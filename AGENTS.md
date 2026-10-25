@@ -38,8 +38,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 3711a8e8e671decc5e77cd37341b9f5d83b622b6
-lastReviewedNote: "Reviewed Worker #339 / PR #340 local companion against base 3711a8e8: registered category receipts, private partial readiness/export, complete-only Portal/publication/release guards and r7 admission. Supplemental PostgreSQL17 WASM proof is recorded separately; full native history, generated workspace and hosted qualification remain pending."
+lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
+lastReviewedNote: "Database #864: scoped Facets/Navigation optimization preserves exact versions, caller permissions, writers and request budgets. Main-hotfix, managed deployment, Dev synchronization and Root integration remain separate required gates."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md
