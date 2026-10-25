@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Database #864: guarded local upgrade and committed visibility qualification.
+"""Database #864/#869: guarded local upgrade and committed visibility qualification.
 
 The exact task-owned local PG17.11 container is the only accepted target. Real
 source INSERTs and unchanged source/settings/projection hashes qualify upgrade
@@ -41,6 +41,93 @@ ROLE_GUARD_MESSAGE = 'Display facets cutover requires an RLS-bypassing migration
 CHECK_LABELS = frozenset(('reject-missing-navigation', 'reject-missing-facet',
     'reject-navigation-facts', 'reject-facet-text-facts', 'reject-facet-state',
     'reject-original-v1-orphan', 'reject-non-bypass-role', 'injected-mid-upgrade'))
+
+PROFILE = '864'
+CAS_BASE = '6a880838efbf4d453103a1141e9282db130171e8'
+PROFILES = {
+    '864': {'candidate': CANDIDATE, 'targets': TARGETS, 'checks': CHECK_LABELS,
+            'guard_tag': '$display_facets_cutover_guard$', 'guard_message': GUARD_MESSAGE,
+            'role_message': ROLE_GUARD_MESSAGE, 'source_rows': {'processes': 4, 'flows': 2},
+            'projection_rows': (5, 3), 'inject_after': 2},
+    '869': {'candidate': ROOT / 'supabase/migrations/20261025103800_activate_portal_flow_cas_fact.sql',
+            'prepare': ROOT / 'supabase/migrations/20261025103759_prepare_portal_flow_cas_fact.sql',
+            'targets': ('display_sync_navigation_membership_v1', 'display_navigation_matched_versions_v1'),
+            'checks': frozenset(('reject-prepare-role', 'reject-activate-role', 'reject-manifest',
+                                'reject-native-key-coverage', 'reject-active-cas-drift',
+                                'reject-process-cas-drift', 'reject-native-index-shape',
+                                'reject-preexisting-index-before-activation', 'reject-active-lost-index-drift',
+                                'injected-prepare', 'injected-activate', 'prepare-cas-only-writer')),
+            'guard_tag': '$display_flow_cas_preflight$',
+            'prepare_guard_tag': '$display_flow_cas_role_guard$',
+            'guard_message': 'Display Flow CAS cutover projection coverage or facts drifted',
+            'role_message': 'Display Flow CAS cutover requires an RLS-bypassing migration role',
+            'source_rows': {'processes': 5, 'flows': 13}, 'projection_rows': (16, 4), 'inject_after': 1},
+}
+
+
+def select_profile(name: str) -> None:
+    """Explicit qualification scope; legacy defaults never infer a new migration."""
+    global PROFILE, CANDIDATE, TARGETS, CHECK_LABELS, GUARD_MESSAGE, ROLE_GUARD_MESSAGE
+    if name not in PROFILES:
+        raise ValueError('Unknown upgrade qualification profile')
+    PROFILE = name
+    profile = PROFILES[name]
+    CANDIDATE, TARGETS, CHECK_LABELS = profile['candidate'], profile['targets'], profile['checks']
+    GUARD_MESSAGE, ROLE_GUARD_MESSAGE = profile['guard_message'], profile['role_message']
+
+
+def profile_candidate(candidate: Path | None, base: str) -> Path:
+    expected = PROFILES[PROFILE]['candidate']
+    if candidate is not None and candidate.resolve() != expected.resolve():
+        raise ValueError('Candidate does not match explicit upgrade profile')
+    if PROFILE == '869' and base != CAS_BASE:
+        raise ValueError('Database #869 requires exact Main predecessor ' + CAS_BASE)
+    return expected
+
+
+class NativeStatements(list):
+    """One reviewed ordered bundle; each phase has its own transaction contract."""
+
+    def __init__(self, prepare: list[str], activate: list[str]):
+        self.prepare, self.activate = prepare, activate
+        super().__init__(prepare + activate)
+
+
+def load_candidate(base: str, candidate: Path | None, prepare: Path | None = None):
+    candidate = profile_candidate(candidate, base)
+    source = candidate.read_text()
+    if PROFILE == '864':
+        if prepare is not None:
+            raise ValueError('Prepare migration is available only in the explicit 869 profile')
+        statements = migration_statements(source)
+        require_pre_ddl_guard(statements)
+        return candidate, source, statements
+    expected = PROFILES['869']['prepare']
+    if prepare is not None and prepare.resolve() != expected.resolve():
+        raise ValueError('Prepare migration does not match the ordered 869 bundle')
+    first = expected.read_text()
+    phases = NativeStatements(migration_statements(first), migration_statements(source))
+    require_pre_ddl_guard(phases.prepare, PROFILES['869']['prepare_guard_tag'])
+    require_pre_ddl_guard(phases.activate)
+    if set(bench.reader_definitions(first)) != {('function', 'display_sync_navigation_membership_v1')}:
+        raise ValueError('Prepare phase must replace only the existing navigation writer')
+    if set(bench.reader_definitions(source)) != {('function', 'display_navigation_matched_versions_v1')}:
+        raise ValueError('Activate phase must replace only the existing matcher')
+    return candidate, first + '\n-- Ordered Database #869 activation phase\n' + source, phases
+
+
+def matcher_replay(predecessor: dict) -> str:
+    """A read-only comparison replays the reader without retiring the new writer."""
+    return bench.definitions_sql({key: value for key, value in predecessor.items()
+                                 if key[1] == 'display_navigation_matched_versions_v1'})
+
+
+def cas_source_fixture() -> str:
+    source = (ROOT / 'supabase/tests/20261025_portal_flow_cas.sql').read_text()
+    begin, end = '-- BEGIN CAS869 REAL WRITER FIXTURE', '-- END CAS869 REAL WRITER FIXTURE'
+    if source.count(begin) != 1 or source.count(end) != 1:
+        raise ValueError('Exact reusable real-writer CAS fixture boundaries required')
+    return source.split(begin)[1].split(end)[0]
 
 
 def split_statements(source: str) -> list[str]:
@@ -154,7 +241,7 @@ def source_fixture() -> str:
     prefix = source.split(marker)[0]
     prefix = re.sub(r'^begin;\s*', '', prefix, count=1, flags=re.M | re.I)
     prefix = prefix.replace('select extensions.no_plan();', '')
-    return prefix + """
+    fixture = prefix + """
 -- Additional exact versions exercise history, literal escaping, mixed brands,
 -- nullable facts and provincial geography through the REAL source/settings
 -- writers. No trigger is disabled in this correctness fixture.
@@ -172,11 +259,12 @@ insert into private.dataset_display_settings(dataset_kind,dataset_id,dataset_ver
 set constraints all immediate;
 update private.portal_display_rollout set mode='display';
 """
+    return fixture + (cas_source_fixture() if PROFILE == '869' else '')
 
 
 def catalog_query() -> str:
     targets = ','.join(bench.literal(name) for name in TARGETS)
-    return f"""select jsonb_build_object(
+    query = f"""select jsonb_build_object(
  'routines',(select md5(coalesce(jsonb_agg(jsonb_build_array(p.oid,n.nspname,p.proname,
    to_jsonb(p)-'prosrc'-'prosqlbody',case when n.nspname='private' and p.proname in ({targets})
    then null else pg_get_functiondef(p.oid) end) order by p.oid)::text,''))
@@ -201,10 +289,40 @@ def catalog_query() -> str:
    rolcanlogin,rolreplication,rolbypassrls,rolconnlimit,rolvaliduntil,rolconfig) order by oid)::text) from pg_roles),
  'roleMemberships',(select md5(coalesce(jsonb_agg(to_jsonb(m) order by m.oid)::text,'')) from pg_auth_members m),
  'manifest',(select to_jsonb(m) from private.portal_display_contract_manifest m where singleton))"""
+    if PROFILE == '869':
+        query = query.replace('where a.attrelid=c.oid and a.attnum>0)',
+            "where a.attrelid=c.oid and a.attnum>0 and not(c.oid='private.display_navigation_versions_v1'::regclass and a.attname='cas_number'))")
+        query = query.replace('where i.indrelid=c.oid)',
+            "where i.indrelid=c.oid and i.indexrelid is distinct from to_regclass('private.d807_portal_navigation_versions_flow_cas_v1_idx'))")
+        query = query.replace("where n.nspname in ('api','private','public','util','archive')),",
+            "where n.nspname in ('api','private','public','util','archive') and c.oid is distinct from to_regclass('private.d807_portal_navigation_versions_flow_cas_v1_idx'))," )
+        query += " || jsonb_build_object('nativeExtension'," + native_extension_query() + ",'migrationHead',(select max(version) from supabase_migrations.schema_migrations))"
+    return query
+
+
+def native_extension_query() -> str:
+    # Retain the extension separately for exact phase rollback/repeat receipts.
+    # JSON extraction works before and after ADD COLUMN.
+    return """jsonb_build_object(
+ 'column',(select to_jsonb(a) from pg_attribute a where a.attrelid='private.display_navigation_versions_v1'::regclass and a.attname='cas_number' and not a.attisdropped),
+ 'default',(select pg_get_expr(d.adbin,d.adrelid) from pg_attrdef d join pg_attribute a on a.attrelid=d.adrelid and a.attnum=d.adnum where a.attrelid='private.display_navigation_versions_v1'::regclass and a.attname='cas_number'),
+ 'index',(select jsonb_build_object('definition',pg_get_indexdef(i.indexrelid),'catalog',to_jsonb(i),'owner',c.relowner,'acl',c.relacl,'bytes',pg_relation_size(c.oid)) from pg_index i join pg_class c on c.oid=i.indexrelid where i.indexrelid=to_regclass('private.d807_portal_navigation_versions_flow_cas_v1_idx')),
+ 'facts',(select md5(coalesce(jsonb_agg(jsonb_build_array(n.dataset_kind,n.id,n.version,to_jsonb(n)->'cas_number') order by n.dataset_kind,n.id,n.version)::text,'')) from private.display_navigation_versions_v1 n))"""
+
+
+def metadata_only(snapshot: dict) -> dict:
+    """Committed real writers change native rows and physical index size."""
+    value = json.loads(json.dumps(snapshot))
+    native = value.get('nativeExtension')
+    if native is not None:
+        native.pop('facts', None)
+        if native.get('index') is not None:
+            native['index'].pop('bytes', None)
+    return value
 
 
 def snapshot_helpers() -> str:
-    return """
+    sql = """
 create temp table upgrade_checks(label text primary key,evidence jsonb not null);
 create temp table upgrade_snapshots(label text primary key,value jsonb not null);
 create temp table upgrade_responses(phase text,label text,payload jsonb,sqlstate text,primary key(phase,label));
@@ -242,6 +360,12 @@ declare payload jsonb;failure text;begin
 end$$;
 grant execute on function pg_temp.upgrade_probe(text,text,text,text) to anon;
 """
+    if PROFILE == '869':
+        sql = sql.replace("declare result jsonb;begin\n execute format(",
+            "declare result jsonb;row_expression text:='to_jsonb(r)';begin\n if rel='private.display_navigation_versions_v1'::regclass then row_expression:='to_jsonb(r)-''cas_number''';end if;\n execute format(")
+        sql = sql.replace('md5(to_jsonb(r)::text)', 'md5((%1$s)::text)').replace("from %s r',rel)", "from %2$s r',row_expression,rel)")
+        sql = sql.replace("expected-'targetDefinitions'-'manifest'", "expected-'targetDefinitions'-'manifest'-'nativeExtension'").replace("actual-'targetDefinitions'-'manifest'", "actual-'targetDefinitions'-'manifest'-'nativeExtension'")
+    return sql
 
 
 def probes(phase: str) -> tuple[str, int]:
@@ -256,6 +380,12 @@ def probes(phase: str) -> tuple[str, int]:
               ('direct', '', {'geographyNodeId': 'geo:cn', 'geographyScope': 'direct'}),
               ('province', '', {'geographyNodeId': 'geo:cn-ah-hfe'}),
               ('brand', '', {'brand': 'bafu'})]
+    if PROFILE == '869':
+        shapes += [('cas-rare', '64-17-5', {}), ('cas-absent', '75-07-0', {}),
+                   ('cas-superstring', '150-00-0', {}), ('cas-filtered', '50-00-0', {'brand': 'bafu', 'geography': 'cn'}),
+                   ('cas-year', '50-00-0', {'referenceYearFrom': 2024}),
+                   ('cas-invalid', 'invalid869', {}), ('cas-object', 'object cas869', {}),
+                   ('cas-numeric', 'numeric cas869', {})]
     for scope in scopes:
         brands = 'array[' + ','.join(bench.literal(x) for x in scope.split(',')) + ']'
         for kind in ('all', 'process', 'flow'):
@@ -287,13 +417,17 @@ def probes(phase: str) -> tuple[str, int]:
 def rejection(label: str, setup: str, statements: list[str], state: str, message: str,
               evidence_sql: str = "'{}'::jsonb") -> str:
     """Nested transactions independently roll back migration and corruption."""
+    # Setup is ordinary SQL, including SELECT assertions in manifest refreshes.
+    # Dynamic EXECUTE discards their results inside this PL/pgSQL block; a raw
+    # SELECT here would fail before the intended migration guard was reached.
+    setup_commands = execute_statements(split_statements(setup))
     return f"""
 do $rejection$
 declare original jsonb:=pg_temp.upgrade_snapshot();corrupted jsonb;rejected boolean:=false;
  caught_state text;caught_message text;
 begin
  begin
-  {setup}
+  {setup_commands}
   corrupted:=pg_temp.upgrade_snapshot();
   begin
    {execute_statements(statements)}
@@ -314,11 +448,20 @@ end$rejection$;
 """
 
 
-def cutover_guard(statements: list[str]) -> str:
-    guards = [s for s in statements if '$display_facets_cutover_guard$' in s]
+def cutover_guard(statements: list[str], tag: str | None = None) -> str:
+    guards = [s for s in statements if (tag or PROFILES[PROFILE]['guard_tag']) in s]
     if len(guards) != 1:
         raise ValueError('Exactly one named cutover guard required')
     return guards[0]
+
+
+def require_pre_ddl_guard(statements: list[str], tag: str | None = None) -> None:
+    guard = cutover_guard(statements, tag)
+    first_ddl = next((index for index, statement in enumerate(statements)
+                      if re.match(r'(?:create|alter|drop|grant|revoke|comment)\b',
+                                  statement_code(statement), re.I)), len(statements))
+    if statements.index(guard) >= first_ddl:
+        raise ValueError('The named coverage/role guard must run before migration DDL')
 
 
 def old_three_way_guard(guard: str) -> str:
@@ -332,38 +475,42 @@ def old_three_way_guard(guard: str) -> str:
 
 
 def build_real_sql(predecessor: dict, statements: list[str]) -> tuple[str, int]:
+    if PROFILE == '869':
+        return build_native_real_sql(predecessor, statements)
     sql = "begin;set local statement_timeout='60s';set local lock_timeout='5s';set local work_mem='4MB';\n"
     sql += "do $$begin if not pg_try_advisory_xact_lock(864,1) then raise exception 'Another #864 fixture owns this database';end if;end$$;\n"
     sql += bench.definitions_sql(predecessor) + source_fixture() + snapshot_helpers()
     sql += "insert into upgrade_snapshots values('baseline',pg_temp.upgrade_snapshot());\n"
-    sql += "do $$begin if (select count(*) from private.display_catalog_search_rows_v1)<>5 or (select count(*) from private.display_catalog_search_rows_v2)<>3 then raise exception 'Real source fixture cardinality drift';end if;end$$;\n"
+    v1, v2 = PROFILES[PROFILE]['projection_rows']
+    sql += f"do $$begin if (select count(*) from private.display_catalog_search_rows_v1)<>{v1} or (select count(*) from private.display_catalog_search_rows_v2)<>{v2} then raise exception 'Real source fixture cardinality drift';end if;end$$;\n"
     before, count = probes('baseline')
     sql += before
     sql += "do $$begin if exists(select 1 from upgrade_responses where label like '%:navigation:geography:empty' and payload->>'nextCursor' is null) then raise exception 'Actual baseline continuation cursor required';end if;end$$;\n"
-    key = "dataset_kind='process' and id='80700000-0000-4000-8000-000000000101' and version='01.00.000'"
-    corruptions = {
-        'reject-missing-navigation': 'delete from private.display_navigation_versions_v1 where ' + key + ';',
-        'reject-missing-facet': 'delete from private.display_catalog_facet_rows_v1 where ' + key + ';',
-        'reject-navigation-facts': "update private.display_navigation_versions_v1 set source='drift864' where " + key + ';',
-        'reject-facet-text-facts': "update private.display_catalog_facet_rows_v1 set facet_reference_year='02024' where " + key + ';',
-        'reject-facet-state': 'update private.display_catalog_facet_rows_v1 set state_code=200 where ' + key + ';',
-    }
-    for label, setup in corruptions.items():
-        sql += rejection(label, setup, statements, GUARD_STATE, GUARD_MESSAGE)
-    orphan_setup = f"""
-delete from private.display_catalog_search_rows_v2 where {key};
-delete from private.display_catalog_facet_rows_v1 where {key};
-do $$begin
- if not exists(select 1 from private.display_catalog_search_rows_v1 where {key})
-  or exists(select 1 from private.display_catalog_search_current_v2 where {key})
-  or exists(select 1 from private.display_navigation_versions_v1 where {key})
-  or exists(select 1 from private.display_catalog_facet_rows_v1 where {key}) then
-  raise exception 'Original-V1 orphan counterexample was not constructed';
- end if;
-end$$;
-""" + old_three_way_guard(cutover_guard(statements))
-    sql += rejection('reject-original-v1-orphan', orphan_setup, statements, GUARD_STATE, GUARD_MESSAGE,
-        "jsonb_build_object('oldThreeWayGuardAccepted',true,'originalV1Present',true,'currentNavigationFacetAbsent',true)")
+    if PROFILE == '864':
+        key = "dataset_kind='process' and id='80700000-0000-4000-8000-000000000101' and version='01.00.000'"
+        corruptions = {
+            'reject-missing-navigation': 'delete from private.display_navigation_versions_v1 where ' + key + ';',
+            'reject-missing-facet': 'delete from private.display_catalog_facet_rows_v1 where ' + key + ';',
+            'reject-navigation-facts': "update private.display_navigation_versions_v1 set source='drift864' where " + key + ';',
+            'reject-facet-text-facts': "update private.display_catalog_facet_rows_v1 set facet_reference_year='02024' where " + key + ';',
+            'reject-facet-state': 'update private.display_catalog_facet_rows_v1 set state_code=200 where ' + key + ';',
+        }
+        for label, setup in corruptions.items():
+            sql += rejection(label, setup, statements, GUARD_STATE, GUARD_MESSAGE)
+        orphan_setup = f"""
+    delete from private.display_catalog_search_rows_v2 where {key};
+    delete from private.display_catalog_facet_rows_v1 where {key};
+    do $$begin
+     if not exists(select 1 from private.display_catalog_search_rows_v1 where {key})
+      or exists(select 1 from private.display_catalog_search_current_v2 where {key})
+      or exists(select 1 from private.display_navigation_versions_v1 where {key})
+      or exists(select 1 from private.display_catalog_facet_rows_v1 where {key}) then
+      raise exception 'Original-V1 orphan counterexample was not constructed';
+     end if;
+    end$$;
+    """ + old_three_way_guard(cutover_guard(statements))
+        sql += rejection('reject-original-v1-orphan', orphan_setup, statements, GUARD_STATE, GUARD_MESSAGE,
+            "jsonb_build_object('oldThreeWayGuardAccepted',true,'originalV1Present',true,'currentNavigationFacetAbsent',true)")
     # Role switching belongs INSIDE the failing migration subtransaction so the
     # exception restores the administrator before either snapshot is read.
     role_setup = """do $$begin
@@ -380,10 +527,10 @@ end$$;"""
         partial.append(statement)
         if re.match(r'create\s+or\s+replace\s+function\b', statement_code(statement), re.I):
             replaced += 1
-            if replaced == 2:
+            if replaced == PROFILES[PROFILE]['inject_after']:
                 break
-    if replaced != 2:
-        raise ValueError('At least two target function replacements required for partial-upgrade injection')
+    if replaced != PROFILES[PROFILE]['inject_after']:
+        raise ValueError('Required target replacement missing before partial-upgrade injection')
     partial.append("do $$begin raise exception using errcode='P0865',message='expected #864 mid-upgrade failure';end$$;")
     sql += rejection('injected-mid-upgrade', '', partial, 'P0865', 'expected #864 mid-upgrade failure')
     migration = '\n'.join(statements)
@@ -398,6 +545,8 @@ do $$begin
  if exists(select 1 from upgrade_responses b full join upgrade_responses c on b.label=c.label and c.phase='candidate'
   where b.phase='baseline' and (c.label is null or b.payload is distinct from c.payload or b.sqlstate is distinct from c.sqlstate)) then raise exception 'Complete API JSON or SQLSTATE drift';end if;
 end$$;
+"""
+    sql += """
 select jsonb_build_object('checks',(select jsonb_object_agg(label,evidence) from upgrade_checks),
  'snapshots',(select jsonb_object_agg(label,value) from upgrade_snapshots),
  'responses',(select jsonb_agg(to_jsonb(r) order by phase,label) from upgrade_responses r),
@@ -410,13 +559,368 @@ rollback;
     return sql, count
 
 
+def native_predecessor_setup(predecessor: dict) -> str:
+    # Only the owned rollback transaction may remove this exact extension.
+    return """
+drop index if exists private.d807_portal_navigation_versions_flow_cas_v1_idx;
+alter table private.display_navigation_versions_v1 drop column if exists cas_number;
+""" + bench.definitions_sql(predecessor)
+
+
+def native_assert_sql(active: bool) -> str:
+    sql = """
+do $native_contract$
+begin
+ if not exists(select 1 from pg_attribute a where a.attrelid='private.display_navigation_versions_v1'::regclass
+  and a.attname='cas_number' and not a.attisdropped and a.atttypid='text'::regtype
+  and not a.attnotnull and not a.atthasdef and not a.atthasmissing
+  and a.attidentity='' and a.attgenerated='' and a.attacl is null) then
+  raise exception 'Native CAS column is not the exact nullable text extension';
+ end if;
+"""
+    if active:
+        sql += """
+ if not exists(select 1 from pg_index i join pg_class c on c.oid=i.indexrelid
+  join pg_am am on am.oid=c.relam
+  where i.indexrelid=to_regclass('private.d807_portal_navigation_versions_flow_cas_v1_idx')
+   and i.indrelid='private.display_navigation_versions_v1'::regclass
+   and i.indisvalid and i.indisready and i.indislive and not i.indisunique
+   and i.indnkeyatts=4 and i.indnatts=4 and am.amname='btree'
+   and c.relowner=(select relowner from pg_class where oid=i.indrelid) and c.relacl is null
+   and array(select a.attname::text from unnest(i.indkey) with ordinality k(attnum,ord)
+    join pg_attribute a on a.attrelid=i.indrelid and a.attnum=k.attnum order by k.ord)
+       =array['dataset_kind','cas_number','id','version']
+   and regexp_replace(pg_get_expr(i.indpred,i.indrelid),'[()[:space:]]','','g')
+       ='dataset_kind=''flow''::textANDcas_numberISNOTNULL') then
+  raise exception 'Native CAS index definition/readiness drift';
+ end if;
+ if exists(
+  (select p.dataset_kind,p.id,p.version,
+   case when jsonb_typeof(p.card->'casNumber')='string'
+    and p.card->>'casNumber' ~ '^[0-9]{2,7}-[0-9]{2}-[0-9]$'
+    and length(p.card->>'casNumber') between 7 and 12 then p.card->>'casNumber' end
+   from private.display_catalog_search_rows_v1 p where p.dataset_kind='flow'
+   except select n.dataset_kind,n.id,n.version,n.cas_number from private.display_navigation_versions_v1 n where n.dataset_kind='flow')
+  union all
+  (select n.dataset_kind,n.id,n.version,n.cas_number from private.display_navigation_versions_v1 n where n.dataset_kind='flow'
+   except select p.dataset_kind,p.id,p.version,
+   case when jsonb_typeof(p.card->'casNumber')='string'
+    and p.card->>'casNumber' ~ '^[0-9]{2,7}-[0-9]{2}-[0-9]$'
+    and length(p.card->>'casNumber') between 7 and 12 then p.card->>'casNumber' end
+   from private.display_catalog_search_rows_v1 p where p.dataset_kind='flow'))
+  or exists(select 1 from private.display_navigation_versions_v1 where dataset_kind='process' and cas_number is not null) then
+  raise exception 'Native CAS facts or exact Flow key coverage drift';
+ end if;
+"""
+    else:
+        sql += """
+ if to_regclass('private.d807_portal_navigation_versions_flow_cas_v1_idx') is not null
+  or exists(select 1 from private.display_navigation_versions_v1 where cas_number is not null) then
+  raise exception 'Prepare phase must not index or backfill existing CAS facts';
+ end if;
+ if (select pg_temp.upgrade_snapshot()#>>'{targetDefinitions,display_navigation_matched_versions_v1}')
+  is distinct from (select value#>>'{targetDefinitions,display_navigation_matched_versions_v1}' from upgrade_snapshots where label='baseline') then
+  raise exception 'Prepare phase changed the established matcher';
+ end if;
+"""
+    return sql + 'end$native_contract$;\n'
+
+
+def injected_phase(label: str, statements: list[str]) -> str:
+    partial = []
+    for statement in statements:
+        partial.append(statement)
+        if re.match(r'create\s+or\s+replace\s+function\b', statement_code(statement), re.I):
+            break
+    else:
+        raise ValueError('Required existing routine replacement absent before injection')
+    message = 'expected native CAS ' + label + ' rollback'
+    partial.append('do $$begin raise exception using errcode=\'P0865\',message=' + bench.literal(message) + ';end$$;')
+    return rejection('injected-' + label, '', partial, 'P0865', message)
+
+
+def native_compare_phases(left: str, right: str) -> str:
+    return f"""
+do $$begin
+ if (select count(*) from upgrade_responses where phase={bench.literal(left)})
+  <> (select count(*) from upgrade_responses where phase={bench.literal(right)})
+ or exists(select 1 from upgrade_responses b full join upgrade_responses c
+  on b.label=c.label and c.phase={bench.literal(right)} where b.phase={bench.literal(left)}
+  and (c.label is null or b.payload is distinct from c.payload or b.sqlstate is distinct from c.sqlstate)) then
+  raise exception 'Complete native CAS phase DTO or SQLSTATE drift';
+ end if;
+end$$;
+"""
+
+
+def build_native_real_sql(predecessor: dict, statements: list[str]) -> tuple[str, int]:
+    if not isinstance(statements, NativeStatements):
+        raise ValueError('Native CAS qualification requires the explicit ordered two-migration bundle')
+    first, second = statements.prepare, statements.activate
+    sql = "begin;set local statement_timeout='60s';set local lock_timeout='5s';set local work_mem='4MB';\n"
+    sql += "do $$begin if not pg_try_advisory_xact_lock(864,1) then raise exception 'Another #864/#869 fixture owns this database';end if;end$$;\n"
+    sql += native_predecessor_setup(predecessor) + source_fixture() + snapshot_helpers()
+    sql += """
+-- Adversarial stored document: exact CAS remains authoritative independently of lexical text.
+update private.display_catalog_search_rows_v1
+ set card=jsonb_set(card,'{document}','"document without registry digits869"'),document='document without registry digits869'
+ where dataset_kind='flow' and id='86900000-0000-4000-8000-000000000103';
+insert into upgrade_snapshots values('baseline',pg_temp.upgrade_snapshot());
+do $$begin
+ if (select count(*) from private.display_catalog_search_rows_v1)<>16
+  or (select count(*) from private.display_catalog_search_rows_v2)<>4 then
+  raise exception 'Native CAS real source fixture cardinality drift';
+ end if;
+end$$;
+"""
+    before, count = probes('baseline')
+    sql += before
+    sql += rejection('reject-prepare-role', '', ['set local role portal_display_executor;'] + first,
+        GUARD_STATE, ROLE_GUARD_MESSAGE)
+    sql += rejection('reject-manifest', "update private.portal_display_contract_manifest set identity='invalid869' where singleton;",
+        first, 'P0001', 'portal catalog unavailable')
+    sql += injected_phase('prepare', first)
+    sql += '\n'.join(first) + '\nselect pg_temp.verify_upgrade();\n' + native_assert_sql(False)
+    sql += "insert into upgrade_snapshots values('prepared',pg_temp.upgrade_snapshot());\n"
+    prepared, prepared_count = probes('prepared')
+    assert prepared_count == count
+    sql += prepared + native_compare_phases('baseline', 'prepared')
+    sql += '\n'.join(first) + """
+do $$begin
+ if pg_temp.upgrade_snapshot() is distinct from (select value from upgrade_snapshots where label='prepared') then
+  raise exception 'Prepare repeat application drift';
+ end if;
+end$$;
+"""
+    sql += """
+do $prepared_writer$
+declare original jsonb:=pg_temp.upgrade_snapshot(); old_facts jsonb;
+begin
+ begin
+  select to_jsonb(n)-'cas_number' into strict old_facts from private.display_navigation_versions_v1 n
+   where dataset_kind='flow' and id='86900000-0000-4000-8000-000000000101' and version='01.00.000';
+  update public.flows set json=pg_temp.portal_cas869_payload('Aldehyde historical869','01.00.000','"64-17-5"')
+   where id='86900000-0000-4000-8000-000000000101' and version='01.00.000';
+  if not exists(select 1 from private.display_navigation_versions_v1 n
+   where dataset_kind='flow' and id='86900000-0000-4000-8000-000000000101' and version='01.00.000'
+    and cas_number='64-17-5' and to_jsonb(n)-'cas_number'=old_facts) then
+   raise exception 'Prepare CAS-only source update left stale CAS or changed old navigation facts';
+  end if;
+  perform api.portal_facets_v4(array['tiangong_lca'],'flow','64-17-5');
+  raise exception using errcode='P0869',message='rollback prepared CAS-only writer fixture';
+ exception when sqlstate 'P0869' then
+  if sqlerrm<>'rollback prepared CAS-only writer fixture' then raise;end if;
+ end;
+ if pg_temp.upgrade_snapshot() is distinct from original then
+  raise exception 'Prepared CAS-only writer rollback leaked state';
+ end if;
+ insert into upgrade_checks values('prepare-cas-only-writer',jsonb_build_object(
+  'realSourceWriter',true,'oldNavigationFactsUnchanged',true,'newCasFactSynchronous',true,'fixtureRolledBack',true));
+end$prepared_writer$;
+"""
+    sql += rejection('reject-activate-role', '', ['set local role portal_display_executor;'] + second,
+        GUARD_STATE, ROLE_GUARD_MESSAGE)
+    sql += rejection('reject-preexisting-index-before-activation', """
+create index d807_portal_navigation_versions_flow_cas_v1_idx
+ on private.display_navigation_versions_v1(dataset_kind,cas_number,id,version)
+ where dataset_kind='flow' and cas_number is not null;
+""" + bench.REFRESH + """
+do $$begin
+ if strpos(pg_get_functiondef('private.display_navigation_matched_versions_v1(text,text,jsonb)'::regprocedure),'display-flow-cas-native-v1')<>0
+  or to_regclass('private.d807_portal_navigation_versions_flow_cas_v1_idx') is null
+  or not exists(select 1 from private.display_navigation_versions_v1 where dataset_kind='flow' and cas_number is null) then
+  raise exception 'Preexisting-index before native activation counterexample was not constructed';
+ end if;
+end$$;
+""", second, GUARD_STATE, 'Display Flow CAS cutover index exists before native activation')
+    sql += rejection('reject-native-key-coverage', """
+delete from private.display_navigation_versions_v1
+ where dataset_kind='flow' and id='86900000-0000-4000-8000-000000000101' and version='01.00.000';
+do $$begin
+ if exists(select 1 from private.display_navigation_versions_v1
+  where dataset_kind='flow' and id='86900000-0000-4000-8000-000000000101' and version='01.00.000')
+  or not exists(select 1 from private.display_catalog_search_rows_v1
+  where dataset_kind='flow' and id='86900000-0000-4000-8000-000000000101' and version='01.00.000') then
+  raise exception 'Native CAS missing-key counterexample was not constructed';
+ end if;
+end$$;
+""", second, GUARD_STATE, GUARD_MESSAGE)
+    sql += injected_phase('activate', second)
+    sql += '\n'.join(second) + '\nselect pg_temp.verify_upgrade();\n' + native_assert_sql(True)
+    sql += "insert into upgrade_snapshots values('candidate',pg_temp.upgrade_snapshot());\n"
+    after, after_count = probes('candidate')
+    assert after_count == count
+    sql += after + native_compare_phases('baseline', 'candidate')
+    sql += rejection('reject-active-cas-drift', """
+update private.display_navigation_versions_v1 set cas_number='75-07-0'
+ where dataset_kind='flow' and id='86900000-0000-4000-8000-000000000101' and version='01.00.000';
+""", second, GUARD_STATE, GUARD_MESSAGE)
+    sql += rejection('reject-process-cas-drift', """
+update private.display_navigation_versions_v1 set cas_number='50-00-0'
+ where dataset_kind='process' and id='86900000-0000-4000-8000-000000000111';
+""", second, GUARD_STATE, GUARD_MESSAGE)
+    sql += rejection('reject-active-lost-index-drift', """
+drop index private.d807_portal_navigation_versions_flow_cas_v1_idx;
+update private.display_navigation_versions_v1 set cas_number='75-07-0'
+ where dataset_kind='flow' and id='86900000-0000-4000-8000-000000000101' and version='01.00.000';
+""" + bench.REFRESH + """
+do $$begin
+ if strpos(pg_get_functiondef('private.display_navigation_matched_versions_v1(text,text,jsonb)'::regprocedure),'display-flow-cas-native-v1')=0
+  or to_regclass('private.d807_portal_navigation_versions_flow_cas_v1_idx') is not null
+  or not exists(select 1 from private.display_navigation_versions_v1
+   where dataset_kind='flow' and id='86900000-0000-4000-8000-000000000101' and version='01.00.000' and cas_number='75-07-0') then
+  raise exception 'Active lost-index and fact-drift counterexample was not constructed';
+ end if;
+end$$;
+""", second, GUARD_STATE, GUARD_MESSAGE)
+    sql += rejection('reject-native-index-shape', """
+drop index private.d807_portal_navigation_versions_flow_cas_v1_idx;
+create index d807_portal_navigation_versions_flow_cas_v1_idx
+ on private.display_navigation_versions_v1(dataset_kind,id,version)
+ where dataset_kind='flow';
+""" + bench.REFRESH, second, GUARD_STATE, 'Display Flow CAS cutover requires the qualified native CAS index')
+    sql += '\n'.join(statements) + '\n' + native_assert_sql(True) + """
+do $$begin
+ if pg_temp.upgrade_snapshot() is distinct from (select value from upgrade_snapshots where label='candidate') then
+  raise exception 'Active ordered-bundle repeat drift';
+ end if;
+end$$;
+"""
+    sql += native_writer_update_replay(predecessor, statements, count) + native_assert_sql(True)
+    sql += """
+select jsonb_build_object('checks',(select jsonb_object_agg(label,evidence) from upgrade_checks),
+ 'snapshots',(select jsonb_object_agg(label,value) from upgrade_snapshots),
+ 'responses',(select jsonb_agg(to_jsonb(r) order by phase,label) from upgrade_responses r),
+ 'realSourceRows',(select jsonb_build_object('processes',count(*)) from public.processes)||
+  (select jsonb_build_object('flows',count(*)) from public.flows),
+ 'phaseACompatibility',true,'phaseBRollbackRetainsA',true,'documentIndependentCas',true,
+ 'sourceWriterTriggersEnabled',not exists(select 1 from pg_trigger where not tgisinternal and tgenabled='D'
+  and tgrelid in ('public.processes'::regclass,'public.flows'::regclass,'private.dataset_display_settings'::regclass)));
+rollback;
+"""
+    return sql, count
+
+
+def native_writer_update_replay(predecessor: dict, statements: list[str], count: int) -> str:
+    if not isinstance(statements, NativeStatements):
+        raise ValueError('Native writer replay requires the ordered candidate bundle')
+    candidate_matcher = bench.reader_definitions('\n'.join(statements.activate))
+    if set(candidate_matcher) != {('function', 'display_navigation_matched_versions_v1')}:
+        raise ValueError('Exactly one existing candidate matcher required for reader replay restoration')
+    sql = ''
+    # Compare the complete DTO on the same real, synchronously updated data.
+    # Replaying only the predecessor reader is transaction-local; the source
+    # and settings writers stay enabled throughout.
+    sql += """
+insert into upgrade_snapshots select 'writer-old-navigation-facts',to_jsonb(n)-'cas_number'
+ from private.display_navigation_versions_v1 n where dataset_kind='flow'
+ and id='86900000-0000-4000-8000-000000000101' and version='01.00.000';
+update public.flows
+ set json=pg_temp.portal_cas869_payload('Aldehyde historical869','01.00.000','"64-17-5"')
+ where id='86900000-0000-4000-8000-000000000101' and version='01.00.000';
+update private.dataset_display_settings set is_visible=false
+ where dataset_kind='flow' and dataset_id='86900000-0000-4000-8000-000000000101'
+ and dataset_version='02.00.000';
+do $$begin
+ if not exists(select 1 from private.display_catalog_search_rows_v1
+  where dataset_kind='flow' and id='86900000-0000-4000-8000-000000000101'
+   and version='01.00.000' and card->>'casNumber'='64-17-5')
+  or exists(select 1 from private.display_catalog_search_rows_v1
+  where dataset_kind='flow' and id='86900000-0000-4000-8000-000000000101' and version='02.00.000') then
+  raise exception 'Real CAS update and exact withdrawal were not constructed';
+ end if;
+ if not exists(select 1 from private.display_navigation_versions_v1 n
+  where dataset_kind='flow' and id='86900000-0000-4000-8000-000000000101' and version='01.00.000'
+  and cas_number='64-17-5' and to_jsonb(n)-'cas_number'=(select value from upgrade_snapshots where label='writer-old-navigation-facts')) then
+  raise exception 'CAS-only source update left native fact stale or changed old navigation facts';
+ end if;
+end$$;
+insert into upgrade_snapshots values('writer-updated',pg_temp.upgrade_snapshot());
+"""
+    updated, updated_count = probes('candidate-writer-updated')
+    sql += updated + matcher_replay(predecessor)
+    replay, replay_count = probes('baseline-writer-updated')
+    assert updated_count == replay_count == count
+    # Only a read-only predecessor matcher was replayed. Restore that exact
+    # candidate definition and manifest; replaying A/B with an old matcher and
+    # an already-active index would correctly violate activation provenance.
+    sql += replay + bench.definitions_sql(candidate_matcher) + """
+do $$begin
+ if pg_temp.upgrade_snapshot() is distinct from (select value from upgrade_snapshots where label='writer-updated') then
+  raise exception 'Writer-update predecessor replay failed to restore candidate or changed writer data';
+ end if;
+ if exists(select 1 from upgrade_responses b full join upgrade_responses c
+  on b.label=c.label and c.phase='candidate-writer-updated'
+  where b.phase='baseline-writer-updated' and
+   (c.label is null or b.payload is distinct from c.payload or b.sqlstate is distinct from c.sqlstate)) then
+  raise exception 'Complete API JSON or SQLSTATE drift after real source update and withdrawal';
+ end if;
+end$$;
+"""
+    return sql
+
+
 def build_synthetic_sql(predecessor: dict, statements: list[str], processes: int, flows: int) -> str:
+    if PROFILE == '869':
+        return build_native_synthetic_sql(predecessor, statements, processes, flows)
     guard = cutover_guard(statements)
-    sql = bench.fixture(processes, flows, 3072) + bench.definitions_sql(predecessor) + snapshot_helpers()
+    sql = bench.fixture(processes, flows, 3072, profile='legacy') + bench.definitions_sql(predecessor) + snapshot_helpers()
     sql += "insert into upgrade_snapshots values('baseline',pg_temp.upgrade_snapshot());set local statement_timeout='60s';create temp table guard_timing(started timestamptz);insert into guard_timing values(clock_timestamp());\n"
     sql += guard + "\nselect jsonb_build_object('guardElapsedMs',extract(epoch from clock_timestamp()-started)*1000) from guard_timing;\n"
     sql += '\n'.join(statements) + '\nselect pg_temp.verify_upgrade();\n'
     sql += "select jsonb_build_object('snapshot',pg_temp.upgrade_snapshot(),'classification','synthetic direct projections: guard volume only; not source-writer proof');rollback;\n"
+    return sql
+
+
+def build_native_synthetic_sql(predecessor: dict, statements: list[str], processes: int, flows: int) -> str:
+    if not isinstance(statements, NativeStatements):
+        raise ValueError('Native synthetic qualification requires the ordered bundle')
+    sql = bench.fixture(processes, flows, 3072, profile='cas-dense') + native_predecessor_setup(predecessor) + snapshot_helpers()
+    sql += """
+insert into upgrade_snapshots values('baseline',pg_temp.upgrade_snapshot());
+create temp table native_phase_timing(phase text primary key,started timestamptz,ended timestamptz);
+create temp table native_controls(phase text,label text,payload jsonb,elapsed_ms double precision,reader_role text,budget text,primary key(phase,label));
+grant select,insert on native_controls to anon;
+create function pg_temp.native_control(p_phase text,p_label text,q text) returns void language plpgsql as $$
+declare started timestamptz:=clock_timestamp();payload jsonb;begin
+ execute q into payload;
+ if payload is null then raise exception 'Native non-CAS control returned no DTO';end if;
+ insert into native_controls values(p_phase,p_label,payload,extract(epoch from clock_timestamp()-started)*1000,current_user,current_setting('statement_timeout'));
+end$$;
+grant execute on function pg_temp.native_control(text,text,text) to anon;
+"""
+    controls = bench.cases('bafu,tiangong_lca,uslci,worldsteel', profile='cas-dense')
+    labels = ('facets_all_empty', 'navigation_classification_root', 'facets_all_lexical')
+    def measure(phase):
+        result = "set local statement_timeout='8s';set local role anon;\n"
+        for label in labels:
+            result += 'select pg_temp.native_control(' + ','.join(bench.literal(value) for value in (phase,label,controls[label])) + ');\n'
+        return result + "reset role;set local statement_timeout='60s';\n"
+    sql += measure('baseline')
+    for phase, body in (('A',statements.prepare),('B',statements.activate)):
+        sql += f"insert into native_phase_timing values('{phase}',clock_timestamp(),null);\n"
+        sql += '\n'.join(body)
+        sql += f"\nupdate native_phase_timing set ended=clock_timestamp() where phase='{phase}';\n"
+    sql += 'select pg_temp.verify_upgrade();\n' + native_assert_sql(True) + measure('candidate')
+    sql += """
+do $$begin
+ if (select count(*) from native_controls)<>6
+  or exists(select 1 from native_controls where reader_role<>'anon' or budget<>'8s')
+  or exists(select 1 from native_controls b join native_controls c using(label)
+    where b.phase='baseline' and c.phase='candidate' and b.payload is distinct from c.payload) then
+  raise exception 'Native non-CAS complete DTO controls drifted';
+ end if;
+end$$;
+select jsonb_build_object('guardElapsedMs',(select sum(extract(epoch from ended-started)*1000) from native_phase_timing),
+ 'timingMeaning','Actual ordered A/B statement elapsed inside one outer rollback transaction; A table lock remains held through B; does not prove short committed lock duration',
+ 'phaseEpochs',(select jsonb_agg(to_jsonb(p)||jsonb_build_object('elapsedMs',extract(epoch from ended-started)*1000) order by phase) from native_phase_timing p),
+ 'nonCasControls',(select jsonb_agg(to_jsonb(c) order by phase,label) from native_controls c),
+ 'controlTimingClassification','Single diagnostic sample per control, not p95 or hosted performance',
+ 'nativeIndexBytes',pg_relation_size('private.d807_portal_navigation_versions_flow_cas_v1_idx'));
+select jsonb_build_object('snapshot',pg_temp.upgrade_snapshot(),
+ 'classification','Synthetic CAS-dense populated outer-rollback A/B phases and non-CAS DTO controls; no ledger transition or actual short-lock-hold proof');
+rollback;
+"""
     return sql
 
 
@@ -508,6 +1012,10 @@ def visibility_queries() -> dict[str, str]:
         result['facets_process_' + label] = f"api.portal_facets_v4({brands},'process','visible','{{}}')"
         result['navigation_geography_' + label] = f"api.portal_navigation_v2({brands},'all','','{{}}','geography',null,null,100)"
         result['navigation_classification_' + label] = f"api.portal_navigation_v2({brands},'process','','{{}}','classification','class:isic',null,20)"
+    if PROFILE == '869':
+        for label, brands in scopes.items():
+            result['facets_cas_' + label] = f"api.portal_facets_v4({brands},'all','50-00-0','{{}}')"
+            result['navigation_cas_' + label] = f"api.portal_navigation_v2({brands},'all','50-00-0','{{}}','geography',null,null,100)"
     result['facets_bafu_control'] = "api.portal_facets_v4(array['bafu'],'flow','50-00-0','{}')"
     return result
 
@@ -545,12 +1053,16 @@ def committed_visibility(args, context: dict, inspected: dict, owner: str, base:
     report = {'schemaVersion': 'portal.facets-navigation-committed-visibility.v1',
         'passed': False, 'classification': 'local real settings writer, independent committed visibility; not load or hosted latency',
         'nonce': nonce, 'applicationNamePrefix': prefix, 'containerId': inspected['Id'],
-        'dockerContext': context['Name'], 'ownerSha256': bench.sha(owner), 'baseCommit': base,
+        'dockerContext': context['Name'], 'ownerSha256': bench.sha(owner), 'profile': PROFILE, 'baseCommit': base,
         'candidateSha256': bench.sha(migration), 'harnessSha256': bench.sha(Path(__file__).read_bytes()),
+        'orderedMigrationBundle': ([{'path': str(PROFILES['869'][key].relative_to(ROOT)), 'sha256': bench.sha(PROFILES['869'][key].read_bytes())} for key in ('prepare','candidate')] if PROFILE == '869' else None),
         'exclusiveFixtureLock': [864, 1], 'writerCommitGateLock': [864, gate],
         'requestBudget': '8s', 'writerPath': 'dataset_display_settings UPDATE with unchanged display writers enabled',
-        'sourceUpdateBeforeHide': False, 'fixtureRetained': False, 'resetRequired': False,
+        'hiddenKind': 'flow' if PROFILE == '869' else 'process', 'sourceUpdateBeforeHide': False, 'fixtureRetained': False, 'resetRequired': False,
         'baselineReplay': 'same committed data, transaction-only predecessor definitions and rollback',
+        'initialMigrationHead': initial_catalog.get('migrationHead'),
+        'migrationLedgerTransition': False,
+        'initialNativeExtensionPresent': initial_catalog.get('nativeExtension', {}).get('column') is not None,
         'cleanup': None}
 
     def call(label: str, sql: str, timeout: int = 120) -> list[dict]:
@@ -568,7 +1080,7 @@ def committed_visibility(args, context: dict, inspected: dict, owner: str, base:
     def capture(label: str, replay: bool = False) -> dict:
         sql = 'begin;set local work_mem=\'4MB\';\n'
         if replay:
-            sql += bench.definitions_sql(predecessor)
+            sql += matcher_replay(predecessor) if PROFILE == '869' else bench.definitions_sql(predecessor)
         sql += visibility_read_sql() + '\nrollback;'
         rows = call(label, sql)
         if len(rows) != 1 or set(rows[0]) != {'readerRole', 'readerPid', 'readerApplication', 'responses'}:
@@ -620,22 +1132,26 @@ select 'CONTROLLER_READY:'||pg_backend_pid();"""
         # terminator. Keep restoration a complete statement before appending SET.
         util = util.rstrip().rstrip(';') + ';\n'
         seed = source_fixture().replace('create extension if not exists pgtap with schema extensions;', '')
-        setup = "begin;set local statement_timeout='60s';set local work_mem='4MB';\n" + '\n'.join(statements) + seed + '\n' + util + "\nset local search_path='';select private.portal_display_assert_contract_v1();\n" + catalog_query() + ';commit;'
+        setup = "begin;set local statement_timeout='60s';set local work_mem='4MB';\n" + '\n'.join(statements) + seed + '\n' + util + "\nset local search_path='';select private.portal_display_assert_contract_v1();\n" + (native_assert_sql(True) if PROFILE == '869' else '') + catalog_query() + ';commit;'
         rows = call('committed-setup', setup)
         setup_committed = True
         report['fixtureRetained'] = report['resetRequired'] = True
         if len(rows) != 1:
             raise ValueError('One committed candidate metadata snapshot required')
         installed_catalog = rows[0]
-        if (installed_catalog | {'targetDefinitions': None, 'manifest': None}) != (initial_catalog | {'targetDefinitions': None, 'manifest': None}):
+        allowed_setup = {'targetDefinitions': None, 'manifest': None}
+        if PROFILE == '869':
+            allowed_setup['nativeExtension'] = None
+        if (metadata_only(installed_catalog) | allowed_setup) != (metadata_only(initial_catalog) | allowed_setup):
             raise ValueError('Committed setup changed unapproved permanent metadata or util definition')
         old = capture('old-candidate')
         report['oldResponses'] = old
         writer = VisibilitySession(prefix + 'writer')
+        hidden_kind, hidden_id = ('flow', '86900000-0000-4000-8000-000000000101') if PROFILE == '869' else ('process', '80700000-0000-4000-8000-000000000101')
         write_sql = f"""begin;set local statement_timeout='60s';
 do $$begin
  update private.dataset_display_settings set is_visible=false
- where dataset_kind='process' and dataset_id='80700000-0000-4000-8000-000000000101'
+ where dataset_kind='{hidden_kind}' and dataset_id='{hidden_id}'
   and dataset_version='01.00.000' and is_visible;
  if not found then raise exception 'Exact real display hide fixture missing';end if;
 end$$;
@@ -658,8 +1174,9 @@ select 'WRITER_COMMITTED';
         writer.marker('WRITER_COMMITTED')
         writer.close()
         new = capture('committed-reader')
-        if old['navigation_geography_tiangong']['totals']['process'] != 1 or new['navigation_geography_tiangong']['totals']['process'] != 0:
-            raise ValueError('Committed hide did not synchronously remove the exact visible Process')
+        total_label, total_kind, before_count, after_count = ('navigation_cas_tiangong', 'flow', 2, 1) if PROFILE == '869' else ('navigation_geography_tiangong', 'process', 1, 0)
+        if old[total_label]['totals'][total_kind] != before_count or new[total_label]['totals'][total_kind] != after_count:
+            raise ValueError('Committed hide did not synchronously remove the exact visible version')
         if old['facets_tiangong'] == new['facets_tiangong'] or old['facets_bafu_control'] != new['facets_bafu_control']:
             raise ValueError('Committed Facets hide or unaffected-brand control failed')
         replay = capture('predecessor-replay', replay=True)
@@ -687,11 +1204,11 @@ select 'WRITER_COMMITTED';
             finally:
                 if controller is not None:
                     controller.close()
-            final = call('final-receipt', catalog_query() + ";select jsonb_build_object('nonceSessions',(select count(*) from pg_stat_activity where pid<>pg_backend_pid() and application_name like " + bench.literal(prefix+'%') + "),'fixtureExclusiveLockReleased',pg_try_advisory_xact_lock(864,1),'manifestValid',(select identity=private.portal_display_contract_identity_v1() from private.portal_display_contract_manifest where singleton),'processRows',(select count(*) from public.processes),'flowRows',(select count(*) from public.flows),'settingsRows',(select count(*) from private.dataset_display_settings),'writersEnabled',not exists(select 1 from pg_trigger where not tgisinternal and tgenabled='D' and tgrelid in ('public.processes'::regclass,'public.flows'::regclass,'private.dataset_display_settings'::regclass)));")
+            final = call('final-receipt', (native_assert_sql(True) if PROFILE == '869' else '') + catalog_query() + ";select jsonb_build_object('nonceSessions',(select count(*) from pg_stat_activity where pid<>pg_backend_pid() and application_name like " + bench.literal(prefix+'%') + "),'fixtureExclusiveLockReleased',pg_try_advisory_xact_lock(864,1),'manifestValid',(select identity=private.portal_display_contract_identity_v1() from private.portal_display_contract_manifest where singleton),'processRows',(select count(*) from public.processes),'flowRows',(select count(*) from public.flows),'settingsRows',(select count(*) from private.dataset_display_settings),'writersEnabled',not exists(select 1 from pg_trigger where not tgisinternal and tgenabled='D' and tgrelid in ('public.processes'::regclass,'public.flows'::regclass,'private.dataset_display_settings'::regclass)));")
             if len(final) != 2:
                 raise ValueError('Unique final metadata and retained-resource receipt required')
             metadata, receipt = final
-            restored = installed_catalog is not None and metadata == installed_catalog
+            restored = installed_catalog is not None and metadata_only(metadata) == metadata_only(installed_catalog)
             retained = setup_committed or bool(receipt['processRows'] or receipt['flowRows'] or receipt['settingsRows'])
             report['fixtureRetained'] = retained
             report['resetRequired'] = retained
@@ -719,9 +1236,11 @@ select 'WRITER_COMMITTED';
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--profile', choices=tuple(PROFILES), default='864', help='Explicit migration/base/target qualification scope')
     parser.add_argument('--container', required=True, choices=[bench.CONTAINER])
     parser.add_argument('--base-ref', required=True)
-    parser.add_argument('--candidate', type=Path, default=CANDIDATE, choices=[CANDIDATE])
+    parser.add_argument('--candidate', type=Path, help='Must match the selected profile migration exactly')
+    parser.add_argument('--prepare-candidate', type=Path, help='Must match phase A of the ordered 869 bundle')
     parser.add_argument('--owner-file', type=Path, default=bench.OWNER, choices=[bench.OWNER])
     parser.add_argument('--report', type=Path, required=True)
     parser.add_argument('--synthetic-processes', type=int, default=0)
@@ -729,6 +1248,7 @@ def main() -> int:
     parser.add_argument('--committed-visibility', action='store_true',
         help='Commit real local fixtures, prove another writer/anonymous reader visibility, retain for owned reset')
     args = parser.parse_args()
+    select_profile(args.profile)
     args.visibility_nonce = uuid.uuid4().hex[:12] if args.committed_visibility else None
     if not args.report.resolve().is_relative_to(bench.OWNER.parent.resolve()):
         parser.error('Evidence must stay in the task-owned private scratch directory')
@@ -751,11 +1271,10 @@ def main() -> int:
         owner = args.owner_file.read_text()
         bench.validate_target(context, inspected, owner)
         base = subprocess.check_output(['git', 'rev-parse', f'{args.base_ref}^{{commit}}'], cwd=ROOT, text=True).strip()
-        migration = args.candidate.read_text()
+        args.candidate, migration, statements = load_candidate(base, args.candidate, args.prepare_candidate)
         definitions = bench.reader_definitions(migration)
         if set(definitions) != {('function', name) for name in TARGETS}:
-            raise ValueError('Migration must replace exactly the four approved existing functions')
-        statements = migration_statements(migration)
+            raise ValueError('Migration must replace exactly the approved profile functions')
         predecessor = bench.baseline(base, list(definitions))
         sql, case_count = build_real_sql(predecessor, statements)
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
@@ -777,13 +1296,21 @@ def main() -> int:
     args.report.parent.mkdir(parents=True, exist_ok=True)
     report = {'schemaVersion': 'portal.facets-navigation-upgrade.v1', 'passed': False,
         'classification': 'local rollback-only real source-writer/full-migration upgrade; not hosted latency',
-        'baseCommit': base, 'candidateSha256': bench.sha(migration),
+        'profile': PROFILE, 'baseCommit': base, 'candidateSha256': bench.sha(migration),
         'harnessSha256': bench.sha(Path(__file__).read_bytes()), 'sourceFixtureSha256': bench.sha(source_fixture()),
         'baselineReaderSha256': bench.sha(bench.definitions_sql(predecessor)),
         'containerId': inspected['Id'], 'dockerContext': context['Name'], 'ownerSha256': bench.sha(owner),
         'image': inspected['Config']['Image'], 'targetFunctions': list(TARGETS),
+        'orderedMigrationBundle': ([{'path': str(PROFILES['869'][key].relative_to(ROOT)), 'sha256': bench.sha(PROFILES['869'][key].read_bytes())} for key in ('prepare','candidate')] if PROFILE == '869' else None),
         'requestBudget': '8s', 'sessionWorkMem': '4MB', 'syntheticGuardVolume': None,
         'unresolvedProof': ['concurrent load', 'hosted production latency'], 'cleanup': None}
+    if PROFILE == '869':
+        initial_state = json.loads(initial_catalog.stdout)
+        report.update({'initialMigrationHead': initial_state['migrationHead'],
+            'migrationLedgerTransition': False,
+            'baselineReconstruction': ('rollback-only removal of exact native extension and predecessor routine replay'
+                if initial_state['nativeExtension']['column'] is not None else 'canonical schema already predates native extension; predecessor routine replay only'),
+            'phaseTransactions': 'raw SQL in one owned outer rollback transaction; phase failures use nested rollback; no migration ledger transition'})
     try:
         records, digest = execute_case(sql, real_stem)
         if len(records) != 1:
@@ -796,12 +1323,29 @@ def main() -> int:
         if any((b['payload'], b['sqlstate']) != (by_phase['candidate'][label]['payload'], by_phase['candidate'][label]['sqlstate'])
                for label, b in by_phase['baseline'].items()):
             raise ValueError('Complete API JSON/SQLSTATE mismatch')
+        if PROFILE == '869':
+            prepared = {r['label']: r for r in real['responses'] if r['phase'] == 'prepared'}
+            if set(prepared) != set(by_phase['baseline']) or any(
+                (b['payload'], b['sqlstate']) != (prepared[label]['payload'], prepared[label]['sqlstate'])
+                for label, b in by_phase['baseline'].items()):
+                raise ValueError('Incomplete or changed phase-A compatibility DTOs')
+            updated = {phase: {r['label']: r for r in real['responses'] if r['phase'] == phase}
+                       for phase in ('baseline-writer-updated', 'candidate-writer-updated')}
+            if any(len(v) != case_count for v in updated.values()) or any(
+                    set(v) != set(by_phase['baseline']) for v in updated.values()):
+                raise ValueError('Missing/duplicate complete writer-update response cases')
+            if any((b['payload'], b['sqlstate']) !=
+                   (updated['candidate-writer-updated'][label]['payload'], updated['candidate-writer-updated'][label]['sqlstate'])
+                   for label, b in updated['baseline-writer-updated'].items()):
+                raise ValueError('Complete writer-update API JSON/SQLSTATE mismatch')
         before, after = (real['snapshots'][phase]['targetDefinitions'] for phase in ('baseline', 'candidate'))
         if set(before) != set(TARGETS) or set(after) != set(TARGETS) or any(before[name] == after[name] for name in TARGETS):
             raise ValueError('Every approved target must have exactly one changed definition')
-        if set(real['checks']) != CHECK_LABELS or not real['sourceWriterTriggersEnabled'] or real['realSourceRows'] != {'processes': 4, 'flows': 2}:
+        if set(real['checks']) != CHECK_LABELS or not real['sourceWriterTriggersEnabled'] or real['realSourceRows'] != PROFILES[PROFILE]['source_rows']:
             raise ValueError('Incomplete rollback guards or real source-writer fixture')
         report['realWriterUpgrade'] = real | {'sqlSha256': digest, 'completeResponseComparisons': case_count,
+                                            'phaseAResponseComparisons': case_count if PROFILE == '869' else 0,
+                                            'writerUpdateResponseComparisons': case_count if PROFILE == '869' else 0,
                                             'repeatApplication': True, 'fullMigrationStatements': len(statements)}
         if args.synthetic_processes:
             synthetic = build_synthetic_sql(predecessor, statements, args.synthetic_processes, args.synthetic_flows)
@@ -812,6 +1356,7 @@ def main() -> int:
                 'flowVersions': 2 * args.synthetic_flows, 'sqlSha256': digest,
                 'summaryPaddingBytes': 3072,
                 'guardElapsedMs': records[0]['guardElapsedMs'], 'result': records[1],
+                'phaseEvidence': records[0] if PROFILE == '869' else None,
                 'sourceWriterProof': False}
         report['passed'] = True
     except (ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:

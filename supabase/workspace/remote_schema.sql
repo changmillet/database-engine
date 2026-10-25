@@ -61344,11 +61344,76 @@ begin
   else
     if p_query ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then v_exact:=p_query::uuid; end if;
     v_pattern := '%' || replace(replace(replace(p_query,chr(92),chr(92)||chr(92)),'%',chr(92)||'%'),'_',chr(92)||'_') || '%';
-    -- Keep the established selective CAS plan; expanding it into the broad
-    -- key union is not qualified at representative volume.
+    -- Native CAS text equality stays indexable under the unchanged forced RLS.
+    -- Its guarded fact is synchronized by the existing navigation writer.
+    -- Preserve Process lexical candidates and every original navigation filter.
+    -- display-flow-cas-native-v1
     if private.display_catalog_summary_valid_cas_v1(p_query) then
+      -- These are ordinary catalog SELECTs in this STABLE call's data snapshot,
+      -- not a current-cache to_regclass readiness test. A call begun before B
+      -- cannot see B's index catalog rows or backfilled facts, even when a late
+      -- inner call resolves this new function body. Keep its original reader.
+      if not exists (
+        select 1
+        from pg_catalog.pg_class idx
+        join pg_catalog.pg_namespace ns on ns.oid=idx.relnamespace
+        join pg_catalog.pg_index i on i.indexrelid=idx.oid
+        where ns.nspname='private'
+          and idx.relname='d807_portal_navigation_versions_flow_cas_v1_idx'
+          and i.indrelid='private.display_navigation_versions_v1'::regclass
+          and i.indisvalid and i.indisready and i.indislive
+      ) then
     return query select v.dataset_kind,v.id,v.version
     from private.display_catalog_facet_candidate_rows_v2(p_kind,p_query,v_exact,v_pattern) c
+    join private.display_navigation_versions_v1 v
+      on (v.dataset_kind,v.id,v.version)=(c.dataset_kind,c.id,c.version)
+    where
+      (not (p_filters ? 'accessLevel') or v.access_level=p_filters->>'accessLevel')
+      and (not (p_filters ? 'geography') or v.geography_code=p_filters->>'geography')
+      and (not (p_filters ? 'classification') or v.classification_codes @> array[p_filters->>'classification'])
+      and (not (p_filters ? 'referenceYearFrom') or v.reference_year >= (p_filters->>'referenceYearFrom')::integer)
+      and (not (p_filters ? 'referenceYearTo') or v.reference_year <= (p_filters->>'referenceYearTo')::integer)
+      and (not (p_filters ? 'processSubtype') or v.process_subtype=p_filters->>'processSubtype')
+      and (not (p_filters ? 'source') or v.source=p_filters->>'source')
+      and (
+        not (p_filters ? 'classificationNodeId')
+        or (v.dataset_kind,v.id,v.version) in (
+          select m.dataset_kind,m.id,m.version
+          from private.display_navigation_membership_v1 m
+          where m.dimension='classification'
+            and m.node_id=p_filters->>'classificationNodeId'
+            and (p_kind='all' or m.dataset_kind=p_kind)
+            and (coalesce(p_filters->>'classificationScope','subtree')<>'direct' or m.direct)
+        )
+      ) and (
+        not (p_filters ? 'geographyNodeId')
+        or (v.dataset_kind,v.id,v.version) in (
+          select m.dataset_kind,m.id,m.version
+          from private.display_navigation_membership_v1 m
+          where m.dimension='geography'
+            and m.node_id=p_filters->>'geographyNodeId'
+            and (p_kind='all' or m.dataset_kind=p_kind)
+            and (coalesce(p_filters->>'geographyScope','subtree')<>'direct' or m.direct)
+        )
+      )
+;
+      return;
+      end if;
+    return query
+    with cas_keys as materialized (
+      select c.dataset_kind,c.id,c.version
+      from private.display_catalog_facet_candidate_rows_v2(
+        'process',p_query,v_exact,v_pattern
+      ) c
+      where p_kind in ('all','process')
+      union all
+      select n.dataset_kind,n.id,n.version
+      from private.display_navigation_versions_v1 n
+      where p_kind in ('all','flow') and n.dataset_kind='flow'
+        and n.cas_number=p_query
+    )
+    select v.dataset_kind,v.id,v.version
+    from cas_keys c
     join private.display_navigation_versions_v1 v
       on (v.dataset_kind,v.id,v.version)=(c.dataset_kind,c.id,c.version)
     where
@@ -64091,7 +64156,7 @@ declare
 begin
   insert into private.display_navigation_versions_v1 (
     dataset_kind,id,version,access_level,geography_code,classification_codes,
-    reference_year,process_subtype,source
+    reference_year,process_subtype,source,cas_number
   ) values (
     p_kind,p_id,p_version,p_card->>'accessLevel',
     lower(btrim(p_card#>>'{geography,code}')),
@@ -64099,16 +64164,22 @@ begin
       from jsonb_array_elements(coalesce(p_card->'classifications','[]'::jsonb)) entry
       where nullif(btrim(entry->>'code'),'') is not null),
     (p_card->>'referenceYear')::integer,
-    lower(btrim(p_card->>'processSubtype')),lower(btrim(p_card->>'source'))
+    lower(btrim(p_card->>'processSubtype')),lower(btrim(p_card->>'source')),
+    case when p_kind='flow'
+      and pg_catalog.jsonb_typeof(p_card -> 'casNumber')='string'
+      and p_card ->> 'casNumber' ~ '^[0-9]{2,7}-[0-9]{2}-[0-9]$'
+      and pg_catalog.length(p_card ->> 'casNumber') between 7 and 12
+      then p_card ->> 'casNumber' end
   ) on conflict (dataset_kind,id,version) do update set
     access_level=excluded.access_level,geography_code=excluded.geography_code,
     classification_codes=excluded.classification_codes,reference_year=excluded.reference_year,
-    process_subtype=excluded.process_subtype,source=excluded.source
+    process_subtype=excluded.process_subtype,source=excluded.source,cas_number=excluded.cas_number
   where (display_navigation_versions_v1.access_level,display_navigation_versions_v1.geography_code,
     display_navigation_versions_v1.classification_codes,display_navigation_versions_v1.reference_year,
-    display_navigation_versions_v1.process_subtype,display_navigation_versions_v1.source)
+    display_navigation_versions_v1.process_subtype,display_navigation_versions_v1.source,
+    display_navigation_versions_v1.cas_number)
     is distinct from (excluded.access_level,excluded.geography_code,excluded.classification_codes,
-      excluded.reference_year,excluded.process_subtype,excluded.source);
+      excluded.reference_year,excluded.process_subtype,excluded.source,excluded.cas_number);
   delete from private.display_navigation_membership_v1
     where dataset_kind=p_kind and id=p_id and version=p_version;
   for v_entry, v_entry_level in
@@ -98546,6 +98617,7 @@ END) STORED,
     "reference_year" integer,
     "process_subtype" "text",
     "source" "text",
+    "cas_number" "text",
     CONSTRAINT "d807_portal_navigation_versions_v1_dataset_kind_check" CHECK (("dataset_kind" = ANY (ARRAY['process'::"text", 'flow'::"text"])))
 );
 
@@ -102412,6 +102484,10 @@ CREATE INDEX "d807_portal_navigation_membership_branch_v1_idx" ON "private"."dis
 
 
 CREATE INDEX "d807_portal_navigation_membership_node_v1_idx" ON "private"."display_navigation_membership_v1" USING "btree" ("node_id");
+
+
+
+CREATE INDEX "d807_portal_navigation_versions_flow_cas_v1_idx" ON "private"."display_navigation_versions_v1" USING "btree" ("dataset_kind", "cas_number", "id", "version") WHERE (("dataset_kind" = 'flow'::"text") AND ("cas_number" IS NOT NULL));
 
 
 
