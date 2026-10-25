@@ -31,9 +31,26 @@ MAX_ARTIFACTS = 256 * 1024 * 1024
 DEFAULT_CASES = ('facets_all_empty', 'facets_all_geography', 'facets_all_history',
                  'facets_all_one', 'facets_flow_cas', 'navigation_geography',
                  'navigation_us', 'navigation_page3')
-ALL_CASES = tuple(sorted(set(serial.cases(SCOPES[0])) |
+NATIVE_DEFAULT_CASES = tuple(
+    f'{api}_{kind}_cas_{population}'
+    for api in ('facets', 'navigation') for kind in ('flow', 'all')
+    for population in ('rare', 'absent', 'common')
+) + ('facets_process_cas_rare', 'navigation_process_cas_rare',
+     'facets_all_empty', 'facets_process_empty',
+     'navigation_classification_root', 'navigation_geography')
+ALL_CASES = tuple(sorted(set(serial.cases(SCOPES[0], 'cas-dense')) |
                          {'navigation_page2', 'navigation_page3', 'navigation_cn_page2'}))
 INSPECT_FORMAT = '{"Id":{{json .Id}},"Name":{{json .Name}},"Config":{"Labels":{{json .Config.Labels}},"Image":{{json .Config.Image}}},"State":{"Running":{{json .State.Running}}},"HostConfig":{"NanoCpus":{{json .HostConfig.NanoCpus}},"CpuQuota":{{json .HostConfig.CpuQuota}},"CpuPeriod":{{json .HostConfig.CpuPeriod}},"CpusetCpus":{{json .HostConfig.CpusetCpus}},"Memory":{{json .HostConfig.Memory}},"MemorySwap":{{json .HostConfig.MemorySwap}}}}'
+
+
+def validate_case_selection(selected: tuple[str, ...], native: bool) -> None:
+    if len(selected) != len(set(selected)):
+        raise ValueError('Duplicate selected case')
+    if native:
+        missing = set(NATIVE_DEFAULT_CASES) - set(selected)
+        if missing:
+            raise ValueError('Native concurrent qualification requires the complete CAS/control matrix; missing: '
+                             + ', '.join(sorted(missing)))
 
 
 def bounded_json(path: Path, maximum: int = MAX_REFERENCE):
@@ -99,9 +116,15 @@ def validate_reference(report: dict, candidate: str, base: str) -> tuple[dict, d
         raise ValueError('Serial reader definition hashes differ')
     fixture = report['fixture']
     p, f, padding = fixture['processVersions'], fixture['flowVersions'], fixture['summaryPaddingBytes']
+    profile = fixture.get('profile')
+    native = fixture.get('nativeCasFact')
+    if profile not in serial.FIXTURE_PROFILES:
+        raise ValueError('Explicit supported fixture profile required')
     if not (type(p) is int and type(f) is int and p % 2 == f % 2 == 0 and
             40 <= p <= 40000 and 80 <= f <= 200000 and type(padding) is int and 0 <= padding <= 4096):
         raise ValueError('Serial fixture parameters are outside guarded bounds')
+    if fixture != serial.fixture_metadata(p//2, f//2, padding, profile, native):
+        raise ValueError('Serial fixture profile metadata differs')
     samples = max(row['ordinal'] for row in report['samples']) + 1
     if not 2 <= samples <= 20:
         raise ValueError('Serial sample count is outside supported bounds')
@@ -111,13 +134,24 @@ def validate_reference(report: dict, candidate: str, base: str) -> tuple[dict, d
     elif not isinstance(selected, list) or not selected or not set(selected).issubset(ALL_CASES):
         raise ValueError('Unsupported serial case matrix')
     sql, cases = serial.build_sql(variants, p // 2, f // 2, padding, samples, SCOPES,
-                                 selected_cases=selected, plan_min_ms=report['nestedPlanMinDurationMs'])
+                                 selected_cases=selected, plan_min_ms=report['nestedPlanMinDurationMs'], fixture_profile=profile, native_cas_fact=native)
     if serial.sha(sql) != report['sqlSha256']:
         raise ValueError('Serial SQL/fixture/cursor identity cannot be reconstructed')
     indexed = serial_rows(report, cases, samples)
     actual = report['fixtureActual']
     if actual['processVersions'] != p or actual['flowVersions'] != f or actual['publicSourceRows'] != 0:
         raise ValueError('Serial actual fixture cardinality differs')
+    if profile == 'cas-dense' and actual.get('casCounts') != serial.expected_dense_cas_counts(f//2):
+        raise ValueError('Serial dense CAS distribution/invariant differs')
+    if native:
+        for snapshot in (report.get('nativeSchemaBefore'),report.get('nativeSchema')):
+            if not isinstance(snapshot,dict) or serial.validate_native_schema(snapshot) != report.get('nativeSchemaFingerprint'):
+                raise ValueError('Serial native schema fingerprint differs')
+        expected = serial.expected_dense_cas_counts(f//2)
+        if actual.get('nativeCasFact') != {k:expected[k] for k in ('nonNull','rare','common')} | {'mismatches':0}:
+            raise ValueError('Serial native fact differs from original CAS predicate')
+        _, failures = serial.native_plan_gate(report.get('nestedPlanCoverage',{}).get('groups',[]),SCOPES)
+        if failures: raise ValueError('Serial native natural plan proof incomplete')
     if not report.get('equivalence') or any(item.get('equal') is not True for item in report['equivalence']):
         raise ValueError('Serial equivalence proof is incomplete')
     return variants, cases, indexed
@@ -144,14 +178,8 @@ def request_cases(cases: dict, indexed: dict, selected: tuple[str, ...]) -> dict
     return result
 
 
-def fixture_summary_sql() -> str:
-    return """select jsonb_build_object(
- 'processVersions',(select count(*) from private.display_navigation_versions_v1 where dataset_kind='process'),
- 'flowVersions',(select count(*) from private.display_navigation_versions_v1 where dataset_kind='flow'),
- 'memberships',(select count(*) from private.display_navigation_membership_v1),
- 'publicSourceRows',(select count(*) from public.processes)+(select count(*) from public.flows),
- 'averageCardBytes',(select avg(pg_column_size(card)) from private.display_catalog_search_rows_v1),
- 'brands',(select jsonb_object_agg(brand,n) from (select brand,count(*) n from private.dataset_display_settings group by brand) b));"""
+def fixture_summary_sql(native_cas_fact: bool = False) -> str:
+    return serial.fixture_summary_sql(native_cas_fact)
 
 
 def client_sql(application: str, statement: str) -> str:
@@ -272,9 +300,10 @@ def main() -> int:
     parser.add_argument('--reference-report', type=Path, required=True)
     parser.add_argument('--candidate', type=Path, required=True)
     parser.add_argument('--base-ref', required=True)
+    parser.add_argument('--native-cas-fact', action='store_true', help='Require the serial receipt native CAS profile and the same installed physical schema')
     parser.add_argument('--owner-file', type=Path, default=serial.OWNER, choices=[serial.OWNER])
-    parser.add_argument('--case', dest='selected', action='append', choices=ALL_CASES)
-    parser.add_argument('--rounds', type=int, default=3, choices=range(1,11))
+    parser.add_argument('--case', dest='selected', action='append', choices=ALL_CASES, metavar='CASE')
+    parser.add_argument('--rounds', type=serial.bounded_int(1, 10), default=3, metavar='1..10')
     parser.add_argument('--clients', type=int, default=4, choices=[4])
     parser.add_argument('--report', type=Path, required=True)
     args = parser.parse_args()
@@ -297,6 +326,7 @@ def main() -> int:
     stop = threading.Event()
     expected_identity = None
     variants = None
+    native = False
     sequence = 0
     def admin(source: str, label: str, timeout: int = 180) -> dict | None:
         nonlocal sequence
@@ -313,14 +343,15 @@ def main() -> int:
     try:
         write_private(directory/'collector.py', Path(__file__).read_bytes())
         reference = bounded_json(args.reference_report)
+        if reference.get('fixture',{}).get('nativeCasFact') is not args.native_cas_fact:
+            raise ValueError('--native-cas-fact must match the exact serial receipt')
         candidate = args.candidate.read_text() if args.candidate.stat().st_size <= MAX_OUTPUT else None
         if candidate is None:
             raise ValueError('Candidate source exceeds bounded input limit')
         base = subprocess.check_output(['git', 'rev-parse', f'{args.base_ref}^{{commit}}'], cwd=serial.ROOT, text=True).strip()
         variants, cases, indexed = validate_reference(reference, candidate, base)
-        selected = tuple(args.selected or DEFAULT_CASES)
-        if len(selected) != len(set(selected)):
-            raise ValueError('Duplicate selected case')
+        selected = tuple(args.selected or (NATIVE_DEFAULT_CASES if args.native_cas_fact else DEFAULT_CASES))
+        validate_case_selection(selected, args.native_cas_fact)
         requests = request_cases(cases, indexed, selected)
         context = json.loads(subprocess.check_output(['docker', 'context', 'inspect'], text=True))[0]
         inspected = json.loads(subprocess.check_output(['docker', 'inspect', '--format', INSPECT_FORMAT, serial.CONTAINER], text=True))
@@ -331,6 +362,15 @@ def main() -> int:
         check = serial.run(serial.guard_sql()+"select count(*) from pg_stat_activity where application_name like 'portal864-concurrent-%' and pid<>pg_backend_pid();", 60)
         if check.returncode or check.stdout.strip().splitlines() != serial.empty_guard_expected()+['0']:
             raise ValueError('Exact owned empty local prestate required; reset is Main-owned')
+        native = reference['fixture']['nativeCasFact']
+        native_schema = None
+        if native:
+            checked_schema = serial.run(serial.native_schema_sql(),60)
+            if checked_schema.returncode:
+                raise ValueError('Native CAS schema admission query failed')
+            native_schema = json.loads(checked_schema.stdout)
+            if serial.validate_native_schema(native_schema) != reference['nativeSchemaFingerprint']:
+                raise ValueError('Native CAS physical schema differs from serial reference')
         admitted = True
         report.update({'baseCommit': base, 'candidateSha256': serial.sha(candidate),
                        'candidateReaderSha256': serial.sha(variants['candidate']), 'baselineSourceSha256': serial.sha(variants['baseline']),
@@ -340,11 +380,13 @@ def main() -> int:
                        'resources': inspected['HostConfig'], 'dockerContext': context['Name'],
                        'ownerSha256': serial.sha(owner), 'selectedCases': selected,
                        'serialVariantRoutineSettings': reference.get('variantRoutineSettings'),
+                       'nativeSchemaBefore':native_schema,'nativeSchemaFingerprint':reference.get('nativeSchemaFingerprint'),
+                       'physicalSchemaComparison':reference.get('physicalSchemaComparison'),
                        'functionOverrides': 'Retained exactly from the verified serial definitions; no per-function override is changed by the collector'})
         fixture = reference['fixture']
-        seed = serial.fixture(fixture['processVersions']//2, fixture['flowVersions']//2, fixture['summaryPaddingBytes'])
+        seed = serial.fixture(fixture['processVersions']//2, fixture['flowVersions']//2, fixture['summaryPaddingBytes'], fixture['profile'], native)
         seed = seed.replace("set application_name='portal864-serial';", 'set application_name='+serial.literal(prefix+'-admin')+';')
-        actual = admin(seed+'\ncommit;\n'+fixture_summary_sql(), 'seed', 900)
+        actual = admin(seed+'\ncommit;\n'+fixture_summary_sql(native), 'seed', 900)
         seeded = True
         report['fixtureActual'] = actual
         if actual != reference['fixtureActual']:
@@ -404,6 +446,9 @@ def main() -> int:
                         raise RuntimeError('Total private artifact bound exceeded')
         summary, failures = summarize(report['samples'], requests, args.rounds, observed)
         report.update(summary)
+        if native:
+            report['relativeCasPerformance'], relative_failures = serial.relative_cas_evidence(report['timings'],list(requests),metric='p95WallMs',enforce='smoke' not in reference['classification'])
+            failures.extend(relative_failures)
         report['failures'] = failures
         report['passed'] = not failures
     except BaseException as exc:
@@ -421,7 +466,12 @@ def main() -> int:
                 report['restoredCandidateIdentity'] = restored['identity']
                 remaining = serial.run("select count(*) from pg_stat_activity where application_name like "+serial.literal(prefix+'%')+" and pid<>pg_backend_pid();", 30)
                 report['disposition']['activeClientsRemaining'] = int(remaining.stdout.strip()) if remaining.returncode == 0 and remaining.stdout.strip().isdigit() else None
-                report['disposition']['fixtureAfter'] = admin(fixture_summary_sql(), 'retained-fixture')
+                report['disposition']['fixtureAfter'] = admin(fixture_summary_sql(native), 'retained-fixture')
+                if native:
+                    snapshot = admin(serial.native_schema_sql(),'native-schema-final')
+                    report['nativeSchema'] = snapshot
+                    if serial.validate_native_schema(snapshot) != reference['nativeSchemaFingerprint']:
+                        raise ValueError('Native CAS schema changed during concurrent comparison')
                 report['disposition']['syntheticRowsRetained'] = bool(report['disposition']['fixtureAfter']['processVersions'] or report['disposition']['fixtureAfter']['flowVersions'])
             except Exception as exc:
                 report['disposition']['restoreError'] = type(exc).__name__+': '+str(exc)

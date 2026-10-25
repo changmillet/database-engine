@@ -1,8 +1,8 @@
 version: 1
 layout: repo
 lastReviewedAt: "2026-10-25"
-lastReviewedCommit: "1868c1f82e929073ae375865171c53cfc9fc895d"
-lastReviewedNote: "Database #864: reviewed routing and ownership for four existing private Facets/Navigation reader changes, guarded qualification tooling and CI registration. No ownership, API permissions, RLS, indexes or delivery boundaries change."
+lastReviewedCommit: "356a06099669c7b4aa2d9261e37bc5cb33644385"
+lastReviewedNote: "Database #869: reviewed existing ownership/routing for the additive navigation CAS fact, index, existing writer/matcher changes and qualification tooling. Governance, public permission and delivery boundaries remain unchanged."
 
 # Keep deterministic governance facts here.
 # AGENTS.md remains the repo contract entrypoint.
