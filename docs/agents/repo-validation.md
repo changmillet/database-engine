@@ -1315,7 +1315,10 @@ only for those candidate rare-case plan groups; timing samples keep it disabled
 and all other plan groups retain a duration threshold. Preserve bounded logs,
 plan receipts, exact physical-schema/collector/candidate hashes and the serial
 receipt consumed by the four-client run. Run the benchmark, upgrade-profile and
-cutover-collector offline boundary tests registered in CI. A local result is not
+cutover-collector offline boundary tests registered in CI. Native concurrent
+custom selections must include all eighteen default CAS/control cases; extra
+cases may be added, but incomplete selections fail before database admission.
+A local result is not
 production p95 or proof of the unknown historical failing arguments; retain the
 preceding hosted, synchronization, integration and cleanup gates.
 

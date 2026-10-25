@@ -953,7 +953,8 @@ python3 scripts/benchmark_portal_facets_navigation_concurrent.py \
 
 并发测试前，把独占项目重建到相同原生 migration 状态；source/fixture/schema
 准确 hash 必须与成功的串行 receipt 一致。不传 `--case` 会包含所需全部原生容量
-形状和对照。`--smoke` 仅用于正确性诊断。collector 强制验证密集 fixture 分布、
+形状和对照。原生并发的自定义选择必须保留全部十八个默认 CAS/对照场景；可以增加
+场景，缺失时会在数据库准入前拒绝。`--smoke` 仅用于正确性诊断。collector 强制验证密集 fixture 分布、
 稀有 CAS 的自然索引计划、相对性能和两秒本地目标。读取对比不测量迁移或 writer
 成本，也不代表托管 p95。
 

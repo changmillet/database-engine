@@ -1112,7 +1112,9 @@ python3 scripts/benchmark_portal_facets_navigation_concurrent.py \
 
 Rebuild the owned project to the same native migration state before concurrency;
 its exact source/fixture/schema hashes must match the successful serial receipt.
-Omitting `--case` includes all required native volume cases and controls. Use
+Omitting `--case` includes all required native volume cases and controls. Native
+concurrent custom selections must retain all eighteen default CAS/control cases;
+additional cases are allowed, and omissions fail before database admission. Use
 `--smoke` only for correctness diagnostics. Dense fixture distributions, native
 rare-key natural plans, relative CAS performance and the two-second local target
 are enforced by the collectors. Their read comparison does not measure migration

@@ -43,6 +43,16 @@ ALL_CASES = tuple(sorted(set(serial.cases(SCOPES[0], 'cas-dense')) |
 INSPECT_FORMAT = '{"Id":{{json .Id}},"Name":{{json .Name}},"Config":{"Labels":{{json .Config.Labels}},"Image":{{json .Config.Image}}},"State":{"Running":{{json .State.Running}}},"HostConfig":{"NanoCpus":{{json .HostConfig.NanoCpus}},"CpuQuota":{{json .HostConfig.CpuQuota}},"CpuPeriod":{{json .HostConfig.CpuPeriod}},"CpusetCpus":{{json .HostConfig.CpusetCpus}},"Memory":{{json .HostConfig.Memory}},"MemorySwap":{{json .HostConfig.MemorySwap}}}}'
 
 
+def validate_case_selection(selected: tuple[str, ...], native: bool) -> None:
+    if len(selected) != len(set(selected)):
+        raise ValueError('Duplicate selected case')
+    if native:
+        missing = set(NATIVE_DEFAULT_CASES) - set(selected)
+        if missing:
+            raise ValueError('Native concurrent qualification requires the complete CAS/control matrix; missing: '
+                             + ', '.join(sorted(missing)))
+
+
 def bounded_json(path: Path, maximum: int = MAX_REFERENCE):
     if path.stat().st_size > maximum:
         raise ValueError('JSON artifact exceeds bounded input limit')
@@ -341,8 +351,7 @@ def main() -> int:
         base = subprocess.check_output(['git', 'rev-parse', f'{args.base_ref}^{{commit}}'], cwd=serial.ROOT, text=True).strip()
         variants, cases, indexed = validate_reference(reference, candidate, base)
         selected = tuple(args.selected or (NATIVE_DEFAULT_CASES if args.native_cas_fact else DEFAULT_CASES))
-        if len(selected) != len(set(selected)):
-            raise ValueError('Duplicate selected case')
+        validate_case_selection(selected, args.native_cas_fact)
         requests = request_cases(cases, indexed, selected)
         context = json.loads(subprocess.check_output(['docker', 'context', 'inspect'], text=True))[0]
         inspected = json.loads(subprocess.check_output(['docker', 'inspect', '--format', INSPECT_FORMAT, serial.CONTAINER], text=True))

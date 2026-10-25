@@ -13,6 +13,18 @@ from test_benchmark_portal_facets_navigation import native_snapshot, native_plan
 
 
 class ConcurrentCollectorTests(unittest.TestCase):
+    def test_native_selection_rejects_missing_cas_or_controls_before_target_admission(self):
+        b.validate_case_selection(b.NATIVE_DEFAULT_CASES, True)
+        b.validate_case_selection(b.NATIVE_DEFAULT_CASES + ('facets_all_lexical',), True)
+        b.validate_case_selection(('facets_all_empty',), False)
+        with self.assertRaisesRegex(ValueError, 'complete CAS/control matrix'):
+            b.validate_case_selection(('facets_all_empty',), True)
+        for missing in b.NATIVE_DEFAULT_CASES:
+            with self.subTest(missing=missing), self.assertRaisesRegex(ValueError, 'complete CAS/control matrix'):
+                b.validate_case_selection(tuple(case for case in b.NATIVE_DEFAULT_CASES if case != missing), True)
+        with self.assertRaisesRegex(ValueError, 'Duplicate'):
+            b.validate_case_selection(b.NATIVE_DEFAULT_CASES + b.NATIVE_DEFAULT_CASES[:1], True)
+
     def test_native_defaults_cover_required_cas_and_control_cases(self):
         required = {f'{api}_{kind}_cas_{population}'
                     for api in ('facets', 'navigation') for kind in ('flow', 'all')
