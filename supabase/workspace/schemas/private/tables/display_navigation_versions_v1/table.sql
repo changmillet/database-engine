@@ -18,6 +18,7 @@ END) STORED,
     "reference_year" integer,
     "process_subtype" "text",
     "source" "text",
+    "cas_number" "text",
     CONSTRAINT "d807_portal_navigation_versions_v1_dataset_kind_check" CHECK (("dataset_kind" = ANY (ARRAY['process'::"text", 'flow'::"text"])))
 );
 

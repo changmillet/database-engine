@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
-lastReviewedNote: "Database #864: reviewed serial/concurrent source-bound proof, full populated migration, rejection/rollback/repeat, committed visibility, real writers, canonical per-file suites and deterministic exports. Hosted qualification remains required."
+lastReviewedCommit: 816a78c23b8b7a006ab54a05ab2c37533dcb9f75
+lastReviewedNote: "Database #869: reviewed mandatory native concurrent CAS/control admission after independent P2 finding. All18 defaults are required before target access; incomplete CLI selection is rejected. The actual20-case960-request run satisfies the guard and all960 request SQL files are unchanged;57 offline collector tests pass. Product SQL and prior runtime evidence remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -1210,6 +1210,117 @@ Preserve receipts and release task-owned resources through the workspace cleanup
 workflow. Local qualification does not establish hosted p95 or identify the
 arguments of historical production failures. Official Preview/CI, exact Main
 deployment and readback, Dev synchronization and Root integration remain required.
+
+### Native Flow CAS qualification (Database #869)
+
+Run `20261025_portal_flow_cas.sql` with the preceding Facets/Navigation and Portal
+suites after a blank rebuild. Prove exact historical/current CAS versions,
+rare/absent/common CAS, malformed and non-string CAS, superstrings, whitespace
+normalization, missing document CAS, Process lexical positives, filters, brand
+isolation, and immediate source CAS update/withdrawal through real writers.
+The nullable native fact must equal the original V1 predicate for every Flow;
+Process facts remain NULL. Existing relation RLS, role/ACL/configuration, all
+unrelated routines, source/settings rows, public DTOs and eight-second budgets
+must retain their contracts. Only the new column/index and two existing private
+routine bodies are allowed metadata changes.
+
+Use `test_portal_facets_navigation_upgrade.py --profile 869` from its pinned
+Main predecessor to execute both complete migrations in order. Retain Phase A
+old-reader compatibility, Phase B rollback to that prepared state, successful
+repeat activation, complete response equality and post-upgrade writer replay.
+Negative cases must reject missing coverage, native fact drift, wrong index
+shape, an index created before first activation, active fact drift after index
+loss, non-bypassing roles and manifest drift. Injected failures must leave no
+partial activation. Raw SQL rehearsal does not prove migration-ledger transition;
+record the actual initial head separately and complete a native CLI rebuild.
+
+`collect_portal_flow_cas_cutover.py` requires a fresh canonical empty owned
+predecessor for each mode. `reader-cutover` pauses one actual anonymous Facets
+RPC between its ordinary facet and brand stages across the activation commit;
+pre-cutover, in-flight and fresh full responses must agree under the unchanged
+eight-second budget. `fence` observes an old real writer, migration source-lock
+wait and a queued writer, then checks the resulting CAS and full DTOs after
+each commit. `cost` records root-statement `EXPLAIN (ANALYZE, BUFFERS, WAL)` for
+real CAS-only updates, batches and withdrawals before/after activation, including
+index/table bytes. Execution time includes AFTER-trigger work, but the root
+ModifyTable WAL counters exclude the navigation writes performed by those
+triggers and cannot establish native-index write amplification. Global WAL
+positions cannot attribute this cost. Preserve
+phase epochs and distinguish actual committed lock duration from a synthetic
+outer rollback that retains Phase A locks. Committed modes retain fixtures for
+the owner's reset; every mode must release nonce sessions/locks and restore
+temporary helpers and the manifest.
+
+`scripts/collect_portal_flow_cas_writer_wal.py` separately captures nested plans
+for actual navigation UPSERTs caused by real source CAS updates. It requires the
+same fresh canonical empty owned predecessor. Fixed warmup plus three measured
+single-row and three-row batch updates in each variant produce sixteen source
+windows and thirty-two distinct navigation invocations. Logging at zero
+milliseconds is confined to the actual source-update windows; fixture snapshots,
+migration statements and rollback remain unlogged. Preserve bounded artifacts
+and verify one exact navigation `INSERT ... ON CONFLICT UPDATE` invocation per
+affected source row, baseline conflict-filter no-ops and candidate native-fact
+updates. Sum each invocation's root WAL once, retaining repeated batch SQL as
+distinct events; summing children or wrapper plans would double-count.
+
+These counters measure the navigation UPSERT's direct heap and all index
+maintenance, not isolated CAS-index bytes, the entire trigger tree, commit or
+rollback WAL. Profiling time is diagnostic; use the separate `cost` mode's
+source execution time for writer latency. This is write-amplification evidence,
+not overall throughput. The collector executes A/B statements within one outer
+rollback, writes no ledger and claims no phase commits. Require restored schema,
+metadata and logical data, zero owned sessions and released fixture lock;
+physical pages may remain, so reset the owned project before other proof.
+
+Use the separate `collect_portal_flow_cas_ddl_fence.py` on a fresh canonical
+empty predecessor to observe regular and concurrent exact-index creation waiting
+behind Phase B's granted navigation fence before preflight. An ordinary reader
+must remain usable. After activation, require the B-created index's OID and
+definition, native facts, complete responses and predecessor data to remain
+intact; bounded competing-DDL timeout is distinct from unexpected failure.
+This collector commits raw A/B SQL, keeps migration history unchanged and
+retains its fixture/native schema for the owner's reset. It releases only its
+nonce sessions/locks and removes an exact owned competing index if activation
+aborted before native state was established.
+
+`scripts/collect_portal_flow_cas_volume_upgrade.py` supplies a separate committed
+synthetic-volume rehearsal: 20,000 Process and 138,000 Flow versions, dense CAS
+and 3,072-byte summary padding, then actual separate Phase A/Phase B commits.
+Record per-phase timestamps and held relation-lock modes, prove the ADD COLUMN
+`ACCESS EXCLUSIVE` lock has ended before Phase B, and require Phase B's observed
+modes to admit ordinary `ACCESS SHARE`. Compare complete non-CAS and rare/common
+CAS control responses before, after A and after B; record native fact/index
+sizes and equality. Instrumentation overhead belongs in reported durations.
+This sequential rehearsal proves neither concurrent load nor real-writer
+throughput and writes no migration ledger. It retains committed synthetic rows
+and the native schema for the owner's exact reset; it never resets or removes
+development resources itself.
+
+For read-scale and four-client proof, use `--native-cas-fact` and the serial
+`--fixture-profile cas-dense`. Install the actual two-phase schema and writer
+before admission; the collector must not create them. Baseline and candidate
+reader comparisons share that final physical schema and writer, so they do not
+replace complete-upgrade or write-amplification proof. Dense fixtures must carry
+literal CAS in their documents, sparse rare/absent CAS within a majority of
+CAS-shaped Flow rows, a common CAS cohort, realistic document widths and
+TOAST-backed cards. Require full JSON equality for Flow/all-kind
+rare/absent/common Facets and Navigation in both scopes, plus Process and non-CAS
+controls. Rare/absent p95 must be at most half the baseline; common p95 must be
+at most `max(baseline * 1.1, baseline + 10ms)`; the two-second absolute candidate
+target also applies. Process controls are observational relative comparisons.
+
+Retain natural native-index equality conditions and at most two examined rare
+Flow keys for both APIs/scopes. Zero-millisecond nested-plan capture is allowed
+only for those candidate rare-case plan groups; timing samples keep it disabled
+and all other plan groups retain a duration threshold. Preserve bounded logs,
+plan receipts, exact physical-schema/collector/candidate hashes and the serial
+receipt consumed by the four-client run. Run the benchmark, upgrade-profile and
+cutover-collector offline boundary tests registered in CI. Native concurrent
+custom selections must include all eighteen default CAS/control cases; extra
+cases may be added, but incomplete selections fail before database admission.
+A local result is not
+production p95 or proof of the unknown historical failing arguments; retain the
+preceding hosted, synchronization, integration and cleanup gates.
 
 ## Seven-kind classification catalog qualification (Database #838)
 

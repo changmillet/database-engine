@@ -1,0 +1,1 @@
+CREATE INDEX "d807_portal_navigation_versions_flow_cas_v1_idx" ON "private"."display_navigation_versions_v1" USING "btree" ("dataset_kind", "cas_number", "id", "version") WHERE (("dataset_kind" = 'flow'::"text") AND ("cas_number" IS NOT NULL));
