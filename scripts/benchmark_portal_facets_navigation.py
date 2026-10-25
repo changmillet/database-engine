@@ -40,6 +40,8 @@ MAX_PLAN_BYTES = 2 * 1024 * 1024
 MAX_GROUP_BYTES = 16 * 1024 * 1024
 FIXTURE_PROFILES = ('legacy', 'cas-dense')
 CAS_QUERIES = {'rare': '50-00-0', 'absent': '75-07-0', 'common': '64-17-5'}
+NATIVE_CAS_INDEX = 'd807_portal_navigation_versions_flow_cas_v1_idx'
+NATIVE_RARE_CASES = ('facets_flow_cas_rare', 'navigation_flow_cas_rare')
 
 REFRESH = '\nupdate private.portal_display_contract_manifest set identity=private.portal_display_contract_identity_v1() where singleton;\nselect private.portal_display_assert_contract_v1();\n'
 
@@ -164,7 +166,7 @@ def definitions_sql(definitions: dict) -> str:
     return '\n'.join(definitions.values()) + REFRESH
 
 
-def fixture(processes: int, flows: int, padding: int, profile: str = 'legacy') -> str:
+def fixture(processes: int, flows: int, padding: int, profile: str = 'legacy', native_cas_fact: bool = False) -> str:
     """Direct, consistent reader projections; all DDL/data rolls back.
 
     No raw source rows are fabricated. All public source tables remain empty;
@@ -172,6 +174,8 @@ def fixture(processes: int, flows: int, padding: int, profile: str = 'legacy') -
     """
     if profile not in FIXTURE_PROFILES:
         raise ValueError('Unsupported fixture profile')
+    if native_cas_fact and profile != 'cas-dense':
+        raise ValueError('Native CAS fact requires cas-dense profile')
     tables = ','.join(literal(t) + '::regclass' for t in TABLES)
     sql = f"""
 set application_name='portal864-serial';
@@ -246,6 +250,7 @@ select dataset_kind,id,version,card->>'accessLevel',lower(btrim(card#>>'{geograp
 array(select distinct lower(btrim(c->>'code')) from jsonb_array_elements(card->'classifications') c),
 (card->>'referenceYear')::integer,lower(btrim(card->>'processSubtype')),lower(btrim(card->>'source'))
 from private.display_catalog_search_current_v2;
+__NATIVE_FACT_SEED__
 -- Resolve seven real direct placements once, then reuse their reviewed ancestors.
 create temp table placement_map as with recursive p as (
  select n.node_id origin,n.node_id,n.parent_node_id,n.dimension,n.taxonomy,n.code,true direct
@@ -269,6 +274,16 @@ set constraints all immediate;
 update private.portal_display_rollout set mode='display';
 """
     sql += '\n'.join('analyze ' + table + ';' for table in TABLES)
+    seed = """update private.display_navigation_versions_v1 v set cas_number=
+ case when p.dataset_kind='flow' and jsonb_typeof(p.card->'casNumber')='string'
+ and p.card->>'casNumber' ~ '^[0-9]{2,7}-[0-9]{2}-[0-9]$'
+ and length(p.card->>'casNumber') between 7 and 12 then p.card->>'casNumber' else null end
+ from private.display_catalog_search_rows_v1 p
+ where (v.dataset_kind,v.id,v.version)=(p.dataset_kind,p.id,p.version);""" if native_cas_fact else ''
+    # Keep the legacy fixture byte-identical, including the original newline.
+    sql = sql.replace('__NATIVE_FACT_SEED__\n', seed+'\n' if seed else '')
+    if native_cas_fact:
+        sql = sql.replace("begin;\nset local statement_timeout", "begin;\nset local auto_explain.log_min_duration=-1;\nset local statement_timeout",1)
     return sql + "\nset local work_mem='4MB';set local statement_timeout='8s';\n"
 
 
@@ -344,8 +359,56 @@ grant execute on function pg_temp.measure(text,text,integer,text),pg_temp.captur
 """
 
 
-def fixture_summary_sql() -> str:
-    return """select jsonb_build_object(
+def native_schema_sql() -> str:
+    """Read-only admission evidence; the collector never installs schema DDL."""
+    return f"""select jsonb_build_object(
+ 'column',(select jsonb_build_object('type',format_type(a.atttypid,a.atttypmod),'nullable',not a.attnotnull,'generated',a.attgenerated,'hasDefault',a.atthasdef)
+ from pg_attribute a where a.attrelid='private.display_navigation_versions_v1'::regclass and a.attname='cas_number' and not a.attisdropped),
+ 'table',(select jsonb_build_object('owner',c.relowner::regrole::text,'rls',c.relrowsecurity,'forceRls',c.relforcerowsecurity,
+ 'executorSelect',has_table_privilege('portal_display_executor',c.oid,'SELECT'),'anonSelect',has_table_privilege('anon',c.oid,'SELECT'),
+ 'authenticatedSelect',has_table_privilege('authenticated',c.oid,'SELECT')) from pg_class c where c.oid='private.display_navigation_versions_v1'::regclass),
+ 'executor',(select jsonb_build_object('login',rolcanlogin,'bypassRls',rolbypassrls,'superuser',rolsuper) from pg_roles where rolname='portal_display_executor'),
+ 'policies',(select jsonb_agg(jsonb_build_object('name',polname,'command',polcmd,'permissive',polpermissive,
+ 'roles',(select jsonb_agg(rolname order by rolname) from pg_roles where oid=any(polroles)),
+ 'qual',pg_get_expr(polqual,polrelid)) order by polname) from pg_policy where polrelid='private.display_navigation_versions_v1'::regclass),
+ 'index',(select jsonb_build_object('name',c.relname,'valid',i.indisvalid,'ready',i.indisready,'live',i.indislive,'unique',i.indisunique,
+ 'method',am.amname,'keys',(select jsonb_agg(pg_get_indexdef(i.indexrelid,s,true) order by s) from generate_series(1,i.indnatts) s),
+ 'keyCount',i.indnkeyatts,'predicate',pg_get_expr(i.indpred,i.indrelid),'expressions',pg_get_expr(i.indexprs,i.indrelid))
+ from pg_index i join pg_class c on c.oid=i.indexrelid join pg_am am on am.oid=c.relam
+ where i.indexrelid=to_regclass('private.{NATIVE_CAS_INDEX}') and i.indrelid='private.display_navigation_versions_v1'::regclass),
+ 'writerMd5',(select md5(pg_get_functiondef(to_regprocedure('private.display_sync_navigation_membership_v1(text,uuid,text,jsonb)')))),
+ 'indexBytes',coalesce(pg_relation_size(to_regclass('private.{NATIVE_CAS_INDEX}')),0));"""
+
+
+def schema_fingerprint(snapshot: dict) -> str:
+    return sha(json.dumps({k:v for k,v in snapshot.items() if k != 'indexBytes'}, sort_keys=True, separators=(',', ':')))
+
+
+def validate_native_schema(snapshot: dict) -> str:
+    if snapshot.get('column') != {'type':'text','nullable':True,'generated':'','hasDefault':False}:
+        raise ValueError('Exact nullable native CAS text column required')
+    if snapshot.get('table') != {'owner':'postgres','rls':True,'forceRls':True,'executorSelect':True,'anonSelect':False,'authenticatedSelect':False}:
+        raise ValueError('Native CAS relation permissions/RLS differ')
+    if snapshot.get('executor') != {'login':False,'bypassRls':False,'superuser':False}:
+        raise ValueError('Native CAS executor permissions differ')
+    index = snapshot.get('index') or {}
+    expected = {'name':NATIVE_CAS_INDEX,'valid':True,'ready':True,'live':True,'unique':False,'method':'btree',
+                'keys':['dataset_kind','cas_number','id','version'],'keyCount':4,'expressions':None}
+    if any(index.get(key) != value for key,value in expected.items()) or re.sub(r'[\s()]','',index.get('predicate','')) != "dataset_kind='flow'::textANDcas_numberISNOTNULL":
+        raise ValueError('Exact ready native CAS index definition required')
+    policies = snapshot.get('policies') or []
+    if len(policies) != 1 or any(policies[0].get(k) != v for k,v in {'name':'display_scope','command':'r','permissive':True,'roles':['portal_display_executor']}.items()):
+        raise ValueError('Native CAS visibility policy differs')
+    qual = re.sub(r'[\s()"]','',policies[0].get('qual',''))
+    if not all(part in qual for part in ('private.display_request_visible_settings_v1','s.dataset_kind=display_navigation_versions_v1.dataset_kind','s.dataset_id=display_navigation_versions_v1.id','s.dataset_version::text=display_navigation_versions_v1.version')):
+        raise ValueError('Native CAS exact-version visibility policy required')
+    if not re.fullmatch('[0-9a-f]{32}',snapshot.get('writerMd5') or '') or type(snapshot.get('indexBytes')) is not int or snapshot['indexBytes'] <= 0:
+        raise ValueError('Native CAS writer/index metadata incomplete')
+    return schema_fingerprint(snapshot)
+
+
+def fixture_summary_sql(native_cas_fact: bool = False) -> str:
+    sql = """select jsonb_build_object(
  'processVersions',(select count(*) from private.display_navigation_versions_v1 where dataset_kind='process'),
  'flowVersions',(select count(*) from private.display_navigation_versions_v1 where dataset_kind='flow'),
  'memberships',(select count(*) from private.display_navigation_membership_v1),
@@ -358,12 +421,23 @@ def fixture_summary_sql() -> str:
  'rare',count(*) filter(where card->>'casNumber'='50-00-0'),'common',count(*) filter(where card->>'casNumber'='64-17-5'),
  'absent',count(*) filter(where card->>'casNumber'='75-07-0'),
  'documentInvariantViolations',count(*) filter(where card->>'casNumber' is not null and (position(card->>'casNumber' in document)=0 or position(card->>'casNumber' in (card->>'document'))=0))) from private.display_catalog_search_rows_v1 where dataset_kind='flow'));"""
+    if native_cas_fact:
+        sql = sql.removesuffix(';') + """ || jsonb_build_object('nativeCasFact',(
+ select jsonb_build_object('nonNull',count(*) filter(where v.cas_number is not null),
+ 'rare',count(*) filter(where v.cas_number='50-00-0'),'common',count(*) filter(where v.cas_number='64-17-5'),
+ 'mismatches',count(*) filter(where v.cas_number is distinct from case when p.dataset_kind='flow'
+ and jsonb_typeof(p.card->'casNumber')='string' and p.card->>'casNumber' ~ '^[0-9]{2,7}-[0-9]{2}-[0-9]$'
+ and length(p.card->>'casNumber') between 7 and 12 then p.card->>'casNumber' else null end))
+ from private.display_navigation_versions_v1 v join private.display_catalog_search_rows_v1 p using(dataset_kind,id,version)));"""
+    return sql
 
 
-def fixture_metadata(processes: int, flows: int, padding: int, profile: str) -> dict:
+def fixture_metadata(processes: int, flows: int, padding: int, profile: str, native_cas_fact: bool = False) -> dict:
     if profile not in FIXTURE_PROFILES:
         raise ValueError('Unsupported fixture profile')
-    return {'processVersions': 2*processes, 'flowVersions': 2*flows,
+    if type(native_cas_fact) is not bool or (native_cas_fact and profile != 'cas-dense'):
+        raise ValueError('Native CAS fact requires cas-dense profile')
+    return {'processVersions': 2*processes, 'flowVersions': 2*flows, 'nativeCasFact':native_cas_fact,
             'summaryPaddingBytes': padding, 'profile': profile,
             'documentWidthCohorts': {'shortBytes': 610, 'longBytes': 2237, 'longEvery': 19} if profile == 'cas-dense' else None}
 
@@ -377,9 +451,9 @@ def expected_dense_cas_counts(flows: int) -> dict:
 
 
 def build_sql(definitions: dict[str, str], processes: int, flows: int, padding: int,
-              samples: int, scopes: tuple[str, ...], include_plans: bool = True, selected_cases: list[str] | None = None, plan_min_ms: int = 10, fixture_profile: str = 'legacy') -> tuple[str, dict]:
+              samples: int, scopes: tuple[str, ...], include_plans: bool = True, selected_cases: list[str] | None = None, plan_min_ms: int = 10, fixture_profile: str = 'legacy', native_cas_fact: bool = False) -> tuple[str, dict]:
     all_cases = {scope: cases(scope, fixture_profile) for scope in scopes}
-    sql = fixture(processes, flows, padding, fixture_profile) + COLLECTOR
+    sql = fixture(processes, flows, padding, fixture_profile, native_cas_fact) + COLLECTOR
     if selected_cases and any(label not in next(iter(all_cases.values())) and label not in ('navigation_page2', 'navigation_page3', 'navigation_cn_page2') for label in selected_cases):
         raise ValueError('Selected case unavailable in fixture profile')
     # Capture predecessor-issued cursors before alternating order. The fixture's
@@ -420,12 +494,15 @@ def build_sql(definitions: dict[str, str], processes: int, flows: int, padding: 
                 for label in dict.fromkeys(plan_cases + tuple(label for label in all_cases[scope] if 'cas' in label)):
                     if label not in all_cases[scope]:
                         continue
+                    threshold = 0 if native_cas_fact and variant == 'candidate' and label in NATIVE_RARE_CASES else plan_min_ms
+                    sql += f'reset role;set local auto_explain.log_min_duration={threshold};set local role anon;\n'
                     sql += f'select pg_temp.capture_plan({literal(variant)},{literal(scope+":"+label)},{literal(all_cases[scope][label])});\n'
         sql += 'reset role;set local auto_explain.log_min_duration=-1;\n'
     sql += """
 reset role;
 select jsonb_build_object(
  'fixtureActual',(__FIXTURE_SUMMARY__),
+ 'nativeSchema',(__NATIVE_SCHEMA__),
  'variantRoutineSettings',(select jsonb_object_agg(variant,routines) from variant_settings),
  'routineSettings',(select jsonb_agg(jsonb_build_object('routine',p.oid::regprocedure::text,'owner',p.proowner::regrole::text,'config',p.proconfig) order by p.oid::regprocedure::text) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in('api','private') and (p.proname like 'display_%facet%' or p.proname like 'display_%navigation%' or p.proname in('portal_facets_v4','portal_navigation_v2','portal_display_brand_facets_v1'))),
  'samples',(select jsonb_agg(jsonb_build_object('variant',variant,'label',label,'ordinal',ordinal,'ms',elapsed_ms,'error',error,
@@ -434,7 +511,7 @@ select jsonb_build_object(
  'plans',(select coalesce(jsonb_agg(jsonb_build_object('variant',variant,'label',label,'plan',payload,'error',error) order by label,variant),'[]'::jsonb) from plans));
 rollback;
 """
-    return sql.replace("__FIXTURE_SUMMARY__", fixture_summary_sql().removesuffix(";")), all_cases
+    return sql.replace("__FIXTURE_SUMMARY__", fixture_summary_sql(native_cas_fact).removesuffix(";")).replace('__NATIVE_SCHEMA__', native_schema_sql().removesuffix(';') if native_cas_fact else 'select null::jsonb'), all_cases
 
 
 def summarize(report: dict, samples: int, scopes: tuple[str, ...], all_cases: dict, variants: tuple[str, ...]) -> list[str]:
@@ -511,15 +588,16 @@ def plan_diagnostics(group: dict) -> dict:
     def visit(node, event):
         relation = node.get('Relation Name', '')
         condition, predicate = node.get('Index Cond', ''), node.get('Filter', '')
-        if relation or 'casnumber' in (condition + predicate).lower():
+        cas_expression = (condition + predicate).lower().replace('_','')
+        if relation or 'casnumber' in cas_expression:
             item = {key: node[key] for key in ('Node Type', 'Relation Name', 'Index Name', 'Index Cond',
                     'Filter', 'Plan Rows', 'Actual Rows', 'Actual Loops', 'Rows Removed by Filter',
                     'Shared Hit Blocks', 'Shared Read Blocks', 'Temp Read Blocks', 'Temp Written Blocks') if key in node}
             item['eventIndex'] = event
             if relation.startswith('display_'):
                 relations.append(item.copy())
-            if 'casnumber' in (condition + predicate).lower() or 'cas' in node.get('Index Name', '').lower():
-                item['equalityIndexCond'] = 'casnumber' in condition.lower() and '=' in condition
+            if 'casnumber' in cas_expression or 'cas' in node.get('Index Name', '').lower():
+                item['equalityIndexCond'] = 'casnumber' in condition.lower().replace('_','') and '=' in condition
                 scans.append(item)
             if relation == 'dataset_display_settings':
                 settings.append(item)
@@ -529,6 +607,41 @@ def plan_diagnostics(group: dict) -> dict:
         visit(event['explain'].get('Plan', {}), ordinal)
     return {'casScans': scans, 'settingsScans': settings, 'relationScans': relations,
             'equalityIndexCondObserved': any(node['equalityIndexCond'] for node in scans)}
+
+
+def native_plan_gate(groups: list[dict], scopes: tuple[str, ...]) -> tuple[list[dict], list[str]]:
+    evidence, failures = [], []
+    indexed = {(g['variant'],g['label']):g for g in groups}
+    for scope in scopes:
+        for case in NATIVE_RARE_CASES:
+            label = scope+':'+case
+            group = indexed.get(('candidate',label), {})
+            diagnostics = group.get('casDiagnostics') or {}
+            lookups = [node for node in diagnostics.get('casScans', [])
+                       if re.search(r'\bcas_number\b',node.get('Index Cond','')) and '=' in node['Index Cond'] and "'50-00-0'" in node['Index Cond']]
+            examined = [(node.get('Actual Rows',0)+node.get('Rows Removed by Filter',0))*node.get('Actual Loops',0) for node in lookups]
+            passed = bool(lookups) and all(0 < rows <= 2 for rows in examined)
+            event_ids = {node['eventIndex'] for node in lookups}
+            settings = [node for node in diagnostics.get('settingsScans',[]) if node['eventIndex'] in event_ids]
+            evidence.append({'label':label,'passed':passed,'nativeLookups':lookups,'examinedRowsPerLookup':examined,'visibilityScans':settings})
+            if not passed: failures.append('Native rare Flow equality/bounded lookup proof missing: '+label)
+    return evidence, failures
+
+
+def relative_cas_evidence(timings: dict, labels: list[str], baseline_prefix: str = 'baseline:', candidate_prefix: str = 'candidate:', metric: str = 'p95Ms', enforce: bool = True) -> tuple[list[dict], list[str]]:
+    evidence, failures = [], []
+    for label in labels:
+        match = re.search(r':(?:facets|navigation)_(flow|all|process)_cas_(rare|absent|common)$',label)
+        if not match: continue
+        kind, shape = match.groups()
+        baseline = timings.get(baseline_prefix+label,{}).get(metric)
+        candidate = timings.get(candidate_prefix+label,{}).get(metric)
+        bound = (max(baseline*1.1,baseline+10) if shape == 'common' else baseline*.5) if baseline is not None else None
+        gated = enforce and kind != 'process'
+        passed = baseline is not None and baseline > 0 and candidate is not None and candidate <= bound
+        evidence.append({'label':label,'baselineP95Ms':baseline,'candidateP95Ms':candidate,'candidateBaselineRatio':candidate/baseline if baseline and candidate is not None else None,'maximumCandidateP95Ms':bound,'enforced':gated,'passed':passed})
+        if gated and not passed: failures.append('CAS relative performance requirement failed: '+label)
+    return evidence, failures
 
 
 def iter_log_events(path: Path):
@@ -608,6 +721,7 @@ def stream_nested_plans(log_path: Path, artifact_path: Path) -> dict:
                 write(json.dumps(current))
                 summaries.append({'variant': current['variant'], 'label': current['label'],
                                   'eventCount': len(current['nestedPlans']),
+                                  'nestedPlanBytes':group_bytes,
                                   'naturalRelationPlan': has_relation_plan(current),
                                   'casDiagnostics': plan_diagnostics(current) if 'cas' in current['label'] else None})
                 current = None
@@ -670,11 +784,14 @@ def main() -> int:
     parser.add_argument('--flow-datasets', type=bounded_int(40, 100000), default=69000, metavar='40..100000')
     parser.add_argument('--card-padding', type=bounded_int(0, 4096), default=1024, metavar='0..4096')
     parser.add_argument('--fixture-profile', choices=FIXTURE_PROFILES, default='legacy')
+    parser.add_argument('--native-cas-fact', action='store_true', help='Use already-installed native CAS fact/index; cas-dense only, reader SQL comparison on one physical schema')
     parser.add_argument('--plan-min-ms', type=bounded_int(1, 1000), metavar='1..1000', help='Nested plan threshold: smoke default 1ms, volume default 10ms')
     parser.add_argument('--case', dest='selected_cases', action='append', choices=sorted(set(cases('tiangong_lca', 'cas-dense')) | {'navigation_page2', 'navigation_page3', 'navigation_cn_page2'}), metavar='CASE', help='Repeat to select representative cases; default is full matrix')
     parser.add_argument('--smoke', action='store_true', help='20 Process/40 Flow datasets, two samples; never volume proof')
     parser.add_argument('--report', type=Path, required=True)
     args = parser.parse_args()
+    if args.native_cas_fact and (args.fixture_profile != 'cas-dense' or not args.candidate):
+        parser.error('--native-cas-fact requires cas-dense and a candidate')
     available = set(cases('tiangong_lca', args.fixture_profile)) | {'navigation_page2', 'navigation_page3', 'navigation_cn_page2'}
     if args.selected_cases and (len(set(args.selected_cases)) != len(args.selected_cases) or not set(args.selected_cases).issubset(available)):
         parser.error('Duplicate or unavailable case for fixture profile')
@@ -700,12 +817,22 @@ def main() -> int:
     checked = run(guard, 60)
     if checked.returncode or checked.stdout.strip().splitlines() != expected:
         parser.error('Refusing unknown/nonempty/nonlocal/wrong-version database')
+    native_schema = None
+    if args.native_cas_fact:
+        try:
+            checked_schema = run(native_schema_sql(),60)
+            if checked_schema.returncode:
+                raise ValueError('Native CAS metadata query failed')
+            native_schema = json.loads(checked_schema.stdout)
+            validate_native_schema(native_schema)
+        except (ValueError,KeyError,TypeError) as exc:
+            parser.error(str(exc))
     plan_min_ms = args.plan_min_ms or (1 if args.smoke else 10)
     variants = {'baseline': definitions_sql(baseline_defs)}
     if candidate_defs:
         variants['candidate'] = definitions_sql(candidate_defs)
     scopes = ('tiangong_lca', 'bafu,tiangong_lca,uslci,worldsteel')
-    sql, all_cases = build_sql(variants, args.process_datasets, args.flow_datasets, args.card_padding, args.samples, scopes, selected_cases=args.selected_cases, plan_min_ms=plan_min_ms, fixture_profile=args.fixture_profile)
+    sql, all_cases = build_sql(variants, args.process_datasets, args.flow_datasets, args.card_padding, args.samples, scopes, selected_cases=args.selected_cases, plan_min_ms=plan_min_ms, fixture_profile=args.fixture_profile, native_cas_fact=args.native_cas_fact)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     with private_output(args.report.with_suffix('.sql')) as output:
         output.write(sql.encode())
@@ -720,12 +847,16 @@ def main() -> int:
         'candidateReaderSha256': sha(variants['candidate']) if 'candidate' in variants else None,
         'readerNames': [name for _, name in baseline_defs], 'collectorSha256': sha(collector_source), 'collectorArtifact': str(args.report.with_suffix('.collector.py')),
         'nestedPlanMinDurationMs': plan_min_ms, 'artifactLimits': {'logBytes': MAX_LOG_BYTES, 'stdoutBytes': MAX_STDOUT_BYTES, 'singlePlanBytes': MAX_PLAN_BYTES, 'singleGroupBytes': MAX_GROUP_BYTES},
+        'scopedZeroMsPlanCapture': {'variant':'candidate','cases':list(NATIVE_RARE_CASES),'scopes':list(scopes)} if args.native_cas_fact else None,
+        'relativeCasPolicy': {'rareAbsentMaximumP95Ratio':.5,'commonMaximumP95Ratio':1.1,'commonNoiseAllowanceMs':10,'kinds':['flow','all'],'enforced':not args.smoke} if args.native_cas_fact else None,
+        'nativeSchemaBefore':native_schema,'nativeSchemaFingerprint':schema_fingerprint(native_schema) if native_schema else None,
+        'physicalSchemaComparison':'same installed final schema/index/writer in both reader phases; upgrade proof is separate' if args.native_cas_fact else 'existing schema',
         'candidateLocalP95TargetMs': 2000,
         'sqlSha256': sha(sql), 'ownerSha256': sha(owner), 'containerId': inspected['Id'],
         'dockerContext': context['Name'], 'image': inspected['Config']['Image'],
         'resources': {key: inspected['HostConfig'].get(key) for key in ('NanoCpus', 'CpuQuota', 'CpuPeriod', 'CpusetCpus', 'Memory', 'MemorySwap')},
         'selectedCases': args.selected_cases or 'full matrix',
-        'fixture': fixture_metadata(args.process_datasets, args.flow_datasets, args.card_padding, args.fixture_profile),
+        'fixture': fixture_metadata(args.process_datasets, args.flow_datasets, args.card_padding, args.fixture_profile, args.native_cas_fact),
         'unresolvedProof': ['populated full migration upgrade/failure/repeat', 'real source writers', 'concurrent load', 'hosted production latency'],
         'sourceRowsFabricated': False, 'sessionWorkMem': '4MB', 'requestBudget': '8s',
         'baselineOnly': args.baseline_only, 'candidateRestored': 'transaction rollback', 'cleanup': None}
@@ -734,6 +865,7 @@ def main() -> int:
         parsed_plans = stream_nested_plans(args.report.with_suffix('.log'), args.report.with_suffix('.plans.json'))
         report['nestedPlanArtifact'] = str(args.report.with_suffix('.plans.json'))
         report['nestedPlanArtifactSha256'] = file_sha(args.report.with_suffix('.plans.json'))
+        report['artifactActualBytes'] = {suffix:args.report.with_suffix(suffix).stat().st_size for suffix in ('.log','.stdout.jsonl','.plans.json')}
         if result.returncode:
             report['failure'] = f'psql exited {result.returncode}; inspect local log'
         else:
@@ -753,6 +885,21 @@ def main() -> int:
                 failures.append('Actual fixture cardinality mismatch')
             if args.fixture_profile == 'cas-dense' and report['fixtureActual']['casCounts'] != expected_dense_cas_counts(args.flow_datasets):
                 failures.append('Dense CAS distribution or document invariant mismatch')
+            if args.native_cas_fact:
+                expected_native = expected_dense_cas_counts(args.flow_datasets)
+                if report['fixtureActual'].get('nativeCasFact') != {k:expected_native[k] for k in ('nonNull','rare','common')} | {'mismatches':0}:
+                    failures.append('Native CAS fact differs from original V1 predicate')
+                if validate_native_schema(report['nativeSchema']) != report['nativeSchemaFingerprint']:
+                    failures.append('Native CAS physical schema changed during reader comparison')
+                report['nativeRarePlanEvidence'], plan_failures = native_plan_gate(parsed_plans['groups'],scopes)
+                failures.extend(plan_failures)
+                labels = [scope+':'+label for scope in scopes for label in all_cases[scope]]
+                report['relativeCasPerformance'], relative_failures = relative_cas_evidence(report['timings'],labels,enforce=not args.smoke)
+                failures.extend(relative_failures)
+                if not args.smoke:
+                    required = {f'{api}_{kind}_cas_{shape}' for api in ('facets','navigation') for kind in ('flow','all') for shape in ('rare','absent','common')}
+                    if any(not required.issubset(all_cases[scope]) for scope in scopes):
+                        failures.append('Native volume proof requires Flow/all rare/absent/common Facets/Navigation cases')
             candidate_times = {key: value for key, value in report['timings'].items() if key.startswith('candidate:')}
             target = {key: value['p95Ms'] is not None and value['p95Ms'] <= 2000 for key, value in candidate_times.items()}
             report['candidateLocalP95TargetPassed'] = all(target.values()) if target else None
@@ -774,6 +921,7 @@ def main() -> int:
         args.report.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps({'report': str(args.report), 'passed': report['passed'], 'baselineOnly': args.baseline_only,
                       'comparisons': len(report.get('equivalence') or []), 'failures': report.get('failures', report.get('failure')),
+                      'artifactActualBytes':report.get('artifactActualBytes'),
                       'cleanup': report['cleanup']}, indent=2))
     return int(not report['passed'])
 

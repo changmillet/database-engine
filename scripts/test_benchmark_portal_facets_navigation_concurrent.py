@@ -9,15 +9,16 @@ import subprocess
 import sys
 from unittest.mock import patch
 import benchmark_portal_facets_navigation_concurrent as b
+from test_benchmark_portal_facets_navigation import native_snapshot, native_plan_groups
 
 
 class ConcurrentCollectorTests(unittest.TestCase):
-    def dense_reference(self):
+    def dense_reference(self,native=False):
         candidate = 'create or replace function private.display_test() returns integer language sql as $$select 1$$;'
         definitions = b.serial.reader_definitions(candidate)
         variants = {name:b.serial.definitions_sql(definitions) for name in ('baseline','candidate')}
-        selected = ['facets_flow_cas_rare','navigation_all_cas_absent']
-        sql, cases = b.serial.build_sql(variants,20,40,0,2,b.SCOPES,selected_cases=selected,plan_min_ms=1,fixture_profile='cas-dense')
+        selected = list(b.serial.NATIVE_RARE_CASES) if native else ['facets_flow_cas_rare','navigation_all_cas_absent']
+        sql, cases = b.serial.build_sql(variants,20,40,0,2,b.SCOPES,selected_cases=selected,plan_min_ms=1,fixture_profile='cas-dense',native_cas_fact=native)
         rows=[]
         def row(variant,label,ordinal,payload):
             canonical=json.dumps(payload)
@@ -33,11 +34,29 @@ class ConcurrentCollectorTests(unittest.TestCase):
                 'candidateLocalP95TargetPassed':True,'cleanup':{'emptyRowsAndLocalIdentityVerified':True},
                 'baseCommit':'exact','candidateSha256':b.serial.sha(candidate),'collectorSha256':b.serial.file_sha(Path(b.serial.__file__)),
                 'collectorArtifact':b.serial.__file__,'baselineSourceSha256':b.serial.sha(variants['baseline']),
-                'candidateReaderSha256':b.serial.sha(variants['candidate']),'fixture':b.serial.fixture_metadata(20,40,0,'cas-dense'),
+                'candidateReaderSha256':b.serial.sha(variants['candidate']),'fixture':b.serial.fixture_metadata(20,40,0,'cas-dense',native),
                 'samples':rows,'selectedCases':selected,'nestedPlanMinDurationMs':1,'sqlSha256':b.serial.sha(sql),
                 'fixtureActual':{'processVersions':40,'flowVersions':80,'publicSourceRows':0,'casCounts':b.serial.expected_dense_cas_counts(40)},
                 'equivalence':[{'equal':True}]}
+        if native:
+            snapshot=native_snapshot()
+            report.update(nativeSchemaBefore=snapshot,nativeSchema=copy.deepcopy(snapshot),nativeSchemaFingerprint=b.serial.schema_fingerprint(snapshot),
+                          nestedPlanCoverage={'groups':native_plan_groups(b.SCOPES)})
+            expected=b.serial.expected_dense_cas_counts(40)
+            report['fixtureActual']['nativeCasFact']={k:expected[k] for k in ('nonNull','rare','common')}|{'mismatches':0}
         return report,candidate,definitions
+
+    def test_native_reference_binds_schema_population_and_bounded_plan_proof(self):
+        report,candidate,definitions=self.dense_reference(True)
+        with patch.object(b.serial,'baseline',return_value=definitions):
+            b.validate_reference(report,candidate,'exact')
+            for mutation in ('schema','fact','plan','flag'):
+                bad=copy.deepcopy(report)
+                if mutation=='schema':bad['nativeSchema']['index']['ready']=False
+                if mutation=='fact':bad['fixtureActual']['nativeCasFact']['mismatches']=1
+                if mutation=='plan':bad['nestedPlanCoverage']['groups']=[]
+                if mutation=='flag':bad['fixture']['nativeCasFact']=False
+                with self.assertRaises(ValueError):b.validate_reference(bad,candidate,'exact')
 
     def test_dense_reference_binds_profile_cases_sql_and_actual_distribution(self):
         report,candidate,definitions=self.dense_reference()
