@@ -33,8 +33,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 816a78c23b8b7a006ab54a05ab2c37533dcb9f75
-lastReviewedNote: "Database #869: reviewed mandatory native concurrent CAS/control admission after independent P2 finding. All18 defaults are required before target access; incomplete CLI selection is rejected. The actual20-case960-request run satisfies the guard and all960 request SQL files are unchanged;57 offline collector tests pass. Product SQL and prior runtime evidence remain unchanged."
+lastReviewedCommit: 2a97bb2014a0674f6c443a7fc174418c6e0154f3
+lastReviewedNote: "Database #869 Dev backmerge: preserved Main CAS qualification and Dev v6 checks; current schema head is resolved from checked-in migrations. Combined history, 13 SQL suites/1291 assertions, deterministic2170-file generation and source parity passed; deployment ownership remains separately tracked in #868."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -1385,4 +1385,4 @@ The terminal-cache replay compatibility fix is a separate forward migration (`20
 
 ## National carbon organization drafts v6
 
-After a fresh migration rebuild, run `supabase test db supabase/tests/20260805_full_schema_cutover.sql supabase/tests/20260806_api_contract_closure.sql supabase/tests/20260901_national_carbon_organization_contributions.sql`. The exact API inventory adds only the v6 dashboard facade (339 total); schema readback must report the highest checked-in migration (`20261025052607` after the Database #864 Main-to-Dev backmerge). In addition to v5 compatibility, verify v6 admission/ACL/capability, latest-version state-0 counting, current-profile unit merging and reviewer-role exclusions, draft-only/zero units, all four numeric ranking priorities, deterministic name ties and continuous ranks. Keep chart membership/limits and summary/region/activity scopes covered.
+After a fresh migration rebuild, run `supabase test db supabase/tests/20260805_full_schema_cutover.sql supabase/tests/20260806_api_contract_closure.sql supabase/tests/20260901_national_carbon_organization_contributions.sql`. The exact API inventory adds only the v6 dashboard facade (339 total); schema readback must report the highest checked-in migration returned by `python3 scripts/resolve_migration_head.py` (`20261025103800` for the Database #869 Main-to-Dev backmerge). In addition to v5 compatibility, verify v6 admission/ACL/capability, latest-version state-0 counting, current-profile unit merging and reviewer-role exclusions, draft-only/zero units, all four numeric ranking priorities, deterministic name ties and continuous ranks. Keep chart membership/limits and summary/region/activity scopes covered.
