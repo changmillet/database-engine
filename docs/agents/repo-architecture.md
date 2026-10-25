@@ -30,9 +30,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-16
-lastReviewedCommit: a84fcd60be87bec5bea3f54ff2d494a09a51e1a4
-lastReviewedNote: "Reviewed Database #845 Actions-only monitoring and exact persistent-Dev push scope guard; existing local/ARM64 checks, Preview authority, generated-workspace ownership and production boundaries remain required."
+lastReviewedAt: 2026-10-25
+lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
+lastReviewedNote: "Database #864: reviewed narrow exact-key matching, four-way projection coverage, selective CAS/Process retention and batched Navigation target IDs; no new projection, index, writer or privilege."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -1310,6 +1310,31 @@ upgrade/concurrency harness verify successive scopes on one prepared statement,
 multiple differently scoped RPCs in one statement, outer-GUC restoration after
 success and failure, and simultaneous sessions. The ordinary contract assertion
 still rejects a changed view definition or security barrier before serving.
+
+### Scoped Facets and Navigation readers (Database #864)
+
+Lexical display matching carries exact kind/id/version keys through the existing
+UUID and literal-pattern paths, then applies navigation facts when filters are
+present. Pattern helpers already read current projections under the same RLS;
+the empty-filter path avoids repeating that existence check. The selective CAS
+path retains its established candidate query. No path selects a latest version.
+Facets groups
+the existing normalized facet facts for those keys; the output keeps the same
+six groups, labels, ordering and bounds. The migration first checks symmetric
+V1/current-card/navigation/facet coverage and null-safe fact agreement, including
+Process V2 against V1-derived facets. It requires a migration role that bypasses
+RLS so an empty request scope cannot hide drift. Missing or inconsistent facts reject the
+cutover with `55000`; the migration does not repair source or projection data.
+
+Empty, unfiltered all-kind and Flow brand counts group V1 brand values directly
+after the same coverage proof; the selective Process path and other brand counts
+retain the existing matcher. Navigation
+collects its target node IDs into one statement-local array for membership
+selection, avoiding a separate parameterized scan per node. Totals still include
+both dataset kinds; `hasChildren`, admission and pagination retain their existing
+rules. These are reader changes only:
+writers, indexes, request-scope settings, RLS, owners, ACLs, API signatures,
+eight-second budgets and cursor fingerprints remain unchanged.
 
 ## Shared dataset classification readers (Database #838)
 

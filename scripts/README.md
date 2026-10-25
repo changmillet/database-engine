@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-21
-lastReviewedCommit: 96d042679810e8df0427d4d4ecd34e2c1b6a5d61
-lastReviewedNote: "Database #857: reviewed one-current-assigned-approval finalization and batch eligibility. Exact-local schema is generated from clean migration history; authority, revision, target-only publication, metadata, helper ACLs and independent rejection remain unchanged. Focused and populated-upgrade proof is tracked on the Issue."
+lastReviewedAt: 2026-10-25
+lastReviewedCommit: 1868c1f82e929073ae375865171c53cfc9fc895d
+lastReviewedNote: "Database #864: reviewed guarded serial, four-client, full-upgrade and committed-visibility entrypoints, exact source receipts, bounded artifacts and owned reset/cleanup dispositions."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -981,6 +981,44 @@ restores source connections immediately, and owns only its fixed local clone
 sessions with independent scopes, and removes the clone before recording success.
 Release the task-owned Docker group through the workspace resource controller
 once qualification evidence is preserved.
+
+### Facets and Navigation qualification (Database #864)
+
+These collectors admit only the owned local `portal-facets-864` project,
+PostgreSQL 17.11, its explicit ownership receipt and new private output paths.
+They accept no hosted DSN or credentials. `--smoke` uses a small correctness
+fixture; omit it for read-scale evidence. `--case` selects repeatable shapes.
+
+```bash
+python3 scripts/benchmark_portal_facets_navigation.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --candidate supabase/migrations/20261025052607_optimize_portal_facets_navigation.sql \
+  --process-datasets 10000 --flow-datasets 69000 --card-padding 3072 \
+  --samples 10 --report <new-private-serial-json>
+python3 supabase/tests/upgrade/test_portal_facets_navigation_upgrade.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --report <new-private-upgrade-json>
+python3 supabase/tests/upgrade/test_portal_facets_navigation_upgrade.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --committed-visibility --report <new-private-visibility-json>
+```
+
+The committed-visibility mode retains real fixtures for an owned reset. After
+that reset, the concurrent profile consumes the exact successful
+serial report and candidate file:
+
+```bash
+python3 scripts/benchmark_portal_facets_navigation_concurrent.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --reference-report <successful-serial-json> \
+  --candidate supabase/migrations/20261025052607_optimize_portal_facets_navigation.sql \
+  --rounds 3 --report <new-private-concurrent-json>
+```
+
+The serial profile rolls back; concurrency restores candidate readers but keeps
+its committed synthetic fixture for the main agent's owned reset. Both preserve
+4 MB session work memory, existing routine overrides and eight-second requests.
+See the validation guide for complete correctness, performance and cleanup gates.
 
 ### Calculation export upgrade qualification
 

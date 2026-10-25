@@ -45,12 +45,68 @@ begin
   else
     if p_query ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then v_exact:=p_query::uuid; end if;
     v_pattern := '%' || replace(replace(replace(p_query,chr(92),chr(92)||chr(92)),'%',chr(92)||'%'),'_',chr(92)||'_') || '%';
-    -- Reuse the exact UUID/CAS/literal/one-character candidate contract of V2.
+    -- Keep the established selective CAS plan; expanding it into the broad
+    -- key union is not qualified at representative volume.
+    if private.display_catalog_summary_valid_cas_v1(p_query) then
     return query select v.dataset_kind,v.id,v.version
     from private.display_catalog_facet_candidate_rows_v2(p_kind,p_query,v_exact,v_pattern) c
     join private.display_navigation_versions_v1 v
       on (v.dataset_kind,v.id,v.version)=(c.dataset_kind,c.id,c.version)
     where
+      (not (p_filters ? 'accessLevel') or v.access_level=p_filters->>'accessLevel')
+      and (not (p_filters ? 'geography') or v.geography_code=p_filters->>'geography')
+      and (not (p_filters ? 'classification') or v.classification_codes @> array[p_filters->>'classification'])
+      and (not (p_filters ? 'referenceYearFrom') or v.reference_year >= (p_filters->>'referenceYearFrom')::integer)
+      and (not (p_filters ? 'referenceYearTo') or v.reference_year <= (p_filters->>'referenceYearTo')::integer)
+      and (not (p_filters ? 'processSubtype') or v.process_subtype=p_filters->>'processSubtype')
+      and (not (p_filters ? 'source') or v.source=p_filters->>'source')
+      and (
+        not (p_filters ? 'classificationNodeId')
+        or (v.dataset_kind,v.id,v.version) in (
+          select m.dataset_kind,m.id,m.version
+          from private.display_navigation_membership_v1 m
+          where m.dimension='classification'
+            and m.node_id=p_filters->>'classificationNodeId'
+            and (p_kind='all' or m.dataset_kind=p_kind)
+            and (coalesce(p_filters->>'classificationScope','subtree')<>'direct' or m.direct)
+        )
+      ) and (
+        not (p_filters ? 'geographyNodeId')
+        or (v.dataset_kind,v.id,v.version) in (
+          select m.dataset_kind,m.id,m.version
+          from private.display_navigation_membership_v1 m
+          where m.dimension='geography'
+            and m.node_id=p_filters->>'geographyNodeId'
+            and (p_kind='all' or m.dataset_kind=p_kind)
+            and (coalesce(p_filters->>'geographyScope','subtree')<>'direct' or m.direct)
+        )
+      )
+;
+      return;
+    end if;
+
+    -- Pattern helpers and UUID lookup already read the authoritative current
+    -- projection under the same RLS. Their UNION has one row per exact key.
+    -- With empty filters the guarded complete navigation projection adds no
+    -- predicate, so the planner may remove this unique-key LEFT JOIN.
+    return query
+    with lexical_keys as materialized (
+      select 'process'::text dataset_kind,p.id,p.version
+      from private.display_catalog_process_pattern_versions_v1(v_pattern) p
+      where p_kind in ('all','process')
+      union
+      select 'flow'::text,p.id,p.version
+      from private.display_catalog_flow_pattern_versions_v1(v_pattern) p
+      where p_kind in ('all','flow')
+      union
+      select p.dataset_kind,p.id,p.version
+      from private.display_catalog_search_current_v2 p
+      where (p_kind='all' or p.dataset_kind=p_kind) and p.id=v_exact
+    )
+    select c.dataset_kind,c.id,c.version
+    from lexical_keys c left join private.display_navigation_versions_v1 v
+      on (v.dataset_kind,v.id,v.version)=(c.dataset_kind,c.id,c.version)
+    where (p_filters='{}'::jsonb or v.id is not null) and
       (not (p_filters ? 'accessLevel') or v.access_level=p_filters->>'accessLevel')
       and (not (p_filters ? 'geography') or v.geography_code=p_filters->>'geography')
       and (not (p_filters ? 'classification') or v.classification_codes @> array[p_filters->>'classification'])
