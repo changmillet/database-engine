@@ -31,7 +31,7 @@ MAX_ARTIFACTS = 256 * 1024 * 1024
 DEFAULT_CASES = ('facets_all_empty', 'facets_all_geography', 'facets_all_history',
                  'facets_all_one', 'facets_flow_cas', 'navigation_geography',
                  'navigation_us', 'navigation_page3')
-ALL_CASES = tuple(sorted(set(serial.cases(SCOPES[0])) |
+ALL_CASES = tuple(sorted(set(serial.cases(SCOPES[0], 'cas-dense')) |
                          {'navigation_page2', 'navigation_page3', 'navigation_cn_page2'}))
 INSPECT_FORMAT = '{"Id":{{json .Id}},"Name":{{json .Name}},"Config":{"Labels":{{json .Config.Labels}},"Image":{{json .Config.Image}}},"State":{"Running":{{json .State.Running}}},"HostConfig":{"NanoCpus":{{json .HostConfig.NanoCpus}},"CpuQuota":{{json .HostConfig.CpuQuota}},"CpuPeriod":{{json .HostConfig.CpuPeriod}},"CpusetCpus":{{json .HostConfig.CpusetCpus}},"Memory":{{json .HostConfig.Memory}},"MemorySwap":{{json .HostConfig.MemorySwap}}}}'
 
@@ -99,9 +99,14 @@ def validate_reference(report: dict, candidate: str, base: str) -> tuple[dict, d
         raise ValueError('Serial reader definition hashes differ')
     fixture = report['fixture']
     p, f, padding = fixture['processVersions'], fixture['flowVersions'], fixture['summaryPaddingBytes']
+    profile = fixture.get('profile')
+    if profile not in serial.FIXTURE_PROFILES:
+        raise ValueError('Explicit supported fixture profile required')
     if not (type(p) is int and type(f) is int and p % 2 == f % 2 == 0 and
             40 <= p <= 40000 and 80 <= f <= 200000 and type(padding) is int and 0 <= padding <= 4096):
         raise ValueError('Serial fixture parameters are outside guarded bounds')
+    if fixture != serial.fixture_metadata(p//2, f//2, padding, profile):
+        raise ValueError('Serial fixture profile metadata differs')
     samples = max(row['ordinal'] for row in report['samples']) + 1
     if not 2 <= samples <= 20:
         raise ValueError('Serial sample count is outside supported bounds')
@@ -111,13 +116,15 @@ def validate_reference(report: dict, candidate: str, base: str) -> tuple[dict, d
     elif not isinstance(selected, list) or not selected or not set(selected).issubset(ALL_CASES):
         raise ValueError('Unsupported serial case matrix')
     sql, cases = serial.build_sql(variants, p // 2, f // 2, padding, samples, SCOPES,
-                                 selected_cases=selected, plan_min_ms=report['nestedPlanMinDurationMs'])
+                                 selected_cases=selected, plan_min_ms=report['nestedPlanMinDurationMs'], fixture_profile=profile)
     if serial.sha(sql) != report['sqlSha256']:
         raise ValueError('Serial SQL/fixture/cursor identity cannot be reconstructed')
     indexed = serial_rows(report, cases, samples)
     actual = report['fixtureActual']
     if actual['processVersions'] != p or actual['flowVersions'] != f or actual['publicSourceRows'] != 0:
         raise ValueError('Serial actual fixture cardinality differs')
+    if profile == 'cas-dense' and actual.get('casCounts') != serial.expected_dense_cas_counts(f//2):
+        raise ValueError('Serial dense CAS distribution/invariant differs')
     if not report.get('equivalence') or any(item.get('equal') is not True for item in report['equivalence']):
         raise ValueError('Serial equivalence proof is incomplete')
     return variants, cases, indexed
@@ -145,13 +152,7 @@ def request_cases(cases: dict, indexed: dict, selected: tuple[str, ...]) -> dict
 
 
 def fixture_summary_sql() -> str:
-    return """select jsonb_build_object(
- 'processVersions',(select count(*) from private.display_navigation_versions_v1 where dataset_kind='process'),
- 'flowVersions',(select count(*) from private.display_navigation_versions_v1 where dataset_kind='flow'),
- 'memberships',(select count(*) from private.display_navigation_membership_v1),
- 'publicSourceRows',(select count(*) from public.processes)+(select count(*) from public.flows),
- 'averageCardBytes',(select avg(pg_column_size(card)) from private.display_catalog_search_rows_v1),
- 'brands',(select jsonb_object_agg(brand,n) from (select brand,count(*) n from private.dataset_display_settings group by brand) b));"""
+    return serial.fixture_summary_sql()
 
 
 def client_sql(application: str, statement: str) -> str:
@@ -273,8 +274,8 @@ def main() -> int:
     parser.add_argument('--candidate', type=Path, required=True)
     parser.add_argument('--base-ref', required=True)
     parser.add_argument('--owner-file', type=Path, default=serial.OWNER, choices=[serial.OWNER])
-    parser.add_argument('--case', dest='selected', action='append', choices=ALL_CASES)
-    parser.add_argument('--rounds', type=int, default=3, choices=range(1,11))
+    parser.add_argument('--case', dest='selected', action='append', choices=ALL_CASES, metavar='CASE')
+    parser.add_argument('--rounds', type=serial.bounded_int(1, 10), default=3, metavar='1..10')
     parser.add_argument('--clients', type=int, default=4, choices=[4])
     parser.add_argument('--report', type=Path, required=True)
     args = parser.parse_args()
@@ -342,7 +343,7 @@ def main() -> int:
                        'serialVariantRoutineSettings': reference.get('variantRoutineSettings'),
                        'functionOverrides': 'Retained exactly from the verified serial definitions; no per-function override is changed by the collector'})
         fixture = reference['fixture']
-        seed = serial.fixture(fixture['processVersions']//2, fixture['flowVersions']//2, fixture['summaryPaddingBytes'])
+        seed = serial.fixture(fixture['processVersions']//2, fixture['flowVersions']//2, fixture['summaryPaddingBytes'], fixture['profile'])
         seed = seed.replace("set application_name='portal864-serial';", 'set application_name='+serial.literal(prefix+'-admin')+';')
         actual = admin(seed+'\ncommit;\n'+fixture_summary_sql(), 'seed', 900)
         seeded = True

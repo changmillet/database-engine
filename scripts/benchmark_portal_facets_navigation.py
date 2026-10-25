@@ -5,6 +5,8 @@ Synthetic projection fixtures measure readers, not source writers or hosted p95.
 No remote DSN, credentials, planner hints, policy changes or budget increases are
 accepted. Public RPCs run as anon and retain their portal_display_executor path.
 The session has 4MB work_mem; existing routine overrides are recorded unchanged.
+The legacy fixture is preserved; cas-dense adds independent CAS populations and
+document widths. Nested plan collection retains its explicit duration threshold.
 """
 from __future__ import annotations
 
@@ -36,6 +38,8 @@ MAX_LOG_BYTES = 128 * 1024 * 1024
 MAX_STDOUT_BYTES = 64 * 1024 * 1024
 MAX_PLAN_BYTES = 2 * 1024 * 1024
 MAX_GROUP_BYTES = 16 * 1024 * 1024
+FIXTURE_PROFILES = ('legacy', 'cas-dense')
+CAS_QUERIES = {'rare': '50-00-0', 'absent': '75-07-0', 'common': '64-17-5'}
 
 REFRESH = '\nupdate private.portal_display_contract_manifest set identity=private.portal_display_contract_identity_v1() where singleton;\nselect private.portal_display_assert_contract_v1();\n'
 
@@ -160,12 +164,14 @@ def definitions_sql(definitions: dict) -> str:
     return '\n'.join(definitions.values()) + REFRESH
 
 
-def fixture(processes: int, flows: int, padding: int) -> str:
+def fixture(processes: int, flows: int, padding: int, profile: str = 'legacy') -> str:
     """Direct, consistent reader projections; all DDL/data rolls back.
 
     No raw source rows are fabricated. All public source tables remain empty;
     real source-trigger/upgrade proof is an explicitly separate qualification.
     """
+    if profile not in FIXTURE_PROFILES:
+        raise ValueError('Unsupported fixture profile')
     tables = ','.join(literal(t) + '::regclass' for t in TABLES)
     sql = f"""
 set application_name='portal864-serial';
@@ -196,6 +202,21 @@ create temp table templates as select k,g,c,
     for kind, count, prefix in (('process', processes, '8640e000'), ('flow', flows, '8640f000')):
         for revision in ([1, 2] if kind == 'process' else [1]):
             base = 't.current' if revision == 2 else 't.old'
+            cas = f"case when '{kind}'='flow' and i%17=0 then '50-00-0' else null end"
+            document = f"cross join lateral (select 'bench{kind} '||lpad(i::text,8,'0')||case when v=0 then ' history864' else ' current864' end||case when i%19=0 then ' %_ literal864' else '' end document) d"
+            if profile == 'cas-dense':
+                cas = 'cas.cas_number'
+                # Exactly two rare keys, in Tiangong history and BAFU current.
+                # Other index-eligible values expose equality left as a Filter.
+                document = f"""cross join lateral (select case when '{kind}'<>'flow' then null
+ when (i=1 and v=0) or (i=5 and v=1) then '50-00-0'
+ when i%100<10 then '64-17-5'
+ when i%100<78 then (array['67-56-1','7732-18-5','124-38-9','74-82-8'])[1+i%4]
+ else null end cas_number) cas
+cross join lateral (select 'bench{kind} '||lpad(i::text,8,'0')||case when v=0 then ' history864' else ' current864' end||
+ case when '{kind}'='process' and i%19=0 then ' 50-00-0' else '' end||
+ coalesce(' '||cas.cas_number,'')||' '||substr((select string_agg(md5(i::text||':doc:'||s::text),'') from generate_series(1,70) s),1,
+ (case when i%19=0 then 2237 else 610 end)-length('bench{kind} '||lpad(i::text,8,'0')||case when v=0 then ' history864' else ' current864' end||case when '{kind}'='process' and i%19=0 then ' 50-00-0' else '' end||coalesce(' '||cas.cas_number,'')||' ')) document) d"""
             sql += f"""
 insert into private.display_catalog_search_rows_v{revision}(dataset_kind,id,version,state_code,modified_at,card,document,projection_contract_version,brand)
 select '{kind}',('{prefix}-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,'01.00.00'||v,
@@ -206,11 +227,11 @@ select '{kind}',('{prefix}-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,'01.00.
  'referenceYear',case when i%11=0 then null else (2020+i%5)::text end,
  'source',case when i%13=0 then null else 'fixture864-source-'||(i%3)::text end,
  'processSubtype',case when '{kind}'='process' then 'unit process, single operation' else null end,
- 'casNumber',case when '{kind}'='flow' and i%17=0 then '50-00-0' else null end),
+ 'casNumber',{cas}),
  d.document,{revision},case when i%5=0 then case when v=0 then 'tiangong_lca' else 'bafu' end
  when i%10<7 then 'tiangong_lca' when i%10=7 then 'bafu' when i%10=8 then 'uslci' else 'worldsteel' end
 from generate_series(1,{count}) i cross join generate_series(0,1) v
-cross join lateral (select 'bench{kind} '||lpad(i::text,8,'0')||case when v=0 then ' history864' else ' current864' end||case when i%19=0 then ' %_ literal864' else '' end document) d
+{document}
 join templates t on t.k='{kind}' and t.g=case i%3 when 0 then 'US' when 1 then 'CN' else 'CN-AH-HFE' end
  and t.c=case when '{kind}'='process' then case when i%2=0 then '0111' else '0112' end else case when i%2=0 then '17100' else '0111' end end;
 """
@@ -251,7 +272,7 @@ update private.portal_display_rollout set mode='display';
     return sql + "\nset local work_mem='4MB';set local statement_timeout='8s';\n"
 
 
-def cases(scope: str) -> dict[str, str]:
+def cases(scope: str, profile: str = 'legacy') -> dict[str, str]:
     brands = 'array[' + ','.join(literal(v) for v in scope.split(',')) + ']'
     result = {}
     shapes = [('empty', '', {}), ('geography', '', {'geographyNodeId': 'geo:cn-ah'}),
@@ -287,6 +308,13 @@ def cases(scope: str) -> dict[str, str]:
         result['navigation_' + label] = f"select api.portal_navigation_v2({brands},{literal(kind)},{literal(query)},{literal(json.dumps(filters))}::jsonb,{literal(dimension)},{'null' if parent is None else literal(parent)},null,20)"
     result['navigation_world'] = result['navigation_world'].replace(',null,20)', ',null,100)')
     result['navigation_geography'] = result['navigation_geography'].replace(',null,20)', ',null,1)')
+    if profile == 'cas-dense':
+        for label, query in CAS_QUERIES.items():
+            for kind in ('all', 'process', 'flow'):
+                result[f'facets_{kind}_cas_{label}'] = f"select api.portal_facets_v4({brands},{literal(kind)},{literal(query)},'{{}}'::jsonb)"
+                result[f'navigation_{kind}_cas_{label}'] = f"select api.portal_navigation_v2({brands},{literal(kind)},{literal(query)},'{{}}'::jsonb,'geography',null,null,20)"
+    elif profile != 'legacy':
+        raise ValueError('Unsupported fixture profile')
     return result
 
 
@@ -316,10 +344,44 @@ grant execute on function pg_temp.measure(text,text,integer,text),pg_temp.captur
 """
 
 
+def fixture_summary_sql() -> str:
+    return """select jsonb_build_object(
+ 'processVersions',(select count(*) from private.display_navigation_versions_v1 where dataset_kind='process'),
+ 'flowVersions',(select count(*) from private.display_navigation_versions_v1 where dataset_kind='flow'),
+ 'memberships',(select count(*) from private.display_navigation_membership_v1),
+ 'publicSourceRows',(select count(*) from public.processes)+(select count(*) from public.flows),'averageCardBytes',(select avg(pg_column_size(card)) from private.display_catalog_search_rows_v1),
+ 'brands',(select jsonb_object_agg(brand,n) from (select brand,count(*) n from private.dataset_display_settings group by brand) b),
+ 'widths',(select jsonb_build_object('averageLogicalCardBytes',avg(octet_length(card::text)),'p95LogicalCardBytes',percentile_disc(.95) within group(order by octet_length(card::text)),
+ 'averageDocumentBytes',avg(octet_length(document)),'p95DocumentBytes',percentile_disc(.95) within group(order by octet_length(document)),
+ 'averageStoredCardBytes',avg(pg_column_size(card)),'p95StoredCardBytes',percentile_disc(.95) within group(order by pg_column_size(card))) from private.display_catalog_search_rows_v1),
+ 'casCounts',(select jsonb_build_object('flowVersions',count(*),'nonNull',count(*) filter(where card->>'casNumber' is not null),
+ 'rare',count(*) filter(where card->>'casNumber'='50-00-0'),'common',count(*) filter(where card->>'casNumber'='64-17-5'),
+ 'absent',count(*) filter(where card->>'casNumber'='75-07-0'),
+ 'documentInvariantViolations',count(*) filter(where card->>'casNumber' is not null and (position(card->>'casNumber' in document)=0 or position(card->>'casNumber' in (card->>'document'))=0))) from private.display_catalog_search_rows_v1 where dataset_kind='flow'));"""
+
+
+def fixture_metadata(processes: int, flows: int, padding: int, profile: str) -> dict:
+    if profile not in FIXTURE_PROFILES:
+        raise ValueError('Unsupported fixture profile')
+    return {'processVersions': 2*processes, 'flowVersions': 2*flows,
+            'summaryPaddingBytes': padding, 'profile': profile,
+            'documentWidthCohorts': {'shortBytes': 610, 'longBytes': 2237, 'longEvery': 19} if profile == 'cas-dense' else None}
+
+
+def expected_dense_cas_counts(flows: int) -> dict:
+    rare = lambda i, v: (i == 1 and v == 0) or (i == 5 and v == 1)
+    return {'flowVersions': flows*2,
+            'nonNull': sum(rare(i, v) or i % 100 < 78 for i in range(1, flows+1) for v in (0, 1)),
+            'rare': 2, 'common': sum(not rare(i, v) and i % 100 < 10 for i in range(1, flows+1) for v in (0, 1)),
+            'absent': 0, 'documentInvariantViolations': 0}
+
+
 def build_sql(definitions: dict[str, str], processes: int, flows: int, padding: int,
-              samples: int, scopes: tuple[str, ...], include_plans: bool = True, selected_cases: list[str] | None = None, plan_min_ms: int = 10) -> tuple[str, dict]:
-    all_cases = {scope: cases(scope) for scope in scopes}
-    sql = fixture(processes, flows, padding) + COLLECTOR
+              samples: int, scopes: tuple[str, ...], include_plans: bool = True, selected_cases: list[str] | None = None, plan_min_ms: int = 10, fixture_profile: str = 'legacy') -> tuple[str, dict]:
+    all_cases = {scope: cases(scope, fixture_profile) for scope in scopes}
+    sql = fixture(processes, flows, padding, fixture_profile) + COLLECTOR
+    if selected_cases and any(label not in next(iter(all_cases.values())) and label not in ('navigation_page2', 'navigation_page3', 'navigation_cn_page2') for label in selected_cases):
+        raise ValueError('Selected case unavailable in fixture profile')
     # Capture predecessor-issued cursors before alternating order. The fixture's
     # vocabulary always contains >20 world children, even in smoke mode.
     sql += 'reset role;\n' + definitions['baseline'] + 'set local role anon;\n'
@@ -354,7 +416,8 @@ def build_sql(definitions: dict[str, str], processes: int, flows: int, padding: 
         for variant, ddl in definitions.items():
             sql += "reset role;set local auto_explain.log_min_duration=-1;\n" + ddl + f"set local auto_explain.log_min_duration={plan_min_ms};set local role anon;\n"
             for scope in scopes:
-                for label in ('facets_all_empty', 'facets_flow_empty', 'facets_all_geography', 'facets_all_history', 'facets_all_current', 'facets_all_one', 'facets_all_combined', 'facets_flow_cas', 'navigation_world', 'navigation_classification_root', 'navigation_process_root', 'navigation_flow_root', 'navigation_filtered', 'navigation_geography', 'navigation_us', 'navigation_history', 'navigation_one'):
+                plan_cases = ('facets_all_empty', 'facets_flow_empty', 'facets_all_geography', 'facets_all_history', 'facets_all_current', 'facets_all_one', 'facets_all_combined', 'facets_flow_cas', 'navigation_world', 'navigation_classification_root', 'navigation_process_root', 'navigation_flow_root', 'navigation_filtered', 'navigation_geography', 'navigation_us', 'navigation_history', 'navigation_one')
+                for label in dict.fromkeys(plan_cases + tuple(label for label in all_cases[scope] if 'cas' in label)):
                     if label not in all_cases[scope]:
                         continue
                     sql += f'select pg_temp.capture_plan({literal(variant)},{literal(scope+":"+label)},{literal(all_cases[scope][label])});\n'
@@ -362,12 +425,7 @@ def build_sql(definitions: dict[str, str], processes: int, flows: int, padding: 
     sql += """
 reset role;
 select jsonb_build_object(
- 'fixtureActual',jsonb_build_object(
- 'processVersions',(select count(*) from private.display_navigation_versions_v1 where dataset_kind='process'),
- 'flowVersions',(select count(*) from private.display_navigation_versions_v1 where dataset_kind='flow'),
- 'memberships',(select count(*) from private.display_navigation_membership_v1),
- 'publicSourceRows',0,'averageCardBytes',(select avg(pg_column_size(card)) from private.display_catalog_search_rows_v1),
- 'brands',(select jsonb_object_agg(brand,n) from (select brand,count(*) n from private.dataset_display_settings group by brand) b)),
+ 'fixtureActual',(__FIXTURE_SUMMARY__),
  'variantRoutineSettings',(select jsonb_object_agg(variant,routines) from variant_settings),
  'routineSettings',(select jsonb_agg(jsonb_build_object('routine',p.oid::regprocedure::text,'owner',p.proowner::regrole::text,'config',p.proconfig) order by p.oid::regprocedure::text) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname in('api','private') and (p.proname like 'display_%facet%' or p.proname like 'display_%navigation%' or p.proname in('portal_facets_v4','portal_navigation_v2','portal_display_brand_facets_v1'))),
  'samples',(select jsonb_agg(jsonb_build_object('variant',variant,'label',label,'ordinal',ordinal,'ms',elapsed_ms,'error',error,
@@ -376,7 +434,7 @@ select jsonb_build_object(
  'plans',(select coalesce(jsonb_agg(jsonb_build_object('variant',variant,'label',label,'plan',payload,'error',error) order by label,variant),'[]'::jsonb) from plans));
 rollback;
 """
-    return sql, all_cases
+    return sql.replace("__FIXTURE_SUMMARY__", fixture_summary_sql().removesuffix(";")), all_cases
 
 
 def summarize(report: dict, samples: int, scopes: tuple[str, ...], all_cases: dict, variants: tuple[str, ...]) -> list[str]:
@@ -445,6 +503,32 @@ def has_relation_plan(group: dict) -> bool:
             yield from visits(child)
     return any(node.get('Relation Name', '').startswith(('display_', 'dataset_display_'))
                for event in group['nestedPlans'] for node in visits(event['explain'].get('Plan', {})))
+
+
+def plan_diagnostics(group: dict) -> dict:
+    """Observation only: retain alternatives to an expression-index scan."""
+    scans, settings, relations = [], [], []
+    def visit(node, event):
+        relation = node.get('Relation Name', '')
+        condition, predicate = node.get('Index Cond', ''), node.get('Filter', '')
+        if relation or 'casnumber' in (condition + predicate).lower():
+            item = {key: node[key] for key in ('Node Type', 'Relation Name', 'Index Name', 'Index Cond',
+                    'Filter', 'Plan Rows', 'Actual Rows', 'Actual Loops', 'Rows Removed by Filter',
+                    'Shared Hit Blocks', 'Shared Read Blocks', 'Temp Read Blocks', 'Temp Written Blocks') if key in node}
+            item['eventIndex'] = event
+            if relation.startswith('display_'):
+                relations.append(item.copy())
+            if 'casnumber' in (condition + predicate).lower() or 'cas' in node.get('Index Name', '').lower():
+                item['equalityIndexCond'] = 'casnumber' in condition.lower() and '=' in condition
+                scans.append(item)
+            if relation == 'dataset_display_settings':
+                settings.append(item)
+        for child in node.get('Plans', []):
+            visit(child, event)
+    for ordinal, event in enumerate(group['nestedPlans']):
+        visit(event['explain'].get('Plan', {}), ordinal)
+    return {'casScans': scans, 'settingsScans': settings, 'relationScans': relations,
+            'equalityIndexCondObserved': any(node['equalityIndexCond'] for node in scans)}
 
 
 def iter_log_events(path: Path):
@@ -524,7 +608,8 @@ def stream_nested_plans(log_path: Path, artifact_path: Path) -> dict:
                 write(json.dumps(current))
                 summaries.append({'variant': current['variant'], 'label': current['label'],
                                   'eventCount': len(current['nestedPlans']),
-                                  'naturalRelationPlan': has_relation_plan(current)})
+                                  'naturalRelationPlan': has_relation_plan(current),
+                                  'casDiagnostics': plan_diagnostics(current) if 'cas' in current['label'] else None})
                 current = None
             elif current is not None:
                 group_bytes += count
@@ -560,6 +645,18 @@ def empty_guard_expected() -> list[str]:
     return ['t', '17.11'] + ['0'] * (len(TABLES)+1)
 
 
+def bounded_int(minimum: int, maximum: int):
+    def parse(value: str) -> int:
+        try:
+            number = int(value)
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError('Expected an integer') from exc
+        if not minimum <= number <= maximum:
+            raise argparse.ArgumentTypeError(f'Expected {minimum}..{maximum}')
+        return number
+    return parse
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--container', required=True, choices=[CONTAINER])
@@ -568,15 +665,19 @@ def main() -> int:
     mode.add_argument('--candidate', type=Path)
     mode.add_argument('--baseline-only', action='store_true')
     parser.add_argument('--owner-file', type=Path, default=OWNER, choices=[OWNER])
-    parser.add_argument('--samples', type=int, default=10, choices=range(2, 21))
-    parser.add_argument('--process-datasets', type=int, default=9500, choices=range(20, 20001))
-    parser.add_argument('--flow-datasets', type=int, default=69000, choices=range(40, 100001))
-    parser.add_argument('--card-padding', type=int, default=1024, choices=range(0, 4097))
-    parser.add_argument('--plan-min-ms', type=int, choices=range(1,1001), help='Nested plan threshold: smoke default 1ms, volume default 10ms')
-    parser.add_argument('--case', dest='selected_cases', action='append', choices=sorted(set(cases('tiangong_lca')) | {'navigation_page2', 'navigation_page3', 'navigation_cn_page2'}), help='Repeat to select representative cases; default is full matrix')
+    parser.add_argument('--samples', type=bounded_int(2, 20), default=10, metavar='2..20')
+    parser.add_argument('--process-datasets', type=bounded_int(20, 20000), default=9500, metavar='20..20000')
+    parser.add_argument('--flow-datasets', type=bounded_int(40, 100000), default=69000, metavar='40..100000')
+    parser.add_argument('--card-padding', type=bounded_int(0, 4096), default=1024, metavar='0..4096')
+    parser.add_argument('--fixture-profile', choices=FIXTURE_PROFILES, default='legacy')
+    parser.add_argument('--plan-min-ms', type=bounded_int(1, 1000), metavar='1..1000', help='Nested plan threshold: smoke default 1ms, volume default 10ms')
+    parser.add_argument('--case', dest='selected_cases', action='append', choices=sorted(set(cases('tiangong_lca', 'cas-dense')) | {'navigation_page2', 'navigation_page3', 'navigation_cn_page2'}), metavar='CASE', help='Repeat to select representative cases; default is full matrix')
     parser.add_argument('--smoke', action='store_true', help='20 Process/40 Flow datasets, two samples; never volume proof')
     parser.add_argument('--report', type=Path, required=True)
     args = parser.parse_args()
+    available = set(cases('tiangong_lca', args.fixture_profile)) | {'navigation_page2', 'navigation_page3', 'navigation_cn_page2'}
+    if args.selected_cases and (len(set(args.selected_cases)) != len(args.selected_cases) or not set(args.selected_cases).issubset(available)):
+        parser.error('Duplicate or unavailable case for fixture profile')
     paths = (args.report, args.report.with_suffix('.sql'), args.report.with_suffix('.log'), args.report.with_suffix('.plans.json'), args.report.with_suffix('.stdout.jsonl'), args.report.with_suffix('.collector.py'))
     if len(set(paths)) != 6 or any(path.exists() for path in paths):
         parser.error('Report/.sql/.log/.plans.json evidence paths must be distinct and new')
@@ -604,7 +705,7 @@ def main() -> int:
     if candidate_defs:
         variants['candidate'] = definitions_sql(candidate_defs)
     scopes = ('tiangong_lca', 'bafu,tiangong_lca,uslci,worldsteel')
-    sql, all_cases = build_sql(variants, args.process_datasets, args.flow_datasets, args.card_padding, args.samples, scopes, selected_cases=args.selected_cases, plan_min_ms=plan_min_ms)
+    sql, all_cases = build_sql(variants, args.process_datasets, args.flow_datasets, args.card_padding, args.samples, scopes, selected_cases=args.selected_cases, plan_min_ms=plan_min_ms, fixture_profile=args.fixture_profile)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     with private_output(args.report.with_suffix('.sql')) as output:
         output.write(sql.encode())
@@ -624,7 +725,7 @@ def main() -> int:
         'dockerContext': context['Name'], 'image': inspected['Config']['Image'],
         'resources': {key: inspected['HostConfig'].get(key) for key in ('NanoCpus', 'CpuQuota', 'CpuPeriod', 'CpusetCpus', 'Memory', 'MemorySwap')},
         'selectedCases': args.selected_cases or 'full matrix',
-        'fixture': {'processVersions': 2*args.process_datasets, 'flowVersions': 2*args.flow_datasets, 'summaryPaddingBytes': args.card_padding},
+        'fixture': fixture_metadata(args.process_datasets, args.flow_datasets, args.card_padding, args.fixture_profile),
         'unresolvedProof': ['populated full migration upgrade/failure/repeat', 'real source writers', 'concurrent load', 'hosted production latency'],
         'sourceRowsFabricated': False, 'sessionWorkMem': '4MB', 'requestBudget': '8s',
         'baselineOnly': args.baseline_only, 'candidateRestored': 'transaction rollback', 'cleanup': None}
@@ -650,6 +751,8 @@ def main() -> int:
                 failures.append('Nested natural relation plan missing')
             if report['fixtureActual']['processVersions'] != 2*args.process_datasets or report['fixtureActual']['flowVersions'] != 2*args.flow_datasets:
                 failures.append('Actual fixture cardinality mismatch')
+            if args.fixture_profile == 'cas-dense' and report['fixtureActual']['casCounts'] != expected_dense_cas_counts(args.flow_datasets):
+                failures.append('Dense CAS distribution or document invariant mismatch')
             candidate_times = {key: value for key, value in report['timings'].items() if key.startswith('candidate:')}
             target = {key: value['p95Ms'] is not None and value['p95Ms'] <= 2000 for key, value in candidate_times.items()}
             report['candidateLocalP95TargetPassed'] = all(target.values()) if target else None
