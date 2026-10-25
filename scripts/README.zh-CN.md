@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-25
-lastReviewedCommit: 356a06099669c7b4aa2d9261e37bc5cb33644385
-lastReviewedNote: "Database #869: reviewed exact owned-local admission, dense CAS benchmarks, upgrade/cutover/volume/nested-WAL collectors and artifact/cleanup limits. Commands preserve real source guards, request budgets and receipt provenance."
+lastReviewedCommit: 816a78c23b8b7a006ab54a05ab2c37533dcb9f75
+lastReviewedNote: "Database #869: reviewed mandatory native concurrent CAS/control admission after independent P2 finding. All18 defaults are required before target access; incomplete CLI selection is rejected. The actual20-case960-request run satisfies the guard and all960 request SQL files are unchanged;57 offline collector tests pass. Product SQL and prior runtime evidence remain unchanged."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
