@@ -30,9 +30,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-19
-lastReviewedCommit: dfca000480e54723fabc5fc30fae22e874d40c4b
-lastReviewedNote: "Reviewed Database #854 at dfca0004: four setup-cli v3 uses retain fixed CLI 2.117.0 and all deployment guards. Offline contract and negative controls pass; hosted x64/ARM, provider-event safety, source delivery and integration remain unproved. Schema, generated paths, ownership and branch policy are unchanged."
+lastReviewedAt: 2026-10-25
+lastReviewedCommit: e49be4835ffce76db5bfd25f0a8cddcfe647d53e
+lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -131,6 +131,8 @@ request context. Function owners, signatures and private-helper ACLs remain
 unchanged; a definer's `current_user` is not evidence of the caller's identity.
 
 ## Review opinion dependency scope
+
+Final approval requires at least one currently assigned Comment in state `1`; other reviewers may still be pending or rejected. Single finalization and batch eligibility apply the same rule. No assigned reviewers, revoked/unassigned approvals, and missing approval remain blocked. Admin rejection remains available for active state `0`/`1` tasks without waiting for opinions. The exact target/revision, authority, metadata and final-state guards remain unchanged.
 
 Current Root/Reference derivation reads actual Root JSON, approving submissions
 (`1`), and retained finalized-Comment compatibility (`2`). A current reviewer
@@ -476,25 +478,36 @@ commands and Review Admin membership admission do not write this binding.
 
 ## National Carbon Process Statistics
 
-`api.qry_national_carbon_organization_contributions(integer)` returns the
-administrator-only `national_carbon_organization_contribution_v5` snapshot.
+`api.qry_national_carbon_organization_contributions_v6(integer)` returns the
+administrator-only `national_carbon_organization_contribution_v6` snapshot.
+The original `api.qry_national_carbon_organization_contributions(integer)` keeps
+its v5 fields and ranking unchanged for older strict clients; deploy v6 before
+publishing the frontend that consumes it. Both signatures use `NX-DASH-01`.
 Only `public.processes` contributes dataset counts; LifecycleModels are not read.
 The RPC has a function-level 30-second `statement_timeout` for browser calls.
 
 - `rankings` contains up to `p_limit` units with published processes, ordered by
-  published count, assigned-reviewer dataset count, and unassigned-reviewer
-  dataset count descending, then display name and normalized key in `C` order.
+  published, assigned-reviewer, unassigned-reviewer and draft dataset counts
+  descending, then display name and normalized key in `C` order. Draft counts
+  break ties only after the three preceding counts. Ranks use `row_number`.
   `organizations` uses that same order and contains every eligible non-empty
-  current profile organization, including pending-only and zero-data units.
+  current profile organization, including pending-only, draft-only and zero-data units.
   The limit never truncates `organizations` or summary metrics.
 - Unit attribution uses normalized `private.users.raw_user_meta_data.organization`.
   A user with `review-admin` or `review-member` in any team is excluded from
-  the unit catalog and its published/pending facts. This does not change the
+  the unit catalog and its published/pending/draft facts. This does not change the
   independent reviewer KPI, regional distribution, or daily activity.
   Published and pending-review summary counts retain the organization-attributed
   scope. Pending review uses the latest process version at state 20; its active
   root review state 1 means assigned, while state 0 or no active root means
   awaiting assignment. Counts represent datasets, not reviewer assignments.
+- `draftDatasetCount` counts one process ID only when its latest-current version
+  (version descending, then modification time descending) has `state_code = 0`.
+  Older drafts below a newer reviewing/published version do not count; multiple
+  draft versions count once. Use the same current-profile attribution and role
+  exclusions as other unit facts. Units without drafts return zero. Drafts do
+  not change the published/reviewing summary metrics, regions or daily activity
+  definitions; `dataAsOf` also considers latest-current draft modification times.
 - `summary.reviewerCount` counts distinct users whose role is `review-member` in
   the platform team (`00000000-0000-0000-0000-000000000000`); administrators and
   memberships in other teams are excluded.
@@ -1309,6 +1322,73 @@ multiple differently scoped RPCs in one statement, outer-GUC restoration after
 success and failure, and simultaneous sessions. The ordinary contract assertion
 still rejects a changed view definition or security barrier before serving.
 
+### Scoped Facets and Navigation readers (Database #864)
+
+Lexical display matching carries exact kind/id/version keys through the existing
+UUID and literal-pattern paths, then applies navigation facts when filters are
+present. Pattern helpers already read current projections under the same RLS;
+the empty-filter path avoids repeating that existence check. The selective CAS
+path retains its established candidate query. No path selects a latest version.
+Facets groups
+the existing normalized facet facts for those keys; the output keeps the same
+six groups, labels, ordering and bounds. The migration first checks symmetric
+V1/current-card/navigation/facet coverage and null-safe fact agreement, including
+Process V2 against V1-derived facets. It requires a migration role that bypasses
+RLS so an empty request scope cannot hide drift. Missing or inconsistent facts reject the
+cutover with `55000`; the migration does not repair source or projection data.
+
+Empty, unfiltered all-kind and Flow brand counts group V1 brand values directly
+after the same coverage proof; the selective Process path and other brand counts
+retain the existing matcher. Navigation
+collects its target node IDs into one statement-local array for membership
+selection, avoiding a separate parameterized scan per node. Totals still include
+both dataset kinds; `hasChildren`, admission and pagination retain their existing
+rules. These are reader changes only:
+writers, indexes, request-scope settings, RLS, owners, ACLs, API signatures,
+eight-second budgets and cursor fingerprints remain unchanged.
+
+### Native Flow CAS matching (Database #869)
+
+Exact Flow CAS matching for display Facets and Navigation reads nullable
+`cas_number text` on `private.display_navigation_versions_v1`. The existing
+navigation writer derives it from the same original V1 string/type/shape/length
+predicate; Process rows keep NULL and their CAS-shaped text continues through
+the original lexical candidate helper. A partial B-tree over
+`(dataset_kind, cas_number, id, version)` admits only Flow rows with a non-NULL
+CAS. Equality on this native text fact can remain an index condition under the
+existing forced RLS. Historical versions and every navigation filter retain
+their exact keys; no new public field or RPC is introduced.
+
+Migration `20261025103759` prepares the nullable column and existing writer in a
+short transaction while the old reader remains active. It fences source
+projection writers in their established V1-then-V2 order before replacing the
+helper. This separate commit avoids holding ADD COLUMN's `ACCESS EXCLUSIVE`
+lock through the volume backfill. Migration `20261025103800` takes the same
+source fence, then `SHARE ROW EXCLUSIVE` on navigation before preflight, and
+atomically backfills, creates the index, activates the reader and refreshes the
+manifest. Ordinary SELECT readers remain admitted; concurrent writers and index
+DDL serialize with activation under their own existing budgets. Migration lock
+acquisition retains its five-second timeout. Both phases require an
+RLS-bypassing migration role and retain the sixty-second migration
+statement budget. A failed activation leaves the prepared phase compatible
+with the original reader.
+
+The first activation rejects an index that predates native activation. On
+reapplication, the native matcher marker also identifies active state after
+index loss, so fact drift is rejected before backfill rather than silently
+repaired. Coverage, native-column shape, exact index definition and
+valid/ready/live flags are checked before activation. These guards are scoped
+to the governed migration/writer path; privileged body or manifest replacement
+does not establish historical data provenance.
+
+An in-flight STABLE RPC may execute the new matcher body with its original data
+snapshot. The matcher therefore reads the activation index's `pg_class` and
+`pg_index` rows through ordinary SQL using that same snapshot. A snapshot that
+cannot see the index created with the complete backfill uses the original Main
+CAS query. Fresh snapshots use native equality. This witness must not become a
+syscache or `to_regclass` existence check. The existing eight-second request
+budget, owners, ACLs, RLS, rollout state and source data remain unchanged.
+
 ## Shared dataset classification readers (Database #838)
 
 `api.query_dataset_catalog` adds one actor-bound reader for all seven dataset
@@ -1375,3 +1455,9 @@ selected kind.
 Snapshot auto-enqueue terminal guard (Database #842): under the existing request advisory lock, the service facade reuses active work, returns `SNAPSHOT_BUILD_BLOCKED` for blockage, and returns `SNAPSHOT_BUILD_FAILED` for the latest same-actor/request failure or cancellation regardless of retryability. It never inserts a replacement draft for those outcomes. A partial snapshot-request history index bounds this lookup. Existing explicit service-only `private.worker_retry_job` recovery requeues the same canonical job; a changed build contract has a new request key. Live source edits do not implicitly clear a same-key failure. Successful previous jobs retain normal refresh behavior, since request keys do not bind mutable dataset content.
 
 Database #846 adds `api.svc_lca_calculation_export(uuid,uuid,text,boolean)`: service-only, live manager authorization, completed package/result binding, server-resolved immutable Bundle, default Parquet and five allowed formats. The read mode never admits work. Explicit enqueue deduplicates all statuses under a request advisory lock; failures remain until explicit Worker retry. Worker job results provide lease-fenced export metadata independently of immutable package readiness. No numerical result or package is rewritten by export status transitions.
+
+## Opaque calculation identities
+
+`private.lca_calculation_contracts` stores exact Worker-authored descriptor bytes and SHA-256 identities. `private.lca_active_calculation_contract` holds the explicitly activated identity. The service-only private activation function uses a locked compare-and-set; application roles cannot mutate descriptors or activate identities. No algorithm version is selected by migrations or Worker startup. Worker owns descriptor semantics and the activation CLI; see its scope-closure contract for the rollout sequence.
+
+New scope-closure execution fingerprints and ordinary snapshot-build queue keys include the active opaque identity independently of scanner and data-policy versions. Recorded actor/token retries return the original closure task even after activation; newly recorded tokens additionally reject a changed input payload. Existing immutable packages and historical task IDs stay readable. `api.svc_lca_snapshot_candidates` projects `calculationCurrent` and orders compatible candidates first so Edge can admit new compute without embedding algorithm knowledge. The unconfigured bootstrap preserves existing admission until explicit activation; after activation, a missing or different ready-snapshot identity is incompatible. Missing geography and factor coverage do not affect this contract.

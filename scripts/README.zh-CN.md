@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-19
-lastReviewedCommit: dfca000480e54723fabc5fc30fae22e874d40c4b
-lastReviewedNote: "Reviewed Database #854 at dfca0004: four setup-cli v3 uses retain fixed CLI 2.117.0 and all deployment guards. Offline contract and negative controls pass; hosted x64/ARM, provider-event safety, source delivery and integration remain unproved. Schema, generated paths, ownership and branch policy are unchanged."
+lastReviewedAt: 2026-10-25
+lastReviewedCommit: e49be4835ffce76db5bfd25f0a8cddcfe647d53e
+lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -835,6 +835,128 @@ Database #807 的本地 sitemap 对比工具，仅使用可回滚的合成测试
 候选查询保留原有 8 秒预算。该结果仅证明本地读取规模，不代表生产 p95。
 执行方式及上线验证边界见 `docs/agents/repo-validation.md` 的 Portal display
 qualification 小节。
+
+### Facets 与 Navigation 验证（Database #864）
+
+这组 collector 只接受明确归属本任务的本地 `portal-facets-864`、PostgreSQL
+17.11、指定 ownership receipt 和新的私有输出路径，不接受托管 DSN 或凭据。
+`--smoke` 使用小型正确性 fixture；容量验证必须不带该参数。可重复传入 `--case`
+选择查询形状。
+
+```bash
+python3 scripts/benchmark_portal_facets_navigation.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --candidate supabase/migrations/20261025052607_optimize_portal_facets_navigation.sql \
+  --process-datasets 10000 --flow-datasets 69000 --card-padding 3072 \
+  --samples 10 --report <new-private-serial-json>
+python3 supabase/tests/upgrade/test_portal_facets_navigation_upgrade.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --report <new-private-upgrade-json>
+python3 supabase/tests/upgrade/test_portal_facets_navigation_upgrade.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --committed-visibility --report <new-private-visibility-json>
+```
+
+committed-visibility 模式会保留真实 fixture，必须对本任务独占环境执行 reset。
+随后并发 profile 使用准确且成功的串行报告与候选文件：
+
+```bash
+python3 scripts/benchmark_portal_facets_navigation_concurrent.py \
+  --container supabase_db_portal-facets-864 --base-ref <exact-predecessor> \
+  --reference-report <successful-serial-json> \
+  --candidate supabase/migrations/20261025052607_optimize_portal_facets_navigation.sql \
+  --rounds 3 --report <new-private-concurrent-json>
+```
+
+串行测试回滚；并发测试恢复候选 readers，但保留已提交的合成 fixture，由主代理
+仅对本任务环境执行 reset。两者保留 4 MB session work_mem、既有函数覆盖值和
+8 秒请求预算。完整正确性、性能与清理要求见 repo validation guide。
+
+### 原生 Flow CAS 验证（Database #869）
+
+同一个明确归属本任务的本地项目支持显式 CAS profile。升级验证及每种 cutover
+模式都从准确 Main 前序、规范且空的独占环境开始，不接受托管目标。升级 profile
+自行加载按序 prepare/activate 迁移，并分别记录原始 SQL 演练与 migration 历史。
+
+```bash
+python3 supabase/tests/upgrade/test_portal_facets_navigation_upgrade.py \
+  --profile 869 --container supabase_db_portal-facets-864 \
+  --base-ref 6a880838efbf4d453103a1141e9282db130171e8 \
+  --report <new-private-upgrade-json>
+python3 supabase/tests/upgrade/collect_portal_flow_cas_cutover.py \
+  --mode reader-cutover --container supabase_db_portal-facets-864 \
+  --base-ref 6a880838efbf4d453103a1141e9282db130171e8 \
+  --report <new-private-cutover-json>
+```
+
+cutover collector 还支持 `--mode fence`，观察真实 writer 的锁顺序；以及
+`--mode cost`，记录根语句 buffers/WAL 和包含 trigger 执行的时长。根 ModifyTable
+WAL 不含 AFTER trigger 内的 navigation 写入，不能证明原生索引的写放大。
+各模式之间仅重置本任务独占项目。
+提交型模式保留 fixture，并验证 session/helper/lock 清理。完整要求及真实提交锁
+时长与回滚演练的区别，见 validation guide。
+
+独立 nested-WAL collector 从规范空前序环境开始，通过真实源 CAS 更新触发
+navigation UPSERT。每个 variant 固定预热一次，再各测三次单行及三行批量更新；
+每个准确根 WAL 事件只累计一次，相同 SQL 的不同调用分别保留。结果覆盖 navigation
+heap 及全部索引维护，不是 CAS 索引独占字节、整个 trigger tree 或总体吞吐量。
+嵌套 profiling 时长仅供诊断；独立 `cost` 模式的源语句执行时间包含 trigger 执行。
+日志有大小上限，仅在实际源更新窗口启用。schema、metadata 与逻辑数据全部回滚；
+物理页可能保留，其他验证前必须由 owner reset 独占环境。
+
+```bash
+python3 scripts/collect_portal_flow_cas_writer_wal.py \
+  --container supabase_db_portal-facets-864 --report <new-private-writer-wal-json>
+```
+
+独立 DDL-fence collector 要求再次从规范空前序环境开始，观察普通及 concurrent
+准确索引创建在 activation preflight 前被 navigation fence 阻塞，并确认普通
+读取仍可执行；随后校验 B 创建的 witness 与完整响应。它保留已提交的 fixture
+及原生 schema，供 owner reset，不改变 migration ledger。
+
+```bash
+python3 supabase/tests/upgrade/collect_portal_flow_cas_ddl_fence.py \
+  --container supabase_db_portal-facets-864 \
+  --base-ref 6a880838efbf4d453103a1141e9282db130171e8 \
+  --report <new-private-ddl-fence-json>
+```
+
+独立的固定容量 collector 同样从准确、规范且空的前序环境开始，提交密集 CAS
+合成 fixture 及两份真实迁移，记录阶段时钟、实际持锁模式、索引/表大小及完整
+对照响应。报告时长包含观测开销；它不写 migration ledger，保留数据和原生
+schema，供环境 owner 准确 reset，不证明并发负载或真实 writer 吞吐。
+
+```bash
+python3 scripts/collect_portal_flow_cas_volume_upgrade.py \
+  --container supabase_db_portal-facets-864 --report <new-private-volume-json>
+```
+
+原生读取基准开始前，先通过本地 migration CLI 把两份真实迁移应用到独占空库。
+collector 检查已安装的列、索引、既有 writer、强制 RLS 与 ACL，不创建产品 DDL；
+它在同一最终物理 schema/writer 上比较前序与候选 reader。
+
+```bash
+python3 scripts/benchmark_portal_facets_navigation.py \
+  --container supabase_db_portal-facets-864 \
+  --base-ref 6a880838efbf4d453103a1141e9282db130171e8 \
+  --candidate supabase/migrations/20261025103800_activate_portal_flow_cas_fact.sql \
+  --fixture-profile cas-dense --native-cas-fact \
+  --process-datasets 10000 --flow-datasets 69000 --card-padding 3072 \
+  --samples 10 --plan-min-ms 1 --report <new-private-native-serial-json>
+python3 scripts/benchmark_portal_facets_navigation_concurrent.py \
+  --container supabase_db_portal-facets-864 \
+  --base-ref 6a880838efbf4d453103a1141e9282db130171e8 \
+  --reference-report <successful-native-serial-json> --native-cas-fact \
+  --candidate supabase/migrations/20261025103800_activate_portal_flow_cas_fact.sql \
+  --rounds 3 --report <new-private-native-concurrent-json>
+```
+
+并发测试前，把独占项目重建到相同原生 migration 状态；source/fixture/schema
+准确 hash 必须与成功的串行 receipt 一致。不传 `--case` 会包含所需全部原生容量
+形状和对照。原生并发的自定义选择必须保留全部十八个默认 CAS/对照场景；可以增加
+场景，缺失时会在数据库准入前拒绝。`--smoke` 仅用于正确性诊断。collector 强制验证密集 fixture 分布、
+稀有 CAS 的自然索引计划、相对性能和两秒本地目标。读取对比不测量迁移或 writer
+成本，也不代表托管 p95。
 
 ### 计算导出升级验证
 

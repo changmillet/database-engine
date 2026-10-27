@@ -1,8 +1,8 @@
 version: 1
 layout: repo
-lastReviewedAt: "2026-10-19"
-lastReviewedCommit: "dfca000480e54723fabc5fc30fae22e874d40c4b"
-lastReviewedNote: "Reviewed Database #854 at dfca0004: four setup-cli v3 uses retain fixed CLI 2.117.0 and all deployment guards. Offline contract and negative controls pass; hosted x64/ARM, provider-event safety, source delivery and integration remain unproved. Schema, generated paths, ownership and branch policy are unchanged."
+lastReviewedAt: "2026-10-25"
+lastReviewedCommit: "e49be4835ffce76db5bfd25f0a8cddcfe647d53e"
+lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
 
 # Keep deterministic governance facts here.
 # AGENTS.md remains the repo contract entrypoint.

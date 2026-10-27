@@ -32,9 +32,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-19
-lastReviewedCommit: dfca000480e54723fabc5fc30fae22e874d40c4b
-lastReviewedNote: "Reviewed Database #854 at dfca0004: four setup-cli v3 uses retain fixed CLI 2.117.0 and all deployment guards. Offline contract and negative controls pass; hosted x64/ARM, provider-event safety, source delivery and integration remain unproved. Schema, generated paths, ownership and branch policy are unchanged."
+lastReviewedAt: 2026-10-25
+lastReviewedCommit: e49be4835ffce76db5bfd25f0a8cddcfe647d53e
+lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -131,7 +131,7 @@ qualify original R1 inputs, a hosted Preview branch, or browser acceptance.
 | OAuth client registry, capability grants, or PostgREST pre-request authorization | `supabase db reset --no-seed`; run `supabase/tests/20260830_oauth_client_capability_foundation.sql`, `20260831_oauth_actor_command_capabilities.sql`, `20260806_api_contract_closure.sql`, and `20260805_full_schema_cutover.sql`; for an environment grant repair also run its populated upgrade harness, including `bash supabase/tests/upgrade/test_issue_638_oauth_cli_bundle_grant_upgrade.sh`; restart local Supabase before transport proof so the configured `public,api,graphql_public` schema list is active | with a locally signed test JWT containing `client_id`, prove an admitted relation read and representative create/save/delete command RPCs, reject raw table DML, an ungranted RPC, and a read-only-client mutation with SQLSTATE `42501`, then prove disabling the client invalidates prior access; repeat against exact Preview before persistent Dev | Supabase Auth owns OAuth client secrets and refresh tokens. Database state stores only public `client_id`, kind, enabled/revoked state, capability grants, and audit history. First-party sessions without `client_id` preserve existing `auth.uid()` behavior. Nine public relations require the read capability; raw table DML remains ACL-closed. Only the three actor-bound CRUD command RPCs use `DB-CORE-WRITE-01`; other first-party CLI commands use `CLI-RPC-01`. Both exact LifecycleModel bundle signatures must use `EDGE-BUNDLE-01`, and tests must reject any `CLI-RPC-01` fallback before the MCP client is admitted. The official Production CLI grant must be exactly `CLI-ALIAS-02`, `CLI-RPC-01`, `DB-CORE-READ-01`, `DB-CORE-WRITE-01`, `NX-CORE-02`, and `EDGE-BUNDLE-01`; provision or repair it only through `api.svc_oauth_client_configure` after an exact row lock, before-state check, and two-signature route-manifest check. A one-time automatic repair may select one client by the unique exact pre-change capability class, but must no-op on zero matches, fail closed on ambiguity, and never hardcode an environment client ID. Verify the exact after-state and one append-only audit event, then use the official CLI OAuth flow to create/read/update/read/delete one disposable LifecycleModel bundle without retaining identifiers or payloads in public evidence. The drift-repair migration must make every authenticated API ACL manifest-complete without changing ACLs or creating ambiguous overloads. Unknown routes fail closed, and the service-only configuration facade atomically replaces grants. Do not grant custom database access from OAuth scopes. |
 | Auth identity/profile mirror Trigger or registered-user lookup | `supabase db reset --no-seed`; run the dedicated Auth profile synchronization pgTAP file plus the affected API contract and nearby identity-field regressions | rehearse a populated upgrade from the previous migration head with both an Auth-only identity and an existing private profile; prove backfill, metadata reconciliation, contact preservation, helper rename, and exactly one governed Trigger | `auth.users` remains authoritative. Prove insert/update/delete mirroring, an Auth-only lookup by normalized email, review-admin-only authorization, fixed empty helper `search_path`, no direct helper execution by application roles, and preserved RPC ACLs. The deferred Trigger must still synchronize before commit while remaining compatible with explicit same-transaction profile writes. |
 | full application Schema cutover | `supabase db reset --no-seed`; run the `20260805`/`20260806` contract pgTAP files plus `20260807_data_product_consumer_facades.sql`; `scripts/test_full_schema_cutover_upgrade.sh` | restart local Supabase after config changes; prove explicit `public` core-table REST access, explicit `api` RPC access, rejection of `private`, and absence of the old `public` RPC route; on hosted Preview/persistent `dev`, also prove profile-less core access resolves to `public` after exact ordered Management API readback; repeat the populated upgrade against a production-shaped disposable copy before hosted deployment | Require the exact nine-table public allowlist, zero public routines/views/sequences, complete target placement, OID and exact-row preservation, trigger/policy/constraint parity, denial of internal Data API exposure, exact equality between external API grants and `private.api_capability_grants`, the exact authenticated `private.roles`/`private.reviews` read-only exception required by core-table RLS, bounded Data Product projections, stable TIDAS DTO/error behavior, a service-only boolean lifecycle review-admin predicate, and real traversal through each constrained façade family. When production has already recorded a later main hotfix, the populated upgrade must reproduce that ledger order, prove any older-version bridge is independently service-valid, and prove the same bridge is a strict no-op after cutover. Local Supabase may normalize custom schemas ahead of `public`, so local profile-less behavior is not hosted default-profile proof. Do not add compatibility views, duplicate tables, or dual-write paths. |
-| Root/Reference Review schema, commands, or queue projections | `supabase db reset --no-seed`; run `supabase/tests/20260731_root_reference_review_v2.sql`, `20260802_root_grouped_review_queue.sql`, `20260809_rejected_reference_resubmission.sql`, `20260809_review_metadata_scope_basis.sql`, `20260812_reference_approval_scope_isolation.sql`, `20260926_review_workspace_stages.sql`, and `20260806_api_contract_closure.sql` | compare all six Admin/Member tabs on a production-shaped disposable copy; capture a bounded `EXPLAIN (ANALYZE, BUFFERS)` for representative queue cardinalities before hosted cutover | Review submission has no numerical-stability or upstream-completeness Gate. Prove seven-table state transitions, parallel active versions for the same table/id with exact version/checksum isolation, active/approved checksum reuse, unchanged rejected-revision re-entry, current JSON/approving-submission and finalized-Comment derivation, stale candidate rejection, Reviewer metadata draft/submission addition and revocation, isolated impacted-root lookup and Reference approval when unrelated Roots are incomplete, one-row-per-Root-or-Reference flat pagination/counts, and exact external grants. V5 must expose Admin `unassigned`/`in-progress`/`completed` and Member `pending`/`submitted`/`completed` stages while preserving V4 search, filter, sort, count, and authorization semantics. Batch eligibility is read-only and actor-scoped; execution commands independently revalidate. Saving an active submitted Process/Lifecycle Model Root opinion resets its Comment to `0`, while terminal Reviews remain immutable. `private.reviews` must not contain scope snapshots or Root/Reference ID arrays; business `reviews[].id` contains Root candidates only; no rebind or history replay contract remains. Comment draft saves (`state_code = 0`) must persist only the editable draft and must not create Reference Reviews or append candidate Root hints; Approving Comment submission must create or reuse Reference Reviews and append candidate Root hints for unpublished targets; rejection opinions preserve evidence without acquiring dependencies. The retained grouped v2 compatibility queues and child relationship query continue deriving only direct or candidate-hinted Roots; the v3 main queues never derive parent membership. |
+| Root/Reference Review schema, commands, or queue projections | `supabase db reset --no-seed`; run `supabase/tests/20260731_root_reference_review_v2.sql`, `20260802_root_grouped_review_queue.sql`, `20260809_rejected_reference_resubmission.sql`, `20260809_review_metadata_scope_basis.sql`, `20260812_reference_approval_scope_isolation.sql`, `20260926_review_workspace_stages.sql`, `20261021_review_one_current_approval.sql`, and `20260806_api_contract_closure.sql` | compare all six Admin/Member tabs on a production-shaped disposable copy; capture a bounded `EXPLAIN (ANALYZE, BUFFERS)` for representative queue cardinalities before hosted cutover | Review submission has no numerical-stability or upstream-completeness Gate. Prove seven-table state transitions, parallel active versions for the same table/id with exact version/checksum isolation, active/approved checksum reuse, unchanged rejected-revision re-entry, current JSON/approving-submission and finalized-Comment derivation, stale candidate rejection, Reviewer metadata draft/submission addition and revocation, isolated impacted-root lookup and Reference approval when unrelated Roots are incomplete, one-row-per-Root-or-Reference flat pagination/counts, and exact external grants. V5 must expose Admin `unassigned`/`in-progress`/`completed` and Member `pending`/`submitted`/`completed` stages while preserving V4 search, filter, sort, count, and authorization semantics. Batch eligibility is read-only and actor-scoped; execution commands independently revalidate. Final approval needs one currently assigned approving Comment even if others are pending/rejected; drafts, revoked/unassigned approvals and absence of approvals must fail in both preflight and execution. Admin rejection remains independent of opinion completion. Saving an active submitted Process/Lifecycle Model Root opinion resets its Comment to `0`, while terminal Reviews remain immutable. `private.reviews` must not contain scope snapshots or Root/Reference ID arrays; business `reviews[].id` contains Root candidates only; no rebind or history replay contract remains. Comment draft saves (`state_code = 0`) must persist only the editable draft and must not create Reference Reviews or append candidate Root hints; Approving Comment submission must create or reuse Reference Reviews and append candidate Root hints for unpublished targets; rejection opinions preserve evidence without acquiring dependencies. The retained grouped v2 compatibility queues and child relationship query continue deriving only direct or candidate-hinted Roots; the v3 main queues never derive parent membership. |
 | Review queue lexical search | Run the Root/Reference baseline above plus `supabase/tests/20260909_review_queue_full_text_search.sql` and `20260811_search_text_source_switch.sql` after reset | Run rollback-only `supabase/tests/benchmarks/20260909_review_queue_search.sql` on an isolated local database; repeat against a production-shaped disposable copy before hosted cutover | V4 preserves empty-query V3 behavior and exact table/id/version identity. Prove all seven types, six tabs, Root/Reference independence, ACL/manifest closure, UUID, multilingual and per-family lexical parity, missing projection, combined filters and count-before-page. Record natural PGroonga plans and distinguish synthetic warm timings from hosted performance. |
 | process/flow hybrid-search query shape, HNSW settings, executor role, or vector indexes | `supabase db reset`; run `supabase/tests/20260727_hybrid_search_staging_plan_governance.sql`, `supabase/tests/20260528_semantic_hybrid_candidate_helpers.sql`, `supabase/tests/20260528_hybrid_semantic_candidate_limit_hotfix.sql`, `supabase/tests/20260903_portal_flow_adaptive_semantic_v2.sql`, `supabase/tests/20260904_portal_flow_semantic_executor_alignment.sql`, `supabase/tests/20260905_portal_process_adaptive_semantic_v2.sql`, `supabase/tests/20260905_portal_process_semantic_executor_alignment.sql`, and `supabase/tests/20260905_next_hybrid_filter_adaptive_v2.sql`; for version-aware Portal changes also run `supabase/tests/20260902_portal_version_search_v2.sql` | Run the rollback-only Next profile with `node scripts/benchmark_next_hybrid_v2.mjs --local-container <isolated-database-624-container>`. After the migration reaches persistent `dev`, run the exact read-only `supabase/tests/benchmarks/20260727_hybrid_search_staging_explain.sql` profile against ref `submidrhbtknjxfympna`; compare process, broad-flow, Product-flow, and full-RPC timings/buffers with Issue #292; for adaptive Process or Flow V2, compare cold and warm buffers/timings for zero, small, cutoff, cutoff-plus-one, and broad candidate sets without changing the session's production-equivalent HNSW settings; rerun performance and security advisors | Use the benchmark's checked-in Edge route lexical parameter profile with its redacted real staging vectors; never synthesize lexical terms from the first Markdown tokens because shared headings create an artificial near-whole-table match. Do not use a seed-only Preview as production-cardinality proof, expose raw text/UUID/vector values, or run production `EXPLAIN ANALYZE`. Empty JSON filters must fold away under a custom plan. General and broad Process/Flow paths retain strict-order iterative HNSW with one 10x semantic bound and a 200-row floor. Version-aware Portal geography/access-level and authenticated Next canonical filters may route to exact distance evaluation only after a bounded 2,001-key probe proves at most 2,000 exact-version candidates; prove zero-match behavior, both sides of the cutoff, complete source-table filter/RLS recheck before output, exact-version identity, deterministic ordering, stable result digests, and no duplicate vector index. A Next public candidate projection may contain only public-state search keys, must have no external grant or embedding, and is never an authorization or hydration source. Executor changes must prove the applicable public executor remains NOLOGIN/NOINHERIT/NOBYPASSRLS under exact public-state policies, the internal caller remains admitted, and external roles remain denied. `my` and `te` stay JWT/team-bound on authenticated RLS. |
 | Legacy latest-Flow lexical payload working set | `supabase db reset --no-seed`; run `supabase/tests/20261004_flow_lexical_payloads.sql`, `20260811_search_text_source_switch.sql` and the Process/Flow Hybrid proof row above | On an isolated Database #774 project reset to `20261002154951`, run `python3 scripts/benchmark_flow_lexical_payloads.py --local-container supabase_db_database-engine-774 --output /tmp/flow-774-benchmark.json`; then reset to head | Preserve complete ordered payload/rank/version/total digests for broad, deep-page, narrow, zero, type and contributed cases. Prove history/latest mismatch, residual JSON, classification object/array, emission exclusion, UUID, owner/state/team isolation and exact count before page. Require natural page-bounded exact-key hydration and fewer temporary blocks. Synthetic warm latency is not hosted latency proof; semantic/fallback kernels remain unchanged. |
@@ -1161,6 +1161,167 @@ retains nested natural plans, and covers empty/filtered/lexical/UUID/escaped/
 one-character/zero-result shapes in single- and multi-brand deployments. These
 are local synthetic warm samples, not hosted p95 or concurrent-load acceptance.
 
+### Facets and Navigation reader qualification (Database #864)
+
+Run `20261025_portal_facets_navigation.sql` after a blank rebuild, all Portal
+suites and adjacent full-schema/API/OAuth/display/publication contracts. The
+focused real-writer suite covers exact historical versions, nullable Flow years,
+CAS-shaped Process text, UUID/literal matching, brand isolation and immediate
+source update/withdrawal. Keep the API closure migration head exact.
+
+The guarded serial collector compares complete baseline/candidate JSON and
+predecessor-issued cursors on the same rollback-only synthetic projections.
+Its full smoke matrix is distinct from representative-volume qualification.
+Include empty, filtered, broad lexical, single-character, CAS and populated
+classification/geography nodes. Record exact source/collector hashes, image,
+card width, versions, sample counts, routine configurations and nested natural
+plans. Normal latency samples run without `auto_explain`; plan collection uses
+a duration threshold and bounded streamed artifacts. A partial or oversized
+plan collection is failed evidence, even if completed timing rows can be
+recovered for diagnosis. Candidate local p95 must not exceed two seconds;
+the public eight-second timeout and existing function work-memory overrides
+remain unchanged.
+
+`test_portal_facets_navigation_upgrade.py` executes the entire migration on real
+source-writer fixtures. It compares full responses, source/settings/projections,
+unmodified routines, existing function metadata, roles, ACLs, RLS, triggers and
+indexes; it also rejects missing/drifted projection facts, proves rollback after
+an injected intermediate failure and verifies repeat application. The guard must
+run with RLS bypass, compare V1/current/navigation/facet key coverage and preserve
+facet year text independently of navigation's integer year. Its optional volume
+guard measurement is separately classified and uses the bounded migration budget,
+not an increased request timeout.
+
+Its `--committed-visibility` mode uses a real settings writer and an observed
+advisory-lock barrier: an independent anonymous reader must see the old complete
+response while the writer is uncommitted, then the new response immediately
+after its COMMIT marker. Replaying the predecessor on that same committed data
+must agree. The fixture's external webhook stub is restored before commit;
+normal projection writers remain enabled. This mode retains its real fixture
+for an owned reset and verifies that its connections and locks are released.
+
+Rebuild only the owned isolated project between serial and concurrent profiles.
+The four-client collector requires the exact successful serial receipt and
+fixture, compares every successful response to that reference, proves overlapping
+database execution and applies a two-second candidate wall-p95 target including
+client overhead. It restores candidate readers but deliberately retains synthetic
+rows; reset that owned project before writer suites and deterministic exports.
+Preserve receipts and release task-owned resources through the workspace cleanup
+workflow. Local qualification does not establish hosted p95 or identify the
+arguments of historical production failures. Official Preview/CI, exact Main
+deployment and readback, Dev synchronization and Root integration remain required.
+
+### Native Flow CAS qualification (Database #869)
+
+Run `20261025_portal_flow_cas.sql` with the preceding Facets/Navigation and Portal
+suites after a blank rebuild. Prove exact historical/current CAS versions,
+rare/absent/common CAS, malformed and non-string CAS, superstrings, whitespace
+normalization, missing document CAS, Process lexical positives, filters, brand
+isolation, and immediate source CAS update/withdrawal through real writers.
+The nullable native fact must equal the original V1 predicate for every Flow;
+Process facts remain NULL. Existing relation RLS, role/ACL/configuration, all
+unrelated routines, source/settings rows, public DTOs and eight-second budgets
+must retain their contracts. Only the new column/index and two existing private
+routine bodies are allowed metadata changes.
+
+Use `test_portal_facets_navigation_upgrade.py --profile 869` from its pinned
+Main predecessor to execute both complete migrations in order. Retain Phase A
+old-reader compatibility, Phase B rollback to that prepared state, successful
+repeat activation, complete response equality and post-upgrade writer replay.
+Negative cases must reject missing coverage, native fact drift, wrong index
+shape, an index created before first activation, active fact drift after index
+loss, non-bypassing roles and manifest drift. Injected failures must leave no
+partial activation. Raw SQL rehearsal does not prove migration-ledger transition;
+record the actual initial head separately and complete a native CLI rebuild.
+
+`collect_portal_flow_cas_cutover.py` requires a fresh canonical empty owned
+predecessor for each mode. `reader-cutover` pauses one actual anonymous Facets
+RPC between its ordinary facet and brand stages across the activation commit;
+pre-cutover, in-flight and fresh full responses must agree under the unchanged
+eight-second budget. `fence` observes an old real writer, migration source-lock
+wait and a queued writer, then checks the resulting CAS and full DTOs after
+each commit. `cost` records root-statement `EXPLAIN (ANALYZE, BUFFERS, WAL)` for
+real CAS-only updates, batches and withdrawals before/after activation, including
+index/table bytes. Execution time includes AFTER-trigger work, but the root
+ModifyTable WAL counters exclude the navigation writes performed by those
+triggers and cannot establish native-index write amplification. Global WAL
+positions cannot attribute this cost. Preserve
+phase epochs and distinguish actual committed lock duration from a synthetic
+outer rollback that retains Phase A locks. Committed modes retain fixtures for
+the owner's reset; every mode must release nonce sessions/locks and restore
+temporary helpers and the manifest.
+
+`scripts/collect_portal_flow_cas_writer_wal.py` separately captures nested plans
+for actual navigation UPSERTs caused by real source CAS updates. It requires the
+same fresh canonical empty owned predecessor. Fixed warmup plus three measured
+single-row and three-row batch updates in each variant produce sixteen source
+windows and thirty-two distinct navigation invocations. Logging at zero
+milliseconds is confined to the actual source-update windows; fixture snapshots,
+migration statements and rollback remain unlogged. Preserve bounded artifacts
+and verify one exact navigation `INSERT ... ON CONFLICT UPDATE` invocation per
+affected source row, baseline conflict-filter no-ops and candidate native-fact
+updates. Sum each invocation's root WAL once, retaining repeated batch SQL as
+distinct events; summing children or wrapper plans would double-count.
+
+These counters measure the navigation UPSERT's direct heap and all index
+maintenance, not isolated CAS-index bytes, the entire trigger tree, commit or
+rollback WAL. Profiling time is diagnostic; use the separate `cost` mode's
+source execution time for writer latency. This is write-amplification evidence,
+not overall throughput. The collector executes A/B statements within one outer
+rollback, writes no ledger and claims no phase commits. Require restored schema,
+metadata and logical data, zero owned sessions and released fixture lock;
+physical pages may remain, so reset the owned project before other proof.
+
+Use the separate `collect_portal_flow_cas_ddl_fence.py` on a fresh canonical
+empty predecessor to observe regular and concurrent exact-index creation waiting
+behind Phase B's granted navigation fence before preflight. An ordinary reader
+must remain usable. After activation, require the B-created index's OID and
+definition, native facts, complete responses and predecessor data to remain
+intact; bounded competing-DDL timeout is distinct from unexpected failure.
+This collector commits raw A/B SQL, keeps migration history unchanged and
+retains its fixture/native schema for the owner's reset. It releases only its
+nonce sessions/locks and removes an exact owned competing index if activation
+aborted before native state was established.
+
+`scripts/collect_portal_flow_cas_volume_upgrade.py` supplies a separate committed
+synthetic-volume rehearsal: 20,000 Process and 138,000 Flow versions, dense CAS
+and 3,072-byte summary padding, then actual separate Phase A/Phase B commits.
+Record per-phase timestamps and held relation-lock modes, prove the ADD COLUMN
+`ACCESS EXCLUSIVE` lock has ended before Phase B, and require Phase B's observed
+modes to admit ordinary `ACCESS SHARE`. Compare complete non-CAS and rare/common
+CAS control responses before, after A and after B; record native fact/index
+sizes and equality. Instrumentation overhead belongs in reported durations.
+This sequential rehearsal proves neither concurrent load nor real-writer
+throughput and writes no migration ledger. It retains committed synthetic rows
+and the native schema for the owner's exact reset; it never resets or removes
+development resources itself.
+
+For read-scale and four-client proof, use `--native-cas-fact` and the serial
+`--fixture-profile cas-dense`. Install the actual two-phase schema and writer
+before admission; the collector must not create them. Baseline and candidate
+reader comparisons share that final physical schema and writer, so they do not
+replace complete-upgrade or write-amplification proof. Dense fixtures must carry
+literal CAS in their documents, sparse rare/absent CAS within a majority of
+CAS-shaped Flow rows, a common CAS cohort, realistic document widths and
+TOAST-backed cards. Require full JSON equality for Flow/all-kind
+rare/absent/common Facets and Navigation in both scopes, plus Process and non-CAS
+controls. Rare/absent p95 must be at most half the baseline; common p95 must be
+at most `max(baseline * 1.1, baseline + 10ms)`; the two-second absolute candidate
+target also applies. Process controls are observational relative comparisons.
+
+Retain natural native-index equality conditions and at most two examined rare
+Flow keys for both APIs/scopes. Zero-millisecond nested-plan capture is allowed
+only for those candidate rare-case plan groups; timing samples keep it disabled
+and all other plan groups retain a duration threshold. Preserve bounded logs,
+plan receipts, exact physical-schema/collector/candidate hashes and the serial
+receipt consumed by the four-client run. Run the benchmark, upgrade-profile and
+cutover-collector offline boundary tests registered in CI. Native concurrent
+custom selections must include all eighteen default CAS/control cases; extra
+cases may be added, but incomplete selections fail before database admission.
+A local result is not
+production p95 or proof of the unknown historical failing arguments; retain the
+preceding hosted, synchronization, integration and cleanup gates.
+
 ## Seven-kind classification catalog qualification (Database #838)
 
 After rebuilding an explicitly owned isolated database, run
@@ -1221,3 +1382,14 @@ For Database #846 run `20261016_all_unit_terminal_guard.sql` and `20261016_calcu
 `scripts/test_calculation_export_upgrade.sh` runs only in the matching isolated GitHub-hosted workspace with `CALCULATION_EXPORT_UPGRADE_ALLOW_RESET=isolated`. It resets the verified migration prefix to canonical `f7c0b829` / `20261014081710`, seeds completed jobs/results/packages, applies the two exact phase-one migration files, compares every historical row, runs export admission/lease/revocation tests and restores the candidate migration head. The rendering helper is read-only and can supply the same fixture to an explicitly owned local baseline.
 
 The terminal-cache replay compatibility fix is a separate forward migration (`20261016035632`) because an already-created Supabase Preview applies only new migrations. Preserve the original pending migration bytes; qualify both the canonical populated-base upgrade and the final Preview head.
+
+## National carbon organization drafts v6
+
+After a fresh migration rebuild, run `supabase test db supabase/tests/20260805_full_schema_cutover.sql supabase/tests/20260806_api_contract_closure.sql supabase/tests/20260901_national_carbon_organization_contributions.sql`. The exact API inventory adds only the v6 dashboard facade (339 total); schema readback must report the highest checked-in migration returned by `python3 scripts/resolve_migration_head.py` (`20261025103800` for the Database #869 Main-to-Dev backmerge). In addition to v5 compatibility, verify v6 admission/ACL/capability, latest-version state-0 counting, current-profile unit merging and reviewer-role exclusions, draft-only/zero units, all four numeric ranking priorities, deterministic name ties and continuous ranks. Keep chart membership/limits and summary/region/activity scopes covered.
+
+
+## Calculation identity qualification (Database #873)
+
+Run `supabase/tests/20261025_calculation_contract_identity.sql` after a blank migration rebuild, alongside scope-closure, snapshot-build terminal guards, API closure and exact schema inventory. Verify service-only descriptor activation, stale compare-and-set rejection, old-token pinning, distinct scan/build identities after activation, unchanged scanner/data identity, compatible-candidate ordering and immutable historical reads. Before activation the additive Worker input field is omitted for legacy decoders. Queue identity is derived from server state, never a caller-supplied fingerprint.
+
+Also apply the migration to a populated canonical-base fixture with an existing request, and run the actual Worker activation CLI against the isolated database. Verify the exact descriptor digest and an activation conflict, then feed actual candidate RPC projections to the Edge admission helper. Regenerate all five schema views and Data API types twice. These local receipts do not replace the original public-100 Manager BuildV2/Storage/download qualification or hosted Preview, deployment and integration proof. No migration selects an algorithm identity automatically.
