@@ -66,7 +66,7 @@ jobs:
           esac
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
           version: 2.117.0
 
@@ -243,7 +243,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
           version: 2.117.0
 
@@ -314,7 +314,7 @@ jobs:
 
       - name: Setup Supabase CLI
         if: steps.current_dev_scope.outputs.required == 'true'
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
           version: 2.117.0
 
@@ -514,7 +514,7 @@ jobs:
 
       - name: Setup pinned Supabase CLI
         if: steps.preview_authority.outputs.available == 'true'
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
           version: 2.117.0
 
