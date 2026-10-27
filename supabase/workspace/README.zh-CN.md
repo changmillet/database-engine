@@ -20,9 +20,9 @@ checkPaths:
   - .githooks/pre-push
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-25
-lastReviewedCommit: e49be4835ffce76db5bfd25f0a8cddcfe647d53e
-lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
+lastReviewedAt: 2026-10-27
+lastReviewedCommit: 693093898b12c698629ec020af0d1c049cdf44b5
+lastReviewedNote: "Database #854: reviewed the history-preserving current-Dev refresh of four setup-cli v3 references and three exact assertions. Fixed CLI2.117.0, all current business/security changes, nine added workflow checks and five deployable inputs remain exact. Offline60 workflow controls and4 migration-head tests pass. Fresh candidate hosted qualification and native-event authority remain pending; no Dev/Main merge or provider operation is claimed."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
