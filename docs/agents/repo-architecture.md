@@ -30,9 +30,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-27
-lastReviewedCommit: 693093898b12c698629ec020af0d1c049cdf44b5
-lastReviewedNote: "Database #854: reviewed the history-preserving current-Dev refresh of four setup-cli v3 references and three exact assertions. Fixed CLI2.117.0, all current business/security changes, nine added workflow checks and five deployable inputs remain exact. Offline60 workflow controls and4 migration-head tests pass. Fresh candidate hosted qualification and native-event authority remain pending; no Dev/Main merge or provider operation is claimed."
+lastReviewedAt: "2026-10-30"
+lastReviewedCommit: "a6ddf4cbcb61c8360788ffcb514e1f38189e9da7"
+lastReviewedNote: "Database #877: user-approved removal of routine Dev PR Preview requirements. Reviewed job-boundary scope, retained Main hotfix checks, persistent-Dev promotion proof and unchanged local/ARM64/deployment gates; generated schema/type contracts are unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -45,6 +45,34 @@ Allocation contract update (Database #789): `private.lcia_scope_closure_normaliz
 ## Repo Shape
 
 This repo is organized around one checked-in Supabase project plus a generated schema-inspection workspace.
+
+## Published HDF5 query bindings
+
+`private.result_query_artifacts`, `result_query_sources` and
+`result_query_release_bindings` contain immutable encoding receipts and exact
+source UUID/version ordinals; numerical values remain in Worker-owned S3 files.
+`svc_result_query_stage` accepts at most 500 rows / 1 MiB per request after a
+trusted publisher verifies all file hashes and the frozen index. It independently
+matches the existing package's canonical Calculation Bundle v2 identity. Exact
+retries are idempotent; identity drift aborts the entire request. `seal` requires
+the full declared axis and coverage of package input processes.
+
+`svc_result_query_bind_release` binds one ready artifact to a finalized formal
+release from that same Bundle, requiring every released Unit Process root to be
+in the index. This binding is immutable. `lca_release_publications` remains the
+only current pointer for this path; `lcia_result_publications` and anonymous
+Portal projections are unchanged. A bound artifact can contain more processes
+than a release exposes.
+
+`svc_result_query_resolve` returns an internal descriptor only for the exact
+current public release after readback verification, ready package/artifact and
+exact released Unit Process membership. It rechecks those facts on every call,
+including a supplied publication ID. It never falls back to another version or
+legacy format. Edge must first authenticate the user and read the exact source
+under actor RLS; this service-only RPC does not accept a client identity as an
+authorization substitute. All four RPCs are admitted only to `service_role` under
+`EDGE-DATA-PRODUCT-01`; no application role can read/write the three raw tables.
+Release remains responsible for verified ZIP scope, storage and publication.
 
 ## Database-to-Edge authentication
 
@@ -550,7 +578,7 @@ pagination, new JSON GIN index, or synthetic 50,000-row benchmark is required.
 | `supabase/tests/preview/**` | exact-ref-bound disposable Hosted Preview mutation fixtures, cleanup, rollback-only fault assertions, and offline transport/lifecycle contracts; test-only and excluded from migrations, seeds, Dev data rehearsal, and production execution |
 | `.env.supabase.dev.local.example`, `.env.supabase.main.local.example` | operator branch-binding templates |
 | `scripts/**` | export, refresh, change-copy, migration-generation, and workflow-contract helpers; `resolve_migration_head.py` is the single parser used to derive the current checkout's exact migration head for persistent-Dev verification |
-| `.github/workflows/supabase-dev.yml` | local-contract rebuild, exact-check-gated PR Preview PostgREST/anonymous Hybrid verification, exact `dev -> main` promotion classification that reuses source-PR and persistent-Dev proof without hosted mutation, database-only persistent-Dev migration deployment with `db push --include-all`, and exact hosted verification |
+| `.github/workflows/supabase-dev.yml` | local-contract rebuild, exact-check-gated Main-PR Preview PostgREST/anonymous Hybrid verification (routine Dev PRs skip before authority), exact `dev -> main` promotion classification that reuses persistent-Dev proof without hosted mutation, database-only persistent-Dev migration deployment with `db push --include-all`, and exact hosted verification |
 | `supabase/workspace/changes/**` | manual overlay area used when generating migrations from workspace files |
 | `supabase/workspace/remote_schema.sql` | generated full raw dump from the remote database |
 | `supabase/workspace/global/**` | generated split-out global objects rebuilt on workspace refresh |
@@ -564,8 +592,8 @@ pagination, new JSON GIN index, or synthetic 50,000-row benchmark is required.
 
 - Git `dev` is the daily integration trunk
 - Git `main` is the promoted release line
-- PR branches map to Supabase preview branches
-- the pull-request-only Preview job skips forks before authority, verifies exact event base/head commits, and classifies only deployable Preview inputs: `config.toml`, migrations, root/extra seed files, and Functions. Repository-only workspace, test, template, and documentation files are excluded. An exact zero diff over the deployable set succeeds without Preview authority or hosted mutation and accepts the official App's expected `skipped` result. The exact same-repository `dev -> main` promotion also stops before authority or hosted mutation because its long-lived head is the persistent Dev project and it reuses the source PRs' disposable Preview evidence plus persistent-Dev proof. Every other deployable change still fails closed when authority is absent and requires the exact official check, disposable BranchResponse identity, PostgREST PATCH/readback, enabled public key, and anonymous Hybrid/sitemap proof; the job has no migration, Function, persistent-Dev, or production mutation path
+- routine PRs targeting Git `dev` require full local-contract and ARM64 checks without a cloud Preview dependency; eligible Main hotfix PRs retain Preview verification
+- the pull-request-only Preview job admits only same-repository PRs targeting `main`; routine Dev PRs and forks skip before authority. Eligible Main PRs verify exact event base/head commits, and classifies only deployable Preview inputs: `config.toml`, migrations, root/extra seed files, and Functions. Repository-only workspace, test, template, and documentation files are excluded. An exact zero diff over the deployable set succeeds without Preview authority or hosted mutation and accepts the official App's expected `skipped` result. The exact same-repository `dev -> main` promotion also stops before authority or hosted mutation because its long-lived head is the persistent Dev project and it reuses persistent-Dev proof. Every other eligible Main PR with a deployable change still fails closed when authority is absent and requires the exact official check, disposable BranchResponse identity, PostgREST PATCH/readback, enabled public key, and anonymous Hybrid/sitemap proof; the job has no migration, Function, persistent-Dev, or production mutation path
 - `.github/workflows/supabase-dev.yml` is the sole migration deployer for Git `dev`; it gates the remote job on both mandatory local jobs and the secretless exact push classification over config/migrations/root and extra seeds/Functions; an empty deployable diff stops before credentials or mutation, while unknown commits, unexpected checkout/history or diff errors fail closed. Dev push runs do not cancel each other. Deployment jobs serialize with a bounded non-replacing queue and freshly fetch Dev under the lock; a candidate superseded by newer deployable inputs performs no hosted step, while a later repository-only push preserves its deployment proof. A verified current deployable push issues exactly one `db push --include-all`, applies one exact Management API PATCH limited to the three PostgREST runtime fields checked into `supabase/config.toml`, and verifies the exact hosted result without Functions deployment, broad config push, or any other Management API mutation
 - after the database deployment succeeds, persistent-Dev Functions are deployed and validated through `tiangong-lca-edge-functions`; this repo contains no Function runtime source or Function deploy command
 - the production Supabase project is migrated automatically by the Supabase GitHub integration when Git `main` advances

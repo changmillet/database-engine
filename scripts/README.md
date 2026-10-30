@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-27
-lastReviewedCommit: 693093898b12c698629ec020af0d1c049cdf44b5
-lastReviewedNote: "Database #854: reviewed the history-preserving current-Dev refresh of four setup-cli v3 references and three exact assertions. Fixed CLI2.117.0, all current business/security changes, nine added workflow checks and five deployable inputs remain exact. Offline60 workflow controls and4 migration-head tests pass. Fresh candidate hosted qualification and native-event authority remain pending; no Dev/Main merge or provider operation is claimed."
+lastReviewedAt: "2026-10-30"
+lastReviewedCommit: "a6ddf4cbcb61c8360788ffcb514e1f38189e9da7"
+lastReviewedNote: "Database #877: user-approved removal of routine Dev PR Preview requirements. Reviewed job-boundary scope, retained Main hotfix checks, persistent-Dev promotion proof and unchanged local/ARM64/deployment gates; generated schema/type contracts are unchanged."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -507,6 +507,10 @@ python scripts/test_resolve_migration_head.py
 
 ### `test_supabase_dev_workflow_contract.py`
 
+Twelve event/base/repository cases evaluate the actual Preview job condition:
+routine Dev PRs, forks and non-PR events cannot enter; same-repository Main PRs
+retain their existing classifier and authority checks.
+
 The same script executes the actual push and Preview classifier Bash bodies
 against disposable local Git history. It covers all five deployable path
 families, repository-only changes, mixed deletions/renames, zero/unknown bases,
@@ -527,13 +531,15 @@ Fails closed unless `.github/workflows/supabase-dev.yml` keeps two isolated
 hosted paths. The push-only persistent-Dev job must link the configured Dev
 project, run exactly one `supabase db push --include-all`, derive its migration
 head, and apply exactly one three-field PostgREST PATCH. The pull-request-only
-Preview job skips forks and first validates the event base/head commits plus
+Preview job admits only same-repository Main PRs. Routine Dev PRs and forks
+skip at the job boundary before credentials or hosted operations; full local
+contract/upgrade and ARM64 checks remain required. Eligible Main PRs validate
+the event base/head commits plus
 the exact deployable-input allowlist: config, migrations, root/extra seeds,
 and Functions. Workspace, tests, Auth templates, and docs are excluded. A
 zero-diff PR emits `required=false` and performs no hosted Preview work. The
 exact same-repository `dev -> main` promotion also emits `required=false`
-after exact commit/branch validation, reuses source-PR disposable Preview and
-persistent-Dev proof, and receives no Preview authority or mutation. Any other
+after exact commit/branch validation, reuses persistent-Dev proof, and receives no Preview authority or mutation. Any other eligible Main PR
 allowlisted change still fails when its access token, main-parent ref, or
 persistent-Dev ref is absent, then binds one
 successful check from the exact official Supabase App/head to a unique

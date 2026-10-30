@@ -3685,6 +3685,28 @@ export type Database = {
         }
         Returns: Json
       }
+      svc_result_query_bind_release: {
+        Args: { p_artifact_id: string; p_release_run_id: string }
+        Returns: Json
+      }
+      svc_result_query_resolve: {
+        Args: {
+          p_process_id: string
+          p_process_version: string
+          p_publication_id?: string
+        }
+        Returns: Json
+      }
+      svc_result_query_seal: { Args: { p_artifact_id: string }; Returns: Json }
+      svc_result_query_stage: {
+        Args: {
+          p_artifact_ref: Json
+          p_manifest: Json
+          p_package_id: string
+          p_rows: Json
+        }
+        Returns: Json
+      }
       svc_schema_contract_status: { Args: never; Returns: Json }
       svc_tidas_package_export_enqueue: {
         Args: {
