@@ -89,6 +89,23 @@ unchanged required hosted PR jobs still rebuild and validate the full database
 contract. Record those hosted results separately before merge; offline fixtures
 do not replace them.
 
+## HDF5 result binding validation
+
+After a clean reset, run `supabase test db
+supabase/tests/20261030_hdf5_result_query_bindings.sql` and the API closure plus
+existing release-control-plane suites. The new suite exercises the real
+service-role functions with rollback-only synthetic data: wrong Bundle,
+incomplete axis, duplicate retry/conflict, two exact versions, immutable sealed
+records, same-Bundle release binding, readback readiness, publication subset,
+explicit wrong publication, revocation and browser denial. The local-contract CI
+job includes this suite. Preserve populated package/release rows through the
+additive upgrade and record that evidence separately from clean-reset proof.
+
+Database tests prove registration and fresh descriptor scope, not file content
+verification, caller RLS in Edge, HMAC transport, ZIP full-range authorization,
+production performance or hosted deployment. Those need paired Worker, Edge,
+Release and Platform qualification before rollout.
+
 ## Proof Matrix
 
 For Database #842, the local-contract job runs `20261014_snapshot_build_terminal_guard.sql`: terminal failures survive repeated polling without additional jobs or draft snapshots, while explicit service retry and completed-request refresh remain available. The API closure assertion must track the exact new migration head.

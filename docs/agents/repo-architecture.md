@@ -46,6 +46,34 @@ Allocation contract update (Database #789): `private.lcia_scope_closure_normaliz
 
 This repo is organized around one checked-in Supabase project plus a generated schema-inspection workspace.
 
+## Published HDF5 query bindings
+
+`private.result_query_artifacts`, `result_query_sources` and
+`result_query_release_bindings` contain immutable encoding receipts and exact
+source UUID/version ordinals; numerical values remain in Worker-owned S3 files.
+`svc_result_query_stage` accepts at most 500 rows / 1 MiB per request after a
+trusted publisher verifies all file hashes and the frozen index. It independently
+matches the existing package's canonical Calculation Bundle v2 identity. Exact
+retries are idempotent; identity drift aborts the entire request. `seal` requires
+the full declared axis and coverage of package input processes.
+
+`svc_result_query_bind_release` binds one ready artifact to a finalized formal
+release from that same Bundle, requiring every released Unit Process root to be
+in the index. This binding is immutable. `lca_release_publications` remains the
+only current pointer for this path; `lcia_result_publications` and anonymous
+Portal projections are unchanged. A bound artifact can contain more processes
+than a release exposes.
+
+`svc_result_query_resolve` returns an internal descriptor only for the exact
+current public release after readback verification, ready package/artifact and
+exact released Unit Process membership. It rechecks those facts on every call,
+including a supplied publication ID. It never falls back to another version or
+legacy format. Edge must first authenticate the user and read the exact source
+under actor RLS; this service-only RPC does not accept a client identity as an
+authorization substitute. All four RPCs are admitted only to `service_role` under
+`EDGE-DATA-PRODUCT-01`; no application role can read/write the three raw tables.
+Release remains responsible for verified ZIP scope, storage and publication.
+
 ## Database-to-Edge authentication
 
 `util.invoke_edge_function` obtains the project service credential from Vault.
