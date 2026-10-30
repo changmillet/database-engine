@@ -38,8 +38,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-30
-lastReviewedCommit: ba720e157f544cb93054079992cc3faa65bcb86e
-lastReviewedNote: "Database #854: reviewed the history-preserving current-Dev refresh of four setup-cli v3 references and three exact assertions. Fixed CLI2.117.0, all current business/security changes, nine added workflow checks and five deployable inputs remain exact. Offline60 workflow controls and4 migration-head tests pass. Fresh candidate hosted qualification and native-event authority remain pending; no Dev/Main merge or provider operation is claimed."
+lastReviewedCommit: c9e9f0f834bed3dbb5b3b1aaae5c5c16fbbc842f
+lastReviewedNote: "Database #877: reviewed the generated HDF5 query binding snapshots and governance coverage. Migration history remains schema truth, exact-local exports are review evidence, and hosted Dev comparison and main promotion remain required."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md
