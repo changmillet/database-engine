@@ -38,8 +38,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: 2026-10-30
-lastReviewedCommit: c9e9f0f834bed3dbb5b3b1aaae5c5c16fbbc842f
-lastReviewedNote: "Database #877: reviewed the generated HDF5 query binding snapshots and governance coverage. Migration history remains schema truth, exact-local exports are review evidence, and hosted Dev comparison and main promotion remain required."
+lastReviewedCommit: "99ae82610ab0a16e252c420eaf46980314e4f4c3"
+lastReviewedNote: "Database #877: reviewed full-schema inventory changes for four service facades, one helper, three immutable guards, fifteen constraints and three RLS relations; generated-schema hosted verification passes. Full SQL regression and final hosted qualification are recorded on PR #878."
 related:
   - .docpact/config.yaml
   - docs/agents/repo-validation.md
