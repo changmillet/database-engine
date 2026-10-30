@@ -1,8 +1,8 @@
 version: 1
 layout: repo
 lastReviewedAt: "2026-10-30"
-lastReviewedCommit: "99ae82610ab0a16e252c420eaf46980314e4f4c3"
-lastReviewedNote: "Database #877: reviewed full-schema inventory changes for four service facades, one helper, three immutable guards, fifteen constraints and three RLS relations; generated-schema hosted verification passes. Full SQL regression and final hosted qualification are recorded on PR #878."
+lastReviewedCommit: "a6ddf4cbcb61c8360788ffcb514e1f38189e9da7"
+lastReviewedNote: "Database #877: user-approved removal of routine Dev PR Preview requirements. Reviewed job-boundary scope, retained Main hotfix checks, persistent-Dev promotion proof and unchanged local/ARM64/deployment gates; generated schema/type contracts are unchanged."
 
 # Keep deterministic governance facts here.
 # AGENTS.md remains the repo contract entrypoint.

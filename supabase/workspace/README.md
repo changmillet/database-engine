@@ -21,8 +21,8 @@ checkPaths:
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
 lastReviewedAt: "2026-10-30"
-lastReviewedCommit: "c9e9f0f834bed3dbb5b3b1aaae5c5c16fbbc842f"
-lastReviewedNote: "Database #877: refreshed query-artifact schema and Data API type contracts from a blank local migration rebuild using pinned CLI 2.117.0; 2157 generated files reproduce exactly and the 26 binding assertions pass. This is local review provenance; hosted Dev refresh remains pending."
+lastReviewedCommit: "a6ddf4cbcb61c8360788ffcb514e1f38189e9da7"
+lastReviewedNote: "Database #877: user-approved removal of routine Dev PR Preview requirements. Reviewed job-boundary scope, retained Main hotfix checks, persistent-Dev promotion proof and unchanged local/ARM64/deployment gates; generated schema/type contracts are unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

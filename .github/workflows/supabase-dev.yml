@@ -452,8 +452,10 @@ jobs:
 
   preview-runtime-contract:
     name: Verify Supabase Preview runtime
+    # Routine Dev PRs require local-contract and ARM64 proof, not a cloud Preview.
     if: >-
       github.event_name == 'pull_request' &&
+      github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.head.repo.full_name == github.repository
     needs: local-contract
     runs-on: ubuntu-latest
@@ -485,7 +487,7 @@ jobs:
           git cat-file -e "$PREVIEW_HEAD_SHA^{commit}"
           if [[ "$PREVIEW_BASE_BRANCH" == "main" && "$PREVIEW_GIT_BRANCH" == "dev" ]]; then
             echo "required=false" >> "$GITHUB_OUTPUT"
-            echo "Exact dev-to-main promotion reuses prior disposable Preview and persistent Dev proof."
+            echo "Exact dev-to-main promotion reuses persistent Dev proof."
             exit 0
           fi
           if git diff --quiet "$PREVIEW_BASE_SHA" "$PREVIEW_HEAD_SHA" -- \
