@@ -20,9 +20,9 @@ checkPaths:
   - .githooks/pre-push
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-25
-lastReviewedCommit: e49be4835ffce76db5bfd25f0a8cddcfe647d53e
-lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
+lastReviewedAt: "2026-10-30"
+lastReviewedCommit: "a6ddf4cbcb61c8360788ffcb514e1f38189e9da7"
+lastReviewedNote: "Database #877: user-approved removal of routine Dev PR Preview requirements. Reviewed job-boundary scope, retained Main hotfix checks, persistent-Dev promotion proof and unchanged local/ARM64/deployment gates; generated schema/type contracts are unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml

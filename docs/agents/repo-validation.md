@@ -32,9 +32,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-25
-lastReviewedCommit: e49be4835ffce76db5bfd25f0a8cddcfe647d53e
-lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
+lastReviewedAt: "2026-10-30"
+lastReviewedCommit: "a6ddf4cbcb61c8360788ffcb514e1f38189e9da7"
+lastReviewedNote: "Database #877: user-approved removal of routine Dev PR Preview requirements. Reviewed job-boundary scope, retained Main hotfix checks, persistent-Dev promotion proof and unchanged local/ARM64/deployment gates; generated schema/type contracts are unchanged."
 related:
   - ../../AGENTS.md
   - ../../.docpact/config.yaml
@@ -88,6 +88,29 @@ no local or hosted database operation is needed for that scoped proof. The
 unchanged required hosted PR jobs still rebuild and validate the full database
 contract. Record those hosted results separately before merge; offline fixtures
 do not replace them.
+
+## HDF5 result binding validation
+
+Also run `supabase/tests/20260805_full_schema_cutover.sql`: the additive query
+contract includes four API functions, one private helper, three triggers, fifteen
+constraints and three private RLS relations. Keep its exact inventory assertions
+aligned with reviewed migration objects; retain the dedicated permission and
+immutability behavior tests.
+
+After a clean reset, run `supabase test db
+supabase/tests/20261030_hdf5_result_query_bindings.sql` and the API closure plus
+existing release-control-plane suites. The new suite exercises the real
+service-role functions with rollback-only synthetic data: wrong Bundle,
+incomplete axis, duplicate retry/conflict, two exact versions, immutable sealed
+records, same-Bundle release binding, readback readiness, publication subset,
+explicit wrong publication, revocation and browser denial. The local-contract CI
+job includes this suite. Preserve populated package/release rows through the
+additive upgrade and record that evidence separately from clean-reset proof.
+
+Database tests prove registration and fresh descriptor scope, not file content
+verification, caller RLS in Edge, HMAC transport, ZIP full-range authorization,
+production performance or hosted deployment. Those need paired Worker, Edge,
+Release and Platform qualification before rollout.
 
 ## Proof Matrix
 
@@ -167,7 +190,7 @@ qualify original R1 inputs, a hosted Preview branch, or browser acceptance.
 | `supabase/tests/**` only | run the relevant SQL assertion files against a reset local DB | add a nearby migration or policy smoke check if the new assertions expose a gap | This repo stores PGTAP-style SQL assertions, not a single canonical runner wrapper. |
 | `supabase/seed.sql` or `supabase/seeds/dev.sql` | `supabase db reset` succeeds with expected seed behavior | rerun targeted SQL assertions that depend on the seeded rows; for shared-seed changes, confirm the hosted Preview seed stage completes | Keep shared seed and dev-only seed expectations separate. A shared seed with no data must still contain an executable no-op statement; a comments-only batch is not deployment-safe. |
 | `supabase/config.toml` or `supabase/templates/**` | `supabase start` and `supabase db reset` still work locally; for Auth recovery template changes, run `python3 scripts/check_auth_email_templates.py` and `python3 scripts/test_check_auth_email_templates.py` | verify the changed branch-binding or auth assumption against `docs/agents/supabase-branching.md`; for exposed-schema changes, prove the Supabase GitHub integration applies the configuration or record the explicit operator gate, then read back exact ordered hosted PostgREST schema/search-path lists; for hosted Auth templates, require the documented authorized Dashboard apply and end-to-end email validation | Config changes affect preview, persistent dev, and local behavior together; neither local CLI order nor a checked-in email template proves the hosted project state. |
-| `.github/workflows/supabase-dev.yml` | inspect and parse YAML; run `python3 scripts/test_resolve_migration_head.py` and `python3 scripts/test_supabase_dev_workflow_contract.py`; execute the shipped push/Preview/fresh-Dev classifiers against disposable Git fixtures; prove A-deployable/B-docs does not lose A, non-replacing deployment queueing, C-first/out-of-order completion cannot let late A overwrite newer inputs, and failed fetch/unknown current history stops; compare complete folded/plain gate expressions and reject same-line or continued logical-OR bypass mutations; prove persistent Dev validates the exact nonzero push before/head, checkout and ancestor history before credentials, and that zero diff skips its entire job while unknown bases, stale checkouts, unrelated history and diff errors fail closed; prove the Preview classifier validates exact base/head commits and compares exactly `supabase/config.toml`, `supabase/migrations/`, `supabase/seed.sql`, `supabase/seeds/`, and `supabase/functions/`; prove repository-only workspace/tests/templates/docs are excluded; require both the x64 local contract and isolated ARM64 profiles before persistent-Dev deployment; retain the persistent-Dev one-push/one-PATCH and Preview one-PATCH/no-deployment contracts | on a PR changing only repository-owned nondeployable files, prove the official Supabase App `skipped` result does not fail the job and no authority or hosted mutation step runs. On any deployable-input change, require all authority, exact successful official check, disposable BranchResponse, PostgREST readback, public-key selection, and anonymous Hybrid/sitemap probes | Missing commits or diff errors fail. The explicit allowlist mirrors the Supabase GitHub integration's configuration, migration, seeding, and Function inputs; Auth templates remain separately manual. Every deployable change retains fail-closed App identity, branch equality, main/Dev exclusion, credential isolation, and no Functions/config/schema deployment from the verifier. |
+| `.github/workflows/supabase-dev.yml` | inspect and parse YAML; run `python3 scripts/test_resolve_migration_head.py` and `python3 scripts/test_supabase_dev_workflow_contract.py`; execute the shipped push/Preview/fresh-Dev classifiers against disposable Git fixtures; prove A-deployable/B-docs does not lose A, non-replacing deployment queueing, C-first/out-of-order completion cannot let late A overwrite newer inputs, and failed fetch/unknown current history stops; compare complete folded/plain gate expressions and reject same-line or continued logical-OR bypass mutations; prove persistent Dev validates the exact nonzero push before/head, checkout and ancestor history before credentials, and that zero diff skips its entire job while unknown bases, stale checkouts, unrelated history and diff errors fail closed; prove the Preview classifier validates exact base/head commits and compares exactly `supabase/config.toml`, `supabase/migrations/`, `supabase/seed.sql`, `supabase/seeds/`, and `supabase/functions/`; prove repository-only workspace/tests/templates/docs are excluded; require both the x64 local contract and isolated ARM64 profiles before persistent-Dev deployment; retain the persistent-Dev one-push/one-PATCH and Preview one-PATCH/no-deployment contracts | prove routine Dev PRs and forks skip the Preview job before authority; on an eligible Main PR changing only repository-owned nondeployable files, prove the official Supabase App `skipped` result does not fail the job and no authority or hosted mutation step runs. On an eligible Main PR with a deployable-input change, require all authority, exact successful official check, disposable BranchResponse, PostgREST readback, public-key selection, and anonymous Hybrid/sitemap probes | Missing commits or diff errors fail. The explicit allowlist mirrors the Supabase GitHub integration's configuration, migration, seeding, and Function inputs; Auth templates remain separately manual. Every eligible Main deployable change retains fail-closed App identity, branch equality, main/Dev exclusion, credential isolation, and no Functions/config/schema deployment from the verifier. |
 | `.github/dependabot.yml` | parse YAML and validate the current Dependabot schema; retain Actions-only `dev` targeting, weekly cooldown/limit and existing PR jobs; run the workflow contract above without starting a database | after separate Main promotion, require a successful hosted Actions scan before claiming activation | This configuration is not SQL, CLI or hosted-runtime qualification; security settings are independent. |
 | `scripts/**` | run the touched script with `--help` when possible, or execute the narrowest safe non-destructive path | if a script changes generated workspace behavior, refresh the workspace in a safe environment and inspect git diff | Avoid remote-destructive script runs unless the task explicitly requires them. |
 | `supabase/workspace/**` | prove whether the touched file is generated or stable | if stable manual overlay files changed, explain how they feed migration generation | Generated files alone are not sufficient evidence of a durable schema change. |
@@ -734,9 +757,10 @@ For a schema-changing PR, an exact-local reconstruction may be committed as a re
 
 For branch-oriented changes:
 
-- preview-branch proof usually happens on the repo PR
+- routine PRs targeting `dev` require full local contract/upgrades and ARM64 proof; the Preview job skips before authority and no disposable cloud branch is required
+- same-repository Main hotfix PRs retain the existing exact Preview identity/runtime checks for deployable changes
 - persistent remote `dev` proof happens after merge into Git `dev`: first record the database workflow result, then the Edge-owned Function deployment and runtime validation
-- an exact same-repository `dev -> main` promotion reruns the local contract but reuses the source-PR disposable Preview and persistent-Dev proof; it must stop before Preview authority or hosted mutation because the `dev` head resolves to the persistent project
+- an exact same-repository `dev -> main` promotion reruns the local contract but reuses the exact persistent-Dev proof; it must stop before Preview authority or hosted mutation because the `dev` head resolves to the persistent project
 - production `main` proof happens after `dev -> main` promote and should confirm the Supabase GitHub integration applied migrations automatically
 - root workspace proof happens later in `lca-workspace`
 

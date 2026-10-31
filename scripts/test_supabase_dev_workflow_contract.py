@@ -42,6 +42,11 @@ EXPECTED_DEPLOYMENT_CONDITION = (
     "github.event_name == 'push' && github.ref == 'refs/heads/dev' && "
     "needs.local-contract.outputs.deploy_required == 'true'"
 )
+EXPECTED_PREVIEW_CONDITION = (
+    "github.event_name == 'pull_request' && "
+    "github.event.pull_request.base.ref == 'main' && "
+    "github.event.pull_request.head.repo.full_name == github.repository"
+)
 
 
 def effective_condition(header: str, indent: int) -> str | None:
@@ -68,6 +73,33 @@ def effective_condition(header: str, indent: int) -> str | None:
 
 def effective_deployment_condition(header: str) -> str | None:
     return effective_condition(header, 4)
+
+
+def exercise_preview_job_gate(header: str) -> int:
+    """Evaluate the actual equality-only job gate across event/base/owner cases."""
+    condition = effective_condition(header, 4)
+    assert condition == EXPECTED_PREVIEW_CONDITION
+    checks = 0
+    for event in ("pull_request", "push", "workflow_dispatch"):
+        for base in ("dev", "main"):
+            for same_repo in (False, True):
+                context = {
+                    "github.event_name": event,
+                    "github.event.pull_request.base.ref": base,
+                    "github.event.pull_request.head.repo.full_name":
+                        "owner/database" if same_repo else "fork/database",
+                    "github.repository": "owner/database",
+                }
+                comparisons = []
+                for clause in condition.split(" && "):
+                    left, right = clause.split(" == ")
+                    value = right[1:-1] if right.startswith("'") else context[right]
+                    comparisons.append(context[left] == value)
+                assert all(comparisons) == (
+                    event == "pull_request" and base == "main" and same_repo
+                ), (event, base, same_repo)
+                checks += 1
+    return checks
 
 
 def exact_deployment_condition(header: str) -> bool:
@@ -168,7 +200,7 @@ def exercise_scope_classifiers(text: str) -> int:
 
         def preview_values(head: str) -> dict[str, str]:
             return {"PREVIEW_BASE_SHA": base, "PREVIEW_HEAD_SHA": head,
-                    "PREVIEW_BASE_BRANCH": "dev", "PREVIEW_GIT_BRANCH": "dependabot/github_actions/fixture",
+                    "PREVIEW_BASE_BRANCH": "main", "PREVIEW_GIT_BRANCH": "dependabot/github_actions/fixture",
                     "GITHUB_ACTOR": "dependabot[bot]"}
 
         for path in (".github/dependabot.yml", ".github/workflows/supabase-dev.yml",
@@ -303,7 +335,7 @@ def main() -> int:
             )
 
     supabase_cli_versions = re.findall(
-        r"uses: supabase/setup-cli@v2\s+with:\s+version:\s*([^\s#]+)", text
+        r"uses: supabase/setup-cli@v3\s+with:\s+version:\s*([^\s#]+)", text
     )
     if supabase_cli_versions != ["2.117.0"] * 4:
         failures.append(
@@ -380,7 +412,7 @@ def main() -> int:
         "runs-on: ubuntu-24.04-arm",
         "timeout-minutes: 25",
         "uses: actions/checkout@v7",
-        "uses: supabase/setup-cli@v2",
+        "uses: supabase/setup-cli@v3",
         "run: supabase start && supabase db reset --no-seed",
         "supabase test db supabase/tests/20260923_derivative_scheduler_benchmark.sql",
         "supabase test db supabase/tests/20260923_derivative_scheduler_history_profile.sql",
@@ -534,7 +566,7 @@ def main() -> int:
         'git cat-file -e "$PREVIEW_BASE_SHA^{commit}"',
         'git cat-file -e "$PREVIEW_HEAD_SHA^{commit}"',
         '[[ "$PREVIEW_BASE_BRANCH" == "main" && "$PREVIEW_GIT_BRANCH" == "dev" ]]',
-        "Exact dev-to-main promotion reuses prior disposable Preview and persistent Dev proof.",
+        "Exact dev-to-main promotion reuses persistent Dev proof.",
         'git diff --quiet "$PREVIEW_BASE_SHA" "$PREVIEW_HEAD_SHA" --',
         "supabase/config.toml",
         "supabase/migrations/",
@@ -547,7 +579,7 @@ def main() -> int:
         "steps.preview_authority.outputs.available == 'true'",
         "Supabase Preview runtime verification requires SUPABASE_ACCESS_TOKEN, SUPABASE_MAIN_PROJECT_ID, and SUPABASE_DEV_PROJECT_ID",
         "exit 1",
-        "uses: supabase/setup-cli@v2",
+        "uses: supabase/setup-cli@v3",
         "version: 2.117.0",
         "Wait for exact Supabase Preview check",
         "check_name=Supabase%20Preview&filter=latest",
@@ -729,6 +761,16 @@ def main() -> int:
     )[0]
     preview_probe = preview_workflow.split(preview_probe_marker, 1)[-1]
     preview_job_header = preview_workflow.split("    steps:", 1)[0]
+    if effective_condition(preview_job_header, 4) != EXPECTED_PREVIEW_CONDITION:
+        failures.append("Preview job must require a same-repository PR targeting main")
+    for bypass in (" || true", "\n      || true"):
+        mutated = preview_job_header.replace(
+            "github.event.pull_request.head.repo.full_name == github.repository",
+            "github.event.pull_request.head.repo.full_name == github.repository" + bypass,
+            1,
+        )
+        if effective_condition(mutated, 4) == EXPECTED_PREVIEW_CONDITION:
+            failures.append(f"Preview condition parser accepted bypass {bypass!r}")
     if "secrets.SUPABASE_ACCESS_TOKEN" in preview_job_header:
         failures.append("Supabase access token must be scoped only to steps that require it")
     if "available=false" in preview_workflow or "verification skipped" in preview_workflow:
@@ -843,6 +885,8 @@ def main() -> int:
             print(f"FAIL: {failure}")
         return 1
 
+    gate_checks = exercise_preview_job_gate(preview_job_header)
+    print(f"PASS: {gate_checks} Preview event/base/repository job-gate cases")
     checks = exercise_scope_classifiers(text)
     print(f"PASS: {checks} offline push/Preview scope and missing-authority controls")
     print(

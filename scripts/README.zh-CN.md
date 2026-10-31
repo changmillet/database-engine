@@ -20,9 +20,9 @@ checkPaths:
   - scripts/docpact
   - scripts/docpact-gate.sh
   - scripts/install-git-hooks.sh
-lastReviewedAt: 2026-10-25
-lastReviewedCommit: e49be4835ffce76db5bfd25f0a8cddcfe647d53e
-lastReviewedNote: "Database #873: reviewed opaque Worker-owned calculation identity, explicit activation, pinned retries and candidate projection; schema ownership, application authorization and deployment boundaries remain unchanged."
+lastReviewedAt: "2026-10-30"
+lastReviewedCommit: "a6ddf4cbcb61c8360788ffcb514e1f38189e9da7"
+lastReviewedNote: "Database #877: user-approved removal of routine Dev PR Preview requirements. Reviewed job-boundary scope, retained Main hotfix checks, persistent-Dev promotion proof and unchanged local/ARM64/deployment gates; generated schema/type contracts are unchanged."
 related:
   - ../AGENTS.md
   - ../.docpact/config.yaml
@@ -424,6 +424,9 @@ python scripts/test_resolve_migration_head.py
 
 ### `test_supabase_dev_workflow_contract.py`
 
+12 组 event/base/repository 用例执行真实 Preview job 条件：日常 Dev PR、fork
+与非 PR 事件不可进入；同仓 Main PR 保留原有分类与权限检查。
+
 同一脚本在临时本地 Git 历史上执行 workflow 中真实的 push/Preview 分类 Bash，
 覆盖五类可部署路径、仓库维护、混合删除/重命名、零值/未知 base、过期 checkout、
 无祖先关系与 diff 错误。无凭据 local job 输出准确范围，持久 Dev job 必须同时
@@ -437,12 +440,13 @@ hosted step。完整 folded/plain 条件拒绝同行/续行 OR 绕过。
 除非 `.github/workflows/supabase-dev.yml` 保持两条相互隔离的托管路径，否则立即
 失败。push-only 持久化 Dev job 必须绑定配置的 Dev 项目，准确执行一次
 `supabase db push --include-all`，从 checkout 推导 migration head，并执行准确一次
-三字段 PostgREST PATCH。pull-request-only Preview job 对 fork 跳过，并先验证事件
+三字段 PostgREST PATCH。pull-request-only Preview job 只允许以 Main 为目标的同仓 PR；日常 Dev PR 和
+fork 在 job 边界跳过，不读取密钥、不执行云端操作，完整 local-contract/upgrade 与
+ARM64 检查仍为必需。符合条件的 Main PR 先验证事件
 base/head commit 和精确可部署 allowlist：config、migrations、根/附加 seed 与
 Functions；workspace、tests、Auth templates 和文档不在其中。零 diff PR 输出
 `required=false`，不执行 hosted Preview。准确的同仓 `dev -> main` promote 也会在
-验证准确 commit/branch 后输出 `required=false`，复用源 PR disposable Preview 与
-persistent-Dev 证明，且不接收 Preview authority、不执行 hosted mutation。除此之外
+验证准确 commit/branch 后输出 `required=false`，复用 persistent-Dev 证明，且不接收 Preview authority、不执行 hosted mutation。其他符合条件的 Main PR
 的任一 allowlist 变化仍要求 access token、main-parent ref 与 persistent-Dev ref；
 随后必须把准确 head 上来自官方 Supabase App
 的唯一成功 check，与 `branches list` 中按 Git branch、PR number、parent 匹配的唯一

@@ -66,7 +66,7 @@ jobs:
           esac
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
           version: 2.117.0
 
@@ -212,6 +212,7 @@ jobs:
           supabase test db supabase/tests/20261004_flow_lexical_payloads.sql
           supabase test db supabase/tests/20260623_data_product_publication_mvp.sql
           supabase test db supabase/tests/20260716_lci_lcia_release_control_plane.sql
+          supabase test db supabase/tests/20261030_hdf5_result_query_bindings.sql
           python3 scripts/test_protected_alias_postgrest_routing.py
           python3 scripts/test_portal_navigation_backfill.py --container supabase_db_database-engine --report /tmp/portal-navigation-backfill.json
           scripts/test_full_schema_cutover_upgrade.sh
@@ -243,7 +244,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
           version: 2.117.0
 
@@ -314,7 +315,7 @@ jobs:
 
       - name: Setup Supabase CLI
         if: steps.current_dev_scope.outputs.required == 'true'
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
           version: 2.117.0
 
@@ -451,8 +452,10 @@ jobs:
 
   preview-runtime-contract:
     name: Verify Supabase Preview runtime
+    # Routine Dev PRs require local-contract and ARM64 proof, not a cloud Preview.
     if: >-
       github.event_name == 'pull_request' &&
+      github.event.pull_request.base.ref == 'main' &&
       github.event.pull_request.head.repo.full_name == github.repository
     needs: local-contract
     runs-on: ubuntu-latest
@@ -484,7 +487,7 @@ jobs:
           git cat-file -e "$PREVIEW_HEAD_SHA^{commit}"
           if [[ "$PREVIEW_BASE_BRANCH" == "main" && "$PREVIEW_GIT_BRANCH" == "dev" ]]; then
             echo "required=false" >> "$GITHUB_OUTPUT"
-            echo "Exact dev-to-main promotion reuses prior disposable Preview and persistent Dev proof."
+            echo "Exact dev-to-main promotion reuses persistent Dev proof."
             exit 0
           fi
           if git diff --quiet "$PREVIEW_BASE_SHA" "$PREVIEW_HEAD_SHA" -- \
@@ -514,7 +517,7 @@ jobs:
 
       - name: Setup pinned Supabase CLI
         if: steps.preview_authority.outputs.available == 'true'
-        uses: supabase/setup-cli@v2
+        uses: supabase/setup-cli@v3
         with:
           version: 2.117.0
 
